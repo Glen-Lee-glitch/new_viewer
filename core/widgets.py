@@ -126,6 +126,7 @@ class PdfLoadWidget(QWidget):
 
 class PdfViewWidget(QWidget):
     """PDF 뷰어 위젯"""
+    page_change_requested = pyqtSignal(int)
     
     def __init__(self):
         super().__init__()
@@ -137,6 +138,8 @@ class PdfViewWidget(QWidget):
         # --- 툴바 추가 ---
         self.toolbar = FloatingToolbarWidget(self)
         self.toolbar.show()
+
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
@@ -167,13 +170,20 @@ class PdfViewWidget(QWidget):
         y = 10
         self.toolbar.move(x, y)
     
+    def keyPressEvent(self, event):
+        """키보드 'Q', 'E'를 눌러 페이지를 변경한다."""
+        if event.key() == Qt.Key.Key_Q:
+            self.page_change_requested.emit(-1)
+        elif event.key() == Qt.Key.Key_E:
+            self.page_change_requested.emit(1)
+        else:
+            super().keyPressEvent(event)
+    
     def set_renderer(self, renderer: PdfRender | None):
-        """PDF 렌더러를 설정하고 첫 페이지를 표시한다."""
+        """PDF 렌더러를 설정한다."""
         self.renderer = renderer
         self.scene.clear()
         self.current_page_item = None
-        if self.renderer and self.renderer.get_page_count() > 0:
-            self.show_page(0)
 
     def show_page(self, page_num: int):
         """지정된 페이지를 뷰에 렌더링한다."""
@@ -194,12 +204,14 @@ class PdfViewWidget(QWidget):
 class ThumbnailViewWidget(QWidget):
     """썸네일 뷰어 위젯"""
     page_selected = pyqtSignal(int)  # 페이지 번호를 전달하는 시그널
+    page_change_requested = pyqtSignal(int)
     
     def __init__(self):
         super().__init__()
         self.renderer: PdfRender | None = None
         self.init_ui()
         self.setup_connections()
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
     
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
@@ -210,6 +222,15 @@ class ThumbnailViewWidget(QWidget):
         if hasattr(self, 'thumbnail_list_widget'):
             self.setup_list_widget()
     
+    def keyPressEvent(self, event):
+        """키보드 'Q', 'E'를 눌러 페이지를 변경한다."""
+        if event.key() == Qt.Key.Key_Q:
+            self.page_change_requested.emit(-1)
+        elif event.key() == Qt.Key.Key_E:
+            self.page_change_requested.emit(1)
+        else:
+            super().keyPressEvent(event)
+
     def setup_list_widget(self):
         """리스트 위젯 초기 설정"""
         list_widget = self.thumbnail_list_widget
@@ -245,6 +266,13 @@ class ThumbnailViewWidget(QWidget):
         if page_number is not None:
             self.page_selected.emit(page_number)
     
+    def set_current_page(self, page_num: int):
+        """지정된 페이지 번호에 해당하는 썸네일을 선택 상태로 만든다."""
+        if hasattr(self, 'thumbnail_list_widget'):
+            item = self.thumbnail_list_widget.item(page_num)
+            if item:
+                self.thumbnail_list_widget.setCurrentItem(item)
+
     def clear_thumbnails(self):
         """썸네일 목록 초기화"""
         if hasattr(self, 'thumbnail_list_widget'):
@@ -256,6 +284,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.renderer = PdfRender()
+        self._current_page = -1
         self.init_ui()
         self.setup_connections()
     
@@ -289,7 +318,9 @@ class MainWindow(QMainWindow):
     def setup_connections(self):
         """시그널-슬롯 연결"""
         self.pdf_load_widget.pdf_selected.connect(self.load_document)
-        self.thumbnail_widget.page_selected.connect(self.pdf_view_widget.show_page)
+        self.thumbnail_widget.page_selected.connect(self.go_to_page)
+        self.thumbnail_widget.page_change_requested.connect(self.change_page)
+        self.pdf_view_widget.page_change_requested.connect(self.change_page)
     
     def load_document(self, pdf_path: str):
         """PDF 문서를 로드하고 뷰를 전환한다."""
@@ -307,8 +338,24 @@ class MainWindow(QMainWindow):
         self.thumbnail_widget.set_renderer(self.renderer)
         self.pdf_view_widget.set_renderer(self.renderer)
         
+        if self.renderer.get_page_count() > 0:
+            self.go_to_page(0)
+
         # PDF 뷰어 화면으로 전환
         self.main_content_stack.setCurrentWidget(self.pdf_view_widget)
+
+    def go_to_page(self, page_num: int):
+        """지정된 페이지로 이동한다."""
+        if self.renderer and 0 <= page_num < self.renderer.get_page_count():
+            self._current_page = page_num
+            self.pdf_view_widget.show_page(page_num)
+            self.thumbnail_widget.set_current_page(page_num)
+    
+    def change_page(self, delta: int):
+        """현재 페이지에서 delta만큼 페이지를 이동한다."""
+        if self._current_page != -1:
+            new_page = self._current_page + delta
+            self.go_to_page(new_page)
 
     def closeEvent(self, event):
         """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
