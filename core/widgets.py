@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QScrollArea, QGridLayout, QPushButton, QTableWidget, QGraphicsView,
     QFileDialog, QMessageBox, QSplitter, QListWidget, QListWidgetItem,
-    QGraphicsScene, QGraphicsPixmapItem
+    QGraphicsScene, QGraphicsPixmapItem, QStackedWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QIcon
@@ -70,9 +70,9 @@ class PdfViewWidget(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.renderer = None
+        self.renderer: PdfRender | None = None
         self.scene = QGraphicsScene(self)
-        self.current_page_item = None
+        self.current_page_item: QGraphicsPixmapItem | None = None
         self.init_ui()
     
     def init_ui(self):
@@ -100,11 +100,9 @@ class PdfViewWidget(QWidget):
         """PDF 렌더러를 설정하고 첫 페이지를 표시한다."""
         self.renderer = renderer
         self.scene.clear()
+        self.current_page_item = None
         if self.renderer and self.renderer.get_page_count() > 0:
             self.show_page(0)
-        else:
-            # 뷰를 비웁니다.
-            self.current_page_item = None
 
     def show_page(self, page_num: int):
         """지정된 페이지를 뷰에 렌더링한다."""
@@ -118,12 +116,9 @@ class PdfViewWidget(QWidget):
             else:
                 self.current_page_item = self.scene.addPixmap(pixmap)
             
-            # 뷰가 장면에 맞게 조정되도록 합니다.
             self.pdf_graphics_view.fitInView(self.scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
-
         except (IndexError, RuntimeError) as e:
-            print(f"페이지 표시 오류: {e}")
-            QMessageBox.warning(self, "오류", f"페이지 {page_num + 1}을(를) 표시할 수 없습니다.")
+            QMessageBox.warning(self, "오류", f"페이지 {page_num + 1}을(를) 표시할 수 없습니다: {e}")
 
 class ThumbnailViewWidget(QWidget):
     """썸네일 뷰어 위젯"""
@@ -131,7 +126,7 @@ class ThumbnailViewWidget(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.renderer = None
+        self.renderer: PdfRender | None = None
         self.init_ui()
         self.setup_connections()
     
@@ -161,19 +156,14 @@ class ThumbnailViewWidget(QWidget):
         self.renderer = renderer
         self.thumbnail_list_widget.clear()
 
-        if not self.renderer:
-            return
-        
-        page_count = self.renderer.get_page_count()
-        if page_count == 0:
+        if not self.renderer or self.renderer.get_page_count() == 0:
             return
 
-        # TODO: 페이지가 많을 경우 QThread를 사용한 백그라운드 로딩으로 전환해야 합니다.
-        for i in range(page_count):
+        for i in range(self.renderer.get_page_count()):
             try:
                 icon = self.renderer.create_thumbnail(i, max_width=120)
                 item = QListWidgetItem(icon, f"페이지 {i + 1}")
-                item.setData(Qt.ItemDataRole.UserRole, i)  # 페이지 번호 저장
+                item.setData(Qt.ItemDataRole.UserRole, i)
                 self.thumbnail_list_widget.addItem(item)
             except (IndexError, RuntimeError) as e:
                 print(f"썸네일 생성 오류 (페이지 {i}): {e}")
@@ -203,54 +193,51 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PDF Viewer")
         self.setGeometry(100, 100, 1400, 800)
         
-        # 중앙 위젯 설정
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # 메인 스플리터로 3분할
-        main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # 1. 썸네일 뷰어 (왼쪽)
+        # 1. 위젯 인스턴스 생성
         self.thumbnail_widget = ThumbnailViewWidget()
-        main_splitter.addWidget(self.thumbnail_widget)
-        
-        # 2. PDF 로드 영역 (중앙)
         self.pdf_load_widget = PdfLoadWidget()
-        main_splitter.addWidget(self.pdf_load_widget)
-        
-        # 3. PDF 뷰어 영역 (오른쪽)
         self.pdf_view_widget = PdfViewWidget()
-        main_splitter.addWidget(self.pdf_view_widget)
+
+        # 2. 컨텐츠 영역을 관리할 QStackedWidget 생성
+        self.main_content_stack = QStackedWidget()
+        self.main_content_stack.addWidget(self.pdf_load_widget)
+        self.main_content_stack.addWidget(self.pdf_view_widget)
+
+        # 3. 메인 스플리터를 2분할로 구성
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_splitter.addWidget(self.thumbnail_widget)
+        main_splitter.addWidget(self.main_content_stack)
+        main_splitter.setSizes([200, 1200])
         
-        # 스플리터 비율 설정 (1:2:4 정도 - 썸네일:로더:뷰어)
-        main_splitter.setSizes([200, 400, 800])
-        
-        # 메인 레이아웃
-        layout = QHBoxLayout()
+        layout = QHBoxLayout(central_widget)
         layout.addWidget(main_splitter)
-        central_widget.setLayout(layout)
-    
+
     def setup_connections(self):
         """시그널-슬롯 연결"""
-        # PDF 파일 선택 -> 메인 윈도우의 로드 메서드 호출
         self.pdf_load_widget.pdf_selected.connect(self.load_document)
-        
-        # 썸네일 클릭 -> PDF 뷰어의 특정 페이지 표시
         self.thumbnail_widget.page_selected.connect(self.pdf_view_widget.show_page)
     
     def load_document(self, pdf_path: str):
-        """PDF 문서를 로드하고 각 위젯에 렌더러를 설정한다."""
+        """PDF 문서를 로드하고 뷰를 전환한다."""
         try:
+            self.renderer.close() # 이전 문서가 있다면 닫기
             self.renderer.load_pdf(pdf_path)
             self.setWindowTitle(f"PDF Viewer - {Path(pdf_path).name}")
         except (ValueError, FileNotFoundError) as e:
             QMessageBox.critical(self, "문서 로드 실패", str(e))
-            self.renderer.close() # 실패 시 리소스 정리
+            self.renderer.close()
             self.setWindowTitle("PDF Viewer")
+            return
         
         # 렌더러를 자식 위젯에 전달
         self.thumbnail_widget.set_renderer(self.renderer)
         self.pdf_view_widget.set_renderer(self.renderer)
+        
+        # PDF 뷰어 화면으로 전환
+        self.main_content_stack.setCurrentWidget(self.pdf_view_widget)
 
     def closeEvent(self, event):
         """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
