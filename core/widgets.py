@@ -3,11 +3,13 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QScrollArea, QGridLayout, QPushButton, QTableWidget, QGraphicsView,
-    QFileDialog, QMessageBox, QSplitter, QListWidget, QListWidgetItem
+    QFileDialog, QMessageBox, QSplitter, QListWidget, QListWidgetItem,
+    QGraphicsScene, QGraphicsPixmapItem
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QIcon
 from PyQt6 import uic
+from .pdf_render import PdfRender
 
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
@@ -68,7 +70,9 @@ class PdfViewWidget(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.current_pdf_path = None
+        self.renderer = None
+        self.scene = QGraphicsScene(self)
+        self.current_page_item = None
         self.init_ui()
     
     def init_ui(self):
@@ -78,6 +82,7 @@ class PdfViewWidget(QWidget):
         
         # Graphics View 설정
         if hasattr(self, 'pdf_graphics_view'):
+            self.pdf_graphics_view.setScene(self.scene)
             self.setup_graphics_view()
     
     def setup_graphics_view(self):
@@ -91,14 +96,34 @@ class PdfViewWidget(QWidget):
         view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
     
-    def load_pdf(self, pdf_path: str):
-        """PDF 파일 로드"""
-        self.current_pdf_path = pdf_path
-        # 실제 PDF 로딩 로직은 향후 PyMuPDF를 사용해서 구현
-        print(f"PDF 로드: {pdf_path}")
-        
-        # 임시로 메시지 표시
-        QMessageBox.information(self, "PDF 로드", f"PDF 파일이 로드되었습니다:\n{Path(pdf_path).name}")
+    def set_renderer(self, renderer: PdfRender | None):
+        """PDF 렌더러를 설정하고 첫 페이지를 표시한다."""
+        self.renderer = renderer
+        self.scene.clear()
+        if self.renderer and self.renderer.get_page_count() > 0:
+            self.show_page(0)
+        else:
+            # 뷰를 비웁니다.
+            self.current_page_item = None
+
+    def show_page(self, page_num: int):
+        """지정된 페이지를 뷰에 렌더링한다."""
+        if not self.renderer:
+            return
+
+        try:
+            pixmap = self.renderer.render_page(page_num, zoom_factor=2.0)
+            if self.current_page_item:
+                self.current_page_item.setPixmap(pixmap)
+            else:
+                self.current_page_item = self.scene.addPixmap(pixmap)
+            
+            # 뷰가 장면에 맞게 조정되도록 합니다.
+            self.pdf_graphics_view.fitInView(self.scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
+        except (IndexError, RuntimeError) as e:
+            print(f"페이지 표시 오류: {e}")
+            QMessageBox.warning(self, "오류", f"페이지 {page_num + 1}을(를) 표시할 수 없습니다.")
 
 class ThumbnailViewWidget(QWidget):
     """썸네일 뷰어 위젯"""
@@ -106,7 +131,7 @@ class ThumbnailViewWidget(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.current_pdf_path = None
+        self.renderer = None
         self.init_ui()
         self.setup_connections()
     
@@ -131,20 +156,28 @@ class ThumbnailViewWidget(QWidget):
         if hasattr(self, 'thumbnail_list_widget'):
             self.thumbnail_list_widget.itemClicked.connect(self.on_thumbnail_clicked)
     
-    def load_pdf_thumbnails(self, pdf_path: str):
-        """PDF 파일의 썸네일들을 로드"""
-        self.current_pdf_path = pdf_path
+    def set_renderer(self, renderer: PdfRender | None):
+        """PDF 렌더러를 설정하고 썸네일을 생성한다."""
+        self.renderer = renderer
+        self.thumbnail_list_widget.clear()
+
+        if not self.renderer:
+            return
         
-        # 기존 썸네일 제거
-        if hasattr(self, 'thumbnail_list_widget'):
-            self.thumbnail_list_widget.clear()
-            
-            # 임시로 더미 썸네일 추가 (실제로는 PyMuPDF로 생성)
-            for i in range(5):  # 5페이지 가정
-                item = QListWidgetItem(f"페이지 {i+1}")
+        page_count = self.renderer.get_page_count()
+        if page_count == 0:
+            return
+
+        # TODO: 페이지가 많을 경우 QThread를 사용한 백그라운드 로딩으로 전환해야 합니다.
+        for i in range(page_count):
+            try:
+                icon = self.renderer.create_thumbnail(i, max_width=120)
+                item = QListWidgetItem(icon, f"페이지 {i + 1}")
                 item.setData(Qt.ItemDataRole.UserRole, i)  # 페이지 번호 저장
                 self.thumbnail_list_widget.addItem(item)
-    
+            except (IndexError, RuntimeError) as e:
+                print(f"썸네일 생성 오류 (페이지 {i}): {e}")
+
     def on_thumbnail_clicked(self, item):
         """썸네일 클릭 시 호출"""
         page_number = item.data(Qt.ItemDataRole.UserRole)
@@ -161,6 +194,7 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        self.renderer = PdfRender()
         self.init_ui()
         self.setup_connections()
     
@@ -198,18 +232,30 @@ class MainWindow(QMainWindow):
     
     def setup_connections(self):
         """시그널-슬롯 연결"""
-        # PDF 파일 선택 시 뷰어와 썸네일 모두에 전달
-        self.pdf_load_widget.pdf_selected.connect(self.pdf_view_widget.load_pdf)
-        self.pdf_load_widget.pdf_selected.connect(self.thumbnail_widget.load_pdf_thumbnails)
+        # PDF 파일 선택 -> 메인 윈도우의 로드 메서드 호출
+        self.pdf_load_widget.pdf_selected.connect(self.load_document)
         
-        # 썸네일 클릭 시 PDF 뷰어의 해당 페이지로 이동
-        self.thumbnail_widget.page_selected.connect(self.on_page_selected)
+        # 썸네일 클릭 -> PDF 뷰어의 특정 페이지 표시
+        self.thumbnail_widget.page_selected.connect(self.pdf_view_widget.show_page)
     
-    def on_page_selected(self, page_number: int):
-        """썸네일에서 페이지 선택 시 호출"""
-        print(f"페이지 {page_number + 1} 선택됨")
-        # 향후 PDF 뷰어에서 해당 페이지로 이동하는 기능 구현
-        # self.pdf_view_widget.go_to_page(page_number)
+    def load_document(self, pdf_path: str):
+        """PDF 문서를 로드하고 각 위젯에 렌더러를 설정한다."""
+        try:
+            self.renderer.load_pdf(pdf_path)
+            self.setWindowTitle(f"PDF Viewer - {Path(pdf_path).name}")
+        except (ValueError, FileNotFoundError) as e:
+            QMessageBox.critical(self, "문서 로드 실패", str(e))
+            self.renderer.close() # 실패 시 리소스 정리
+            self.setWindowTitle("PDF Viewer")
+        
+        # 렌더러를 자식 위젯에 전달
+        self.thumbnail_widget.set_renderer(self.renderer)
+        self.pdf_view_widget.set_renderer(self.renderer)
+
+    def closeEvent(self, event):
+        """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
+        self.renderer.close()
+        event.accept()
 
 def create_app():
     """애플리케이션 생성 함수"""
