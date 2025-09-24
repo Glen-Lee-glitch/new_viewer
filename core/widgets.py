@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QFileDialog, QMessageBox, QSplitter, QListWidget, QListWidgetItem,
     QGraphicsScene, QGraphicsPixmapItem, QStackedWidget
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QPoint
 from PyQt6.QtGui import QPixmap, QPainter, QIcon
 from PyQt6 import uic
 from .pdf_render import PdfRender
@@ -39,6 +39,7 @@ class ZoomableGraphicsView(QGraphicsView):
 
 class FloatingToolbarWidget(QWidget):
     """pdf_view_widget 위에 떠다니는 이동 가능한 툴바."""
+    stamp_menu_requested = pyqtSignal()
     def __init__(self, parent=None):
         super().__init__(parent)
         ui_path = Path(__file__).parent.parent / "ui" / "floating_toolbar.ui"
@@ -49,6 +50,13 @@ class FloatingToolbarWidget(QWidget):
         
         self._is_dragging = False
         self._drag_start_position = None
+
+        # 스탬프 버튼 클릭 시 오버레이 표시 요청
+        if hasattr(self, 'pushButton_stamp'):
+            try:
+                self.pushButton_stamp.clicked.connect(self.stamp_menu_requested.emit)
+            except Exception:
+                pass
 
     def mousePressEvent(self, event):
         # 'drag_handle_frame' 위에서 마우스를 눌렀는지 확인
@@ -285,6 +293,50 @@ class ThumbnailViewWidget(QWidget):
         if hasattr(self, 'thumbnail_list_widget'):
             self.thumbnail_list_widget.clear()
 
+class StampOverlayWidget(QWidget):
+    """메인 윈도우 위에 나타나는 반투명 오버레이 위젯."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        ui_path = Path(__file__).parent.parent / "ui" / "stamp_overlay.ui"
+        uic.loadUi(str(ui_path), self)
+
+        # 프레임 제거 + 투명 배경
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self.hide()
+        self._connect_signals()
+
+    def _connect_signals(self):
+        if hasattr(self, 'stamp_button_1'):
+            self.stamp_button_1.clicked.connect(self._on_stamp_selected)
+        if hasattr(self, 'stamp_button_2'):
+            self.stamp_button_2.clicked.connect(self._on_stamp_selected)
+        if hasattr(self, 'stamp_button_3'):
+            self.stamp_button_3.clicked.connect(self._on_stamp_selected)
+        if hasattr(self, 'stamp_button_4'):
+            self.stamp_button_4.clicked.connect(self._on_stamp_selected)
+        if hasattr(self, 'stamp_button_5'):
+            self.stamp_button_5.clicked.connect(self._on_stamp_selected)
+
+    def _on_stamp_selected(self):
+        print("성공")
+        self.hide()
+
+    def show_overlay(self, parent_size):
+        self.setGeometry(0, 0, parent_size.width(), parent_size.height())
+        self.show()
+        self.raise_()
+
+    def mousePressEvent(self, event):
+        # content_frame 밖을 클릭하면 닫기
+        if hasattr(self, 'content_frame'):
+            local_in_frame = self.content_frame.mapFrom(self, event.pos())
+            if not self.content_frame.rect().contains(local_in_frame):
+                self.hide()
+                return
+        super().mousePressEvent(event)
+
 class MainWindow(QMainWindow):
     """메인 윈도우"""
     
@@ -293,6 +345,8 @@ class MainWindow(QMainWindow):
         self.renderer = PdfRender()
         self._current_page = -1
         self.init_ui()
+        # 오버레이 위젯 생성
+        self.stamp_overlay = StampOverlayWidget(self)
         self.setup_connections()
     
     def init_ui(self):
@@ -328,6 +382,9 @@ class MainWindow(QMainWindow):
         self.thumbnail_widget.page_selected.connect(self.go_to_page)
         self.thumbnail_widget.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
+        # 툴바 스탬프 버튼 → 오버레이 표시
+        if hasattr(self.pdf_view_widget, 'toolbar'):
+            self.pdf_view_widget.toolbar.stamp_menu_requested.connect(self.show_stamp_overlay)
     
     def load_document(self, pdf_path: str):
         """PDF 문서를 로드하고 뷰를 전환한다."""
@@ -363,6 +420,16 @@ class MainWindow(QMainWindow):
         if self._current_page != -1:
             new_page = self._current_page + delta
             self.go_to_page(new_page)
+
+    def show_stamp_overlay(self):
+        """스탬프 오버레이를 메인 윈도우 크기에 맞춰 표시한다."""
+        self.stamp_overlay.show_overlay(self.size())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # 윈도우 리사이즈 시 오버레이도 동일 크기로 유지
+        if hasattr(self, 'stamp_overlay') and self.stamp_overlay.isVisible():
+            self.stamp_overlay.setGeometry(0, 0, self.width(), self.height())
 
     def closeEvent(self, event):
         """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
