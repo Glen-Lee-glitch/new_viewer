@@ -97,8 +97,8 @@ class PdfLoadWidget(QWidget):
     def setup_table(self):
         """테이블 위젯 초기 설정"""
         table = self.complement_table_widget
-        table.setColumnCount(3)
-        table.setHorizontalHeaderLabels(["파일명", "크기", "수정일"])
+        table.setColumnCount(4)
+        table.setHorizontalHeaderLabels(['RN', '지역', '임시칼럼1', '임시칼럼2'])
         table.setAlternatingRowColors(True)
     
     def setup_connections(self):
