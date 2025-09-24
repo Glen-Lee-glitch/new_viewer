@@ -303,6 +303,7 @@ class StampOverlayWidget(QWidget):
         # 프레임 제거 + 투명 배경
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.hide()
         self._connect_signals()
@@ -321,21 +322,47 @@ class StampOverlayWidget(QWidget):
 
     def _on_stamp_selected(self):
         print("성공")
-        self.hide()
+        try:
+            self.releaseKeyboard()
+        finally:
+            self.hide()
 
     def show_overlay(self, parent_size):
         self.setGeometry(0, 0, parent_size.width(), parent_size.height())
         self.show()
         self.raise_()
+        self.activateWindow()
+        self.setFocus()
+        self.grabKeyboard()
 
     def mousePressEvent(self, event):
         # content_frame 밖을 클릭하면 닫기
         if hasattr(self, 'content_frame'):
             local_in_frame = self.content_frame.mapFrom(self, event.pos())
             if not self.content_frame.rect().contains(local_in_frame):
-                self.hide()
+                try:
+                    self.releaseKeyboard()
+                finally:
+                    self.hide()
                 return
         super().mousePressEvent(event)
+
+    def keyPressEvent(self, event):
+        # 숫자/숫자패드 1~5 모두 처리 (Keypad 여부는 modifiers로만 구분되므로 동일 키코드 수신)
+        if event.key() in (
+            Qt.Key.Key_1,
+            Qt.Key.Key_2,
+            Qt.Key.Key_3,
+            Qt.Key.Key_4,
+            Qt.Key.Key_5,
+        ):
+            print("성공")
+            try:
+                self.releaseKeyboard()
+            finally:
+                self.hide()
+            return
+        super().keyPressEvent(event)
 
 class MainWindow(QMainWindow):
     """메인 윈도우"""

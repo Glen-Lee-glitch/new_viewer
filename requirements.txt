@@ -4,6 +4,7 @@ Pillow
 
 # GUI 프레임워크
 PyQt6
+qt-material
 
 # 데이터 처리
 pandas
