@@ -1,23 +1,124 @@
-import pymupdf
-from PyQt6.QtGui import QPixmap, QImage
+import fitz  # PyMuPDF
+from PyQt6.QtGui import QPixmap, QImage, QIcon
 from PyQt6.QtCore import Qt
 
+
 class PdfRender:
+    """PyMuPDF 기반 PDF 렌더러.
+
+    - render_page: 고화질(oversampling)로 페이지를 QPixmap으로 렌더링
+    - create_thumbnail: 선명한 썸네일(QIcon) 생성
+    """
+
     def __init__(self):
         self.doc = None
         self.page_count = 0
 
-    def load_pdf(self, pdf_path: str):
-        return
+    def load_pdf(self, pdf_path: str) -> None:
+        """PDF 문서를 로드한다.
 
-    def render_page(self, page_num: int, zoom_factor: float = 2.0):
-        # zoom_factor로 해상도 조절 (2.0 = 200% 화질)
-        # 페이지를 QPixmap으로 변환
-        # 안티앨리어싱 적용
-        return
+        Args:
+            pdf_path: PDF 파일 경로
+        Raises:
+            FileNotFoundError: 파일이 존재하지 않을 때
+            ValueError: 문서 로드 실패 시
+        """
+        try:
+            self.doc = fitz.open(pdf_path)
+        except Exception as exc:  # 파일 경로/형식 문제 포함
+            raise ValueError(f"PDF 로드 실패: {exc}")
 
-    def create_thumbnail(self, page_num: int, max_width: int = 90):
-        # 작은 크기로 렌더링 (화질 유지)
-        # 비율 유지하며 리사이징
-        # QIcon으로 변환
-        return
+        if self.doc is None or len(self.doc) == 0:
+            raise ValueError("빈 문서이거나 로드할 수 없습니다.")
+
+        self.page_count = len(self.doc)
+
+    def _ensure_loaded(self) -> None:
+        if self.doc is None:
+            raise RuntimeError("PDF가 로드되지 않았습니다. load_pdf()를 먼저 호출하세요.")
+
+    def render_page(self, page_num: int, zoom_factor: float = 2.0) -> QPixmap:
+        """페이지를 고화질로 렌더링하여 QPixmap을 반환한다.
+
+        고화질 유지 전략:
+        - PyMuPDF의 Matrix zoom(>=2.0)을 사용해 oversampling 렌더링
+        - Qt에서 추가 스케일 없이 그대로 사용해 선명도 유지
+
+        Args:
+            page_num: 0-based 페이지 인덱스
+            zoom_factor: 배율(기본 2.0; 2.0~3.0 권장)
+        Returns:
+            QPixmap: 렌더링 결과
+        """
+        self._ensure_loaded()
+        if page_num < 0 or page_num >= self.page_count:
+            raise IndexError(f"잘못된 페이지 번호: {page_num}")
+
+        page = self.doc.load_page(page_num)
+        # alpha=False로 불필요한 알파 채널 방지(성능/메모리), 주석 해제 시 투명 포함 가능
+        mat = fitz.Matrix(zoom_factor, zoom_factor)
+        pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
+
+        # PyMuPDF pixmap -> QImage -> QPixmap
+        image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
+        qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, image_format)
+        # QImage가 원본 버퍼에 의존하지 않도록 강제 복사
+        qimage = qimage.copy()
+        return QPixmap.fromImage(qimage)
+
+    def create_thumbnail(self, page_num: int, max_width: int = 90) -> QIcon:
+        """선명한 썸네일(QIcon)을 생성한다.
+
+        전략:
+        - oversampling(대략 목표 폭의 2배)로 먼저 크게 렌더링
+        - Qt의 SmoothTransformation으로 다운스케일 → 선명도 유지
+
+        Args:
+            page_num: 0-based 페이지 인덱스
+            max_width: 썸네일 최대 너비(px)
+        Returns:
+            QIcon: 아이콘으로 반환(리스트/트리 뷰에 바로 사용 가능)
+        """
+        self._ensure_loaded()
+        if page_num < 0 or page_num >= self.page_count:
+            raise IndexError(f"잘못된 페이지 번호: {page_num}")
+
+        page = self.doc.load_page(page_num)
+
+        # 페이지 원본 크기(포인트 단위)를 이용해 목표 폭의 2배 정도로 렌더링 비율 계산
+        rect = page.rect
+        if rect.width == 0:
+            zoom = 2.0
+        else:
+            target_render_width = max(max_width * 2, max_width)  # 최소 2배 oversampling
+            zoom = max(1.0, target_render_width / rect.width)
+
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
+
+        image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
+        qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, image_format).copy()
+        qpix = QPixmap.fromImage(qimage)
+
+        if qpix.width() > max_width:
+            qpix = qpix.scaled(
+                max_width,
+                int(qpix.height() * (max_width / qpix.width())),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+
+        return QIcon(qpix)
+
+    def close(self) -> None:
+        """문서를 닫고 자원 해제."""
+        if self.doc is not None:
+            try:
+                self.doc.close()
+            finally:
+                self.doc = None
+                self.page_count = 0
+
+    def get_page_count(self) -> int:
+        """페이지 수 반환."""
+        return self.page_count
