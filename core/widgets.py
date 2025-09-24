@@ -37,6 +37,39 @@ class ZoomableGraphicsView(QGraphicsView):
             # Ctrl 키가 눌리지 않으면 기본 스크롤 동작을 수행
             super().wheelEvent(event)
 
+class FloatingToolbarWidget(QWidget):
+    """pdf_view_widget 위에 떠다니는 이동 가능한 툴바."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        ui_path = Path(__file__).parent.parent / "ui" / "floating_toolbar.ui"
+        uic.loadUi(str(ui_path), self)
+        
+        # 창 테두리 없애기 (parent 위젯에 자연스럽게 떠있도록)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        
+        self._is_dragging = False
+        self._drag_start_position = None
+
+    def mousePressEvent(self, event):
+        # 'drag_handle_frame' 위에서 마우스를 눌렀는지 확인
+        if self.drag_handle_frame.underMouse():
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._is_dragging = True
+                self._drag_start_position = event.globalPosition().toPoint() - self.pos()
+                self.setCursor(Qt.CursorShape.SizeAllCursor) # 커서를 '+' 모양으로 변경
+                event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self._is_dragging:
+            self.move(event.globalPosition().toPoint() - self._drag_start_position)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_dragging = False
+            self.setCursor(Qt.CursorShape.ArrowCursor) # 커서를 원래대로 복원
+            event.accept()
+
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
     pdf_selected = pyqtSignal(str)  # PDF 파일 경로를 전달하는 시그널
@@ -100,7 +133,11 @@ class PdfViewWidget(QWidget):
         self.scene = QGraphicsScene(self)
         self.current_page_item: QGraphicsPixmapItem | None = None
         self.init_ui()
-    
+        
+        # --- 툴바 추가 ---
+        self.toolbar = FloatingToolbarWidget(self)
+        self.toolbar.show()
+
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
         ui_path = Path(__file__).parent.parent / "ui" / "pdf_view_widget.ui"
@@ -121,6 +158,14 @@ class PdfViewWidget(QWidget):
         )
         view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+    
+    def resizeEvent(self, event):
+        """뷰어 크기가 변경될 때 툴바 위치를 재조정한다."""
+        super().resizeEvent(event)
+        # 툴바를 상단 중앙에 배치 (가로 중앙, 세로 상단에서 10px)
+        x = (self.width() - self.toolbar.width()) // 2
+        y = 10
+        self.toolbar.move(x, y)
     
     def set_renderer(self, renderer: PdfRender | None):
         """PDF 렌더러를 설정하고 첫 페이지를 표시한다."""
