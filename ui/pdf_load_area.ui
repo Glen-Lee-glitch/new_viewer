@@ -32,8 +32,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>625</width>
-          <height>700</height>
+          <width>619</width>
+          <height>694</height>
          </rect>
         </property>
         <layout class="QGridLayout" name="gridLayout">
@@ -138,19 +138,6 @@
                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
               </property>
              </widget>
-            </item>
-            <item>
-             <spacer name="verticalSpacer_2">
-              <property name="orientation">
-               <enum>Qt::Orientation::Vertical</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>20</width>
-                <height>106</height>
-               </size>
-              </property>
-             </spacer>
             </item>
            </layout>
           </widget>
