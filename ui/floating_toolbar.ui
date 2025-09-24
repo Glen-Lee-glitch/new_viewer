@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>249</width>
-    <height>89</height>
+    <height>107</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -50,9 +50,9 @@
         <number>1</number>
        </property>
        <item>
-        <widget class="QPushButton" name="pushButton">
+        <widget class="QPushButton" name="pushButton_stamp">
          <property name="text">
-          <string>버튼1</string>
+          <string>도장</string>
          </property>
         </widget>
        </item>
@@ -92,9 +92,9 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="pushButton_6">
+        <widget class="QPushButton" name="pushButton_setting">
          <property name="text">
-          <string>버튼6</string>
+          <string>설정</string>
          </property>
         </widget>
        </item>
