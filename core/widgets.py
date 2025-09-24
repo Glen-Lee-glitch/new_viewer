@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QFileDialog, QMessageBox, QSplitter, QListWidget, QListWidgetItem,
     QGraphicsScene, QGraphicsPixmapItem, QStackedWidget
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent
 from PyQt6.QtGui import QPixmap, QPainter, QIcon
 from PyQt6 import uic
 from .pdf_render import PdfRender
@@ -211,8 +211,24 @@ class ThumbnailViewWidget(QWidget):
         self.renderer: PdfRender | None = None
         self.init_ui()
         self.setup_connections()
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-    
+        
+        # thumbnail_list_widget에 이벤트 필터 설치
+        if hasattr(self, 'thumbnail_list_widget'):
+            self.thumbnail_list_widget.installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        """이벤트 필터. thumbnail_list_widget의 키 이벤트를 가로챈다."""
+        if watched == self.thumbnail_list_widget and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Q:
+                self.page_change_requested.emit(-1)
+                return True  # 이벤트가 처리되었음을 알림
+            elif event.key() == Qt.Key.Key_E:
+                self.page_change_requested.emit(1)
+                return True  # 이벤트가 처리되었음을 알림
+        
+        # 처리하지 않은 이벤트는 기본 로직으로 전달
+        return super().eventFilter(watched, event)
+
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
         ui_path = Path(__file__).parent.parent / "ui" / "thumbnail_viewer.ui"
@@ -222,15 +238,6 @@ class ThumbnailViewWidget(QWidget):
         if hasattr(self, 'thumbnail_list_widget'):
             self.setup_list_widget()
     
-    def keyPressEvent(self, event):
-        """키보드 'Q', 'E'를 눌러 페이지를 변경한다."""
-        if event.key() == Qt.Key.Key_Q:
-            self.page_change_requested.emit(-1)
-        elif event.key() == Qt.Key.Key_E:
-            self.page_change_requested.emit(1)
-        else:
-            super().keyPressEvent(event)
-
     def setup_list_widget(self):
         """리스트 위젯 초기 설정"""
         list_widget = self.thumbnail_list_widget
