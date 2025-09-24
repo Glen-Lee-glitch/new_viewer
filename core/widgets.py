@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QPoint
 from PyQt6.QtGui import QPixmap, QPainter, QIcon
 from PyQt6 import uic
 from .pdf_render import PdfRender
+from qt_material import apply_stylesheet
 
 class ZoomableGraphicsView(QGraphicsView):
     """Ctrl + 마우스 휠로 확대/축소가 가능한 QGraphicsView"""
@@ -47,6 +48,9 @@ class FloatingToolbarWidget(QWidget):
         
         # 창 테두리 없애기 (parent 위젯에 자연스럽게 떠있도록)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        # 스타일 스코프 고정
+        self.setObjectName("floatingToolbar")
+        self._apply_styles()
         
         self._is_dragging = False
         self._drag_start_position = None
@@ -77,6 +81,37 @@ class FloatingToolbarWidget(QWidget):
             self._is_dragging = False
             self.setCursor(Qt.CursorShape.ArrowCursor) # 커서를 원래대로 복원
             event.accept()
+
+    def _apply_styles(self):
+        """FloatingToolbar 전용 QSS 스타일을 적용한다."""
+        self.setStyleSheet(
+            """
+            #floatingToolbar QPushButton {
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-weight: 500;
+                min-height: 28px;
+            }
+            #floatingToolbar QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+            #floatingToolbar QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.14);
+            }
+            #floatingToolbar QPushButton#pushButton_stamp {
+                background-color: #E91E63; /* pink 500 */
+                color: white;
+            }
+            #floatingToolbar QPushButton#pushButton_setting {
+                background-color: #607D8B; /* blue grey 500 */
+                color: white;
+            }
+            #floatingToolbar #drag_handle_frame {
+                background-color: rgba(255, 255, 255, 0.25);
+                border-radius: 3px;
+            }
+            """
+        )
 
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
@@ -466,5 +501,11 @@ class MainWindow(QMainWindow):
 def create_app():
     """애플리케이션 생성 함수"""
     app = QApplication(sys.argv)
+    # qt_material 전역 테마 적용
+    try:
+        apply_stylesheet(app, theme='dark_teal.xml')
+    except Exception:
+        # 테마 적용 실패 시에도 앱은 동작하도록 무시
+        pass
     window = MainWindow()
     return app, window
