@@ -78,7 +78,7 @@ class PdfViewWidget(QWidget):
             return
 
         try:
-            pixmap = self.renderer.render_page(page_num, zoom_factor=2.0)
+            pixmap = self.renderer.render_page(page_num, zoom_factor=3.0)
             if self.current_page_item:
                 self.current_page_item.setPixmap(pixmap)
             else:
