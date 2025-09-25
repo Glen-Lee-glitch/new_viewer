@@ -5,6 +5,15 @@ import io
 import gc
 import os
 
+def _is_a4_size(width_cm: float, height_cm: float, tolerance: float = 2.0) -> bool:
+    """페이지가 A4 크기 범위 내인지 확인한다."""
+    a4_width, a4_height = 21.0, 29.7
+    vertical_match = (abs(width_cm - a4_width) <= tolerance and 
+                     abs(height_cm - a4_height) <= tolerance)
+    horizontal_match = (abs(width_cm - a4_height) <= tolerance and
+                       abs(height_cm - a4_width) <= tolerance)
+    return vertical_match or horizontal_match
+
 def compress_pdf_file(
         input_path: str,
         output_path: str,
@@ -64,36 +73,56 @@ def compress_pdf_file(
 
             # ── 여기부터 '무거운' 페이지만 이미지-재렌더링 ──
             try:
-                # 페이지 크기에 따른 적응형 DPI 계산
-                page_height_inch = page.rect.height / 72  # 포인트 -> 인치
+                # 1. 페이지의 시각적 크기 계산 (회전 고려)
+                rect = page.rect
+                rotation = page.rotation
+                if rotation == 90 or rotation == 270:
+                    visual_width_pt, visual_height_pt = rect.height, rect.width
+                else:
+                    visual_width_pt, visual_height_pt = rect.width, rect.height
+
+                # 2. 시각적 크기(cm)로 A4 여부 판단
+                width_cm = visual_width_pt * 0.0352778
+                height_cm = visual_height_pt * 0.0352778
                 
-                # A4보다 얼마나 큰지에 따라 DPI를 반비례하여 줄임
-                # (최소 30 DPI는 보장하여 너무 낮은 화질 방지)
+                # 3. 적응형 DPI 계산 (물리적 크기 기준)
+                page_height_inch = page.rect.height / 72
                 adaptive_dpi = max(30, int(dpi * (a4_inch_height / page_height_inch))) if page_height_inch > 0 else dpi
                 
-                pix = page.get_pixmap(dpi=adaptive_dpi, alpha=False)
+                # 4. 이미지 렌더링 (회전 없이, 물리적 방향 그대로)
+                pix = page.get_pixmap(dpi=adaptive_dpi, alpha=False, annots=False)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-                # 저장-품질 조정
+                # 5. PIL을 사용하여 명시적으로 이미지 회전
+                if rotation != 0:
+                    # PIL의 회전은 반시계 방향이므로, PyMuPDF의 시계 방향 회전을 변환
+                    # 270(시계) -> 90(반시계) / 90(시계) -> 270(반시계)
+                    pil_rotation_angle = (360 - rotation) % 360
+                    if pil_rotation_angle > 0:
+                        img = img.rotate(pil_rotation_angle, expand=True)
+
+                # 6. JPEG 버퍼 생성
                 img_buf = io.BytesIO()
-                img.save(
-                    img_buf,
-                    format="JPEG",
-                    quality=jpeg_quality,
-                    optimize=True,
-                    progressive=True
-                )
+                img.save(img_buf, format="JPEG", quality=jpeg_quality, optimize=True, progressive=True)
                 img_buf.seek(0)
 
-                # 새 페이지(A4 가 아닐 수도 있으므로 원본 크기 사용)
-                new_p = dst.new_page(
-                    width=page.rect.width,
-                    height=page.rect.height
-                )
-                new_p.insert_image(
-                    new_p.rect,
-                    stream=img_buf.read()
-                )
+                # 7. 최종 저장될 페이지의 크기 및 방향 결정 (시각적 기준)
+                a4_rect = pymupdf.paper_rect("a4")
+                if _is_a4_size(width_cm, height_cm):
+                    # 이미 A4 크기 -> 원본 물리적 크기 유지
+                    target_width, target_height = page.rect.width, page.rect.height
+                else:
+                    # 큰 페이지 -> 시각적 방향에 맞는 A4 크기로 조정
+                    is_visual_landscape = visual_width_pt > visual_height_pt
+                    if is_visual_landscape:
+                        target_width, target_height = a4_rect.height, a4_rect.width
+                    else:
+                        target_width, target_height = a4_rect.width, a4_rect.height
+
+                # 8. 새 페이지 생성 및 이미지 삽입
+                new_p = dst.new_page(width=target_width, height=target_height)
+                new_p.insert_image(new_p.rect, stream=img_buf.read())
+                
             except Exception as e:
                 # 실패하면 그대로 복사(품질 보존 우선)
                 print(f"[compress] page {i+1} fallback copy: {e}")
