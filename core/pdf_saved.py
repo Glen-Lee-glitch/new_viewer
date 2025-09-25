@@ -73,54 +73,47 @@ def compress_pdf_file(
 
             # ── 여기부터 '무거운' 페이지만 이미지-재렌더링 ──
             try:
-                # 1. 페이지의 시각적 크기 계산 (회전 고려)
-                rect = page.rect
-                rotation = page.rotation
-                if rotation == 90 or rotation == 270:
-                    visual_width_pt, visual_height_pt = rect.height, rect.width
+                # === A4 정규화 렌더링 로직 (pdf_render.py와 동일하게) ===
+                
+                # 1. 목표 A4 크기 정의 (DPI 반영)
+                a4_rect_base = pymupdf.paper_rect("a4")
+                # DPI를 고려하여 렌더링할 이미지의 픽셀 크기 계산
+                zoom = dpi / 72  # 72pt = 1inch
+                target_rect = pymupdf.Rect(0, 0, a4_rect_base.width * zoom, a4_rect_base.height * zoom)
+
+                # 2. 페이지의 시각적 크기를 나타내는 사각형 계산
+                r = page.rect
+                if page.rotation in [90, 270]:
+                    source_rect = pymupdf.Rect(0, 0, r.height, r.width)
                 else:
-                    visual_width_pt, visual_height_pt = rect.width, rect.height
+                    source_rect = pymupdf.Rect(0, 0, r.width, r.height)
+                
+                # 3. 시각적 크기를 목표 A4 크기에 맞추는 변환 매트릭스 계산
+                if source_rect.is_empty:
+                    fit_matrix = pymupdf.Matrix(1, 1)
+                else:
+                    sx = target_rect.width / source_rect.width
+                    sy = target_rect.height / source_rect.height
+                    # 원본 비율을 무시하고 A4틀에 꽉 채우도록 스트레칭
+                    fit_matrix = pymupdf.Matrix(sx, sy)
 
-                # 2. 시각적 크기(cm)로 A4 여부 판단
-                width_cm = visual_width_pt * 0.0352778
-                height_cm = visual_height_pt * 0.0352778
+                # 4. 페이지의 원본 회전을 적용하는 매트릭스 생성
+                rotation_matrix = pymupdf.Matrix(page.rotation)
                 
-                # 3. 적응형 DPI 계산 (물리적 크기 기준)
-                page_height_inch = page.rect.height / 72
-                adaptive_dpi = max(30, int(dpi * (a4_inch_height / page_height_inch))) if page_height_inch > 0 else dpi
-                
-                # 4. 이미지 렌더링 (회전 없이, 물리적 방향 그대로)
-                pix = page.get_pixmap(dpi=adaptive_dpi, alpha=False, annots=False)
+                # 5. 두 매트릭스를 결합 (회전 후 맞춤)
+                final_matrix = rotation_matrix * fit_matrix
+
+                pix = page.get_pixmap(matrix=final_matrix, alpha=False, annots=True)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-
-                # 5. PIL을 사용하여 명시적으로 이미지 회전
-                if rotation != 0:
-                    # PIL의 회전은 반시계 방향이므로, PyMuPDF의 시계 방향 회전을 변환
-                    # 270(시계) -> 90(반시계) / 90(시계) -> 270(반시계)
-                    pil_rotation_angle = (360 - rotation) % 360
-                    if pil_rotation_angle > 0:
-                        img = img.rotate(pil_rotation_angle, expand=True)
 
                 # 6. JPEG 버퍼 생성
                 img_buf = io.BytesIO()
                 img.save(img_buf, format="JPEG", quality=jpeg_quality, optimize=True, progressive=True)
                 img_buf.seek(0)
 
-                # 7. 최종 저장될 페이지의 크기 및 방향 결정 (시각적 기준)
+                # 7. 최종 저장될 페이지는 항상 A4 세로 크기
                 a4_rect = pymupdf.paper_rect("a4")
-                if _is_a4_size(width_cm, height_cm):
-                    # 이미 A4 크기 -> 원본 물리적 크기 유지
-                    target_width, target_height = page.rect.width, page.rect.height
-                else:
-                    # 큰 페이지 -> 시각적 방향에 맞는 A4 크기로 조정
-                    is_visual_landscape = visual_width_pt > visual_height_pt
-                    if is_visual_landscape:
-                        target_width, target_height = a4_rect.height, a4_rect.width
-                    else:
-                        target_width, target_height = a4_rect.width, a4_rect.height
-
-                # 8. 새 페이지 생성 및 이미지 삽입
-                new_p = dst.new_page(width=target_width, height=target_height)
+                new_p = dst.new_page(width=a4_rect.width, height=a4_rect.height)
                 new_p.insert_image(new_p.rect, stream=img_buf.read())
                 
             except Exception as e:
