@@ -102,12 +102,14 @@ class FloatingToolbarWidget(QWidget):
             #floatingToolbar QPushButton:hover {
                 background: rgba(255, 255, 255, 0.15);
                 border: 1px solid rgba(255, 255, 255, 0.2);
-                transform: translateY(-1px);
+                margin-top: 1px;
+                margin-bottom: -1px;
             }
             #floatingToolbar QPushButton:pressed {
                 background: rgba(255, 255, 255, 0.25);
                 border: 1px solid rgba(255, 255, 255, 0.3);
-                transform: translateY(0px);
+                margin-top: 0px;
+                margin-bottom: 0px;
             }
             #floatingToolbar QPushButton#pushButton_stamp {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
