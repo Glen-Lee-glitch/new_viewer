@@ -151,8 +151,14 @@ class PdfRender:
             else:
                 source_rect = pymupdf.Rect(0, 0, r.width, r.height)
             
-            # 3. 시각적 크기를 목표 A4 크기에 맞추는 변환 매트릭스 계산
-            fit_matrix = pymupdf.Matrix.new(from_rect=source_rect, to_rect=target_rect)
+            # 3. 시각적 크기를 목표 A4 크기에 맞추는 변환 매트릭스 계산 (최신 PyMuPDF 방식)
+            if source_rect.is_empty: # 너비나 높이가 0인 경우 방지
+                fit_matrix = pymupdf.Matrix(1, 1)
+            else:
+                sx = target_rect.width / source_rect.width
+                sy = target_rect.height / source_rect.height
+                scale = min(sx, sy)
+                fit_matrix = pymupdf.Matrix(scale, scale)
 
             # 4. 페이지의 원본 회전을 적용하는 매트릭스 생성
             rotation_matrix = pymupdf.Matrix(page.rotation)
