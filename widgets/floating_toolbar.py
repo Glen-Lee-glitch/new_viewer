@@ -52,7 +52,9 @@ class FloatingToolbarWidget(QWidget):
     stamp_menu_requested = pyqtSignal()
     fit_to_width_requested = pyqtSignal()
     fit_to_page_requested = pyqtSignal()
+    rotate_90_requested = pyqtSignal()
     save_pdf_requested = pyqtSignal()
+    rotate_90_requested = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -87,12 +89,20 @@ class FloatingToolbarWidget(QWidget):
         if hasattr(self, 'pushButton_3'):
             self.pushButton_3.clicked.connect(self.fit_to_width_requested.emit)
         
+        # 회전 버튼 연결 (pushButton_4를 90도 회전 기능으로 사용)
+        if hasattr(self, 'pushButton_4'):
+            self.pushButton_4.clicked.connect(self.rotate_90_requested.emit)
+        
         if hasattr(self, 'pushButton_5'):
             self.pushButton_5.clicked.connect(self.save_pdf_requested.emit)
                 
         # 드래그 핸들에 마우스 호버 효과 적용
         if hasattr(self, 'drag_handle_label'):
             self.drag_handle_label.setCursor(Qt.CursorShape.SizeAllCursor)
+
+        # 회전 버튼 연결 (pushButton_4를 90도 회전 기능으로 사용)
+        if hasattr(self, 'pushButton_4'):
+            self.pushButton_4.clicked.connect(self.rotate_90_requested.emit)
 
     def _add_shadow_effect(self):
         """툴바에 그림자 효과를 추가한다."""

@@ -59,3 +59,4 @@ class ViewModeMixin:
         transform = QTransform()
         transform.scale(scale_factor, scale_factor)
         view.setTransform(transform)
+

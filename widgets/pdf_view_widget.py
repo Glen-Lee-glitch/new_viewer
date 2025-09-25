@@ -29,11 +29,12 @@ class WorkerSignals(QObject):
 class PdfRenderWorker(QRunnable):
     """단일 PDF 페이지를 렌더링하는 Worker 스레드"""
 
-    def __init__(self, pdf_path: str, page_num: int, zoom_factor: float = 2.0):
+    def __init__(self, pdf_path: str, page_num: int, zoom_factor: float = 2.0, user_rotation: int = 0):
         super().__init__()
         self.pdf_path = pdf_path
         self.page_num = page_num
         self.zoom_factor = zoom_factor
+        self.user_rotation = user_rotation
         self.signals = WorkerSignals()
 
     @staticmethod
@@ -49,15 +50,14 @@ class PdfRenderWorker(QRunnable):
     def run(self):
         """백그라운드 스레드에서 렌더링 실행. 핵심 로직은 PdfRender 클래스에 위임."""
         try:
-            # PdfRender의 스레드 안전 메서드를 호출
+            # PdfRender의 스레드 안전 메서드를 호출 (사용자 회전 각도 포함)
             pixmap = PdfRender.render_page_thread_safe(
-                self.pdf_path, self.page_num, self.zoom_factor
+                self.pdf_path, self.page_num, self.zoom_factor, self.user_rotation
             )
             self.signals.finished.emit(self.page_num, pixmap)
 
         except Exception as e:
             self.signals.error.emit(self.page_num, str(e))
-
 
 class PdfViewWidget(QWidget, ViewModeMixin):
     """PDF 뷰어 위젯"""
@@ -79,6 +79,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.page_cache = {}  # 페이지 캐시: {page_num: QPixmap}
         self.rendering_jobs = set()  # 현재 렌더링 중인 페이지 번호
         self.current_page = -1
+        self.current_rotation = 0  # 현재 회전 각도 (0, 90, 180, 270)
 
         self.init_ui()
 
@@ -93,6 +94,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.toolbar.stamp_menu_requested.connect(self._toggle_stamp_overlay)
         self.toolbar.fit_to_width_requested.connect(self.set_fit_to_width)
         self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
+        self.toolbar.rotate_90_requested.connect(self._rotate_current_page)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -183,8 +185,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             return
 
         self.rendering_jobs.add(page_num)
-        # 모든 페이지를 A4 기준으로 렌더링하므로 고정 줌 팩터(2.0) 사용
-        worker = PdfRenderWorker(self.pdf_path, page_num, zoom_factor=2.0)
+        # 현재 회전 각도를 워커에 전달
+        worker = PdfRenderWorker(self.pdf_path, page_num, zoom_factor=2.0, user_rotation=self.current_rotation)
         worker.signals.finished.connect(self._on_page_rendered)
         worker.signals.error.connect(self._on_render_error)
         self.thread_pool.start(worker)
@@ -230,6 +232,23 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         """현재 페이지의 이전/다음 페이지를 미리 렌더링한다."""
         self._start_render_job(page_num + 1)
         self._start_render_job(page_num - 1)
+
+    def _rotate_current_page(self):
+        """현재 페이지를 90도 회전시킨다."""
+        if not self.current_page_item:
+            return
+        
+        # 회전 각도 업데이트 (90도씩 증가, 360도에서 0으로 리셋)
+        self.current_rotation = (self.current_rotation + 90) % 360
+        
+        # 현재 페이지를 다시 렌더링 (회전 적용)
+        if self.current_page >= 0:
+            # 캐시에서 제거하여 새로 렌더링하도록 함
+            if self.current_page in self.page_cache:
+                del self.page_cache[self.current_page]
+            
+            self._show_loading_message()
+            self._start_render_job(self.current_page)
 
     def _fit_current_page_to_view(self):
         """현재 페이지만을 기준으로 뷰에 맞춤 (페이지 비율에 따라 자동 선택)"""
