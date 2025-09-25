@@ -5,15 +5,6 @@ import io
 import gc
 import os
 
-def _is_a4_size(width_cm: float, height_cm: float, tolerance: float = 2.0) -> bool:
-    """페이지가 A4 크기 범위 내인지 확인한다."""
-    a4_width, a4_height = 21.0, 29.7
-    vertical_match = (abs(width_cm - a4_width) <= tolerance and 
-                     abs(height_cm - a4_height) <= tolerance)
-    horizontal_match = (abs(width_cm - a4_height) <= tolerance and
-                       abs(height_cm - a4_width) <= tolerance)
-    return vertical_match or horizontal_match
-
 def compress_pdf_file(
         input_path: str,
         output_path: str,
@@ -36,6 +27,8 @@ def compress_pdf_file(
         a4_inch_height = 11.69
         
         for i, page in enumerate(src):
+            image_list = []
+            image_size = 0
             # --- 개선된 용량 추정 --------------------------
             # 페이지와 관련된 모든 객체의 크기를 측정
             try:
@@ -48,7 +41,6 @@ def compress_pdf_file(
                         pass
                 
                 # 2. 페이지의 이미지 크기 추정
-                image_size = 0
                 image_list = page.get_images()
                 for img_index, img in enumerate(image_list):
                     try:
@@ -64,8 +56,8 @@ def compress_pdf_file(
             except Exception:
                 total_size = 0
 
-            # threshold 를 넘지 않으면 '가벼운 텍스트 PDF' 로 간주 → 그대로 복사
-            if total_size / 1024 < size_threshold_kb:
+            # 페이지에 이미지가 없거나, 이미지 자체의 크기가 임계값 미만이면 '압축 불필요'로 간주
+            if not image_list or image_size / 1024 < size_threshold_kb:
                 dst.insert_pdf(src, from_page=i, to_page=i)
                 continue
             
@@ -73,47 +65,34 @@ def compress_pdf_file(
 
             # ── 여기부터 '무거운' 페이지만 이미지-재렌더링 ──
             try:
-                # === A4 정규화 렌더링 로직 (pdf_render.py와 동일하게) ===
-                
-                # 1. 목표 A4 크기 정의 (DPI 반영)
-                a4_rect_base = pymupdf.paper_rect("a4")
-                # DPI를 고려하여 렌더링할 이미지의 픽셀 크기 계산
-                zoom = dpi / 72  # 72pt = 1inch
-                target_rect = pymupdf.Rect(0, 0, a4_rect_base.width * zoom, a4_rect_base.height * zoom)
+                # === WYSIWYG 원칙에 따른 렌더링 로직 ===
+                # 페이지의 원본 비율과 크기를 '그대로' 유지하며 압축한다.
 
-                # 2. 페이지의 시각적 크기를 나타내는 사각형 계산
-                r = page.rect
-                if page.rotation in [90, 270]:
-                    source_rect = pymupdf.Rect(0, 0, r.height, r.width)
-                else:
-                    source_rect = pymupdf.Rect(0, 0, r.width, r.height)
+                # 1. 렌더링 해상도(DPI)에 따른 확대/축소 매트릭스 생성
+                # 이 매트릭스는 페이지 크기나 비율을 바꾸지 않고, 렌더링 품질만 결정한다.
+                zoom_matrix = pymupdf.Matrix(dpi / 72, dpi / 72)
                 
-                # 3. 시각적 크기를 목표 A4 크기에 맞추는 변환 매트릭스 계산
-                if source_rect.is_empty:
-                    fit_matrix = pymupdf.Matrix(1, 1)
-                else:
-                    sx = target_rect.width / source_rect.width
-                    sy = target_rect.height / source_rect.height
-                    # 원본 비율을 무시하고 A4틀에 꽉 채우도록 스트레칭
-                    fit_matrix = pymupdf.Matrix(sx, sy)
-
-                # 4. 페이지의 원본 회전을 적용하는 매트릭스 생성
-                rotation_matrix = pymupdf.Matrix(page.rotation)
-                
-                # 5. 두 매트릭스를 결합 (회전 후 맞춤)
-                final_matrix = rotation_matrix * fit_matrix
-
-                pix = page.get_pixmap(matrix=final_matrix, alpha=False, annots=True)
+                # 2. get_pixmap()은 페이지의 원본 회전을 자동으로 처리하여 렌더링한다.
+                pix = page.get_pixmap(matrix=zoom_matrix, alpha=False, annots=True)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-                # 6. JPEG 버퍼 생성
+                # 3. JPEG 이미지 버퍼 생성
                 img_buf = io.BytesIO()
                 img.save(img_buf, format="JPEG", quality=jpeg_quality, optimize=True, progressive=True)
                 img_buf.seek(0)
 
-                # 7. 최종 저장될 페이지는 항상 A4 세로 크기
-                a4_rect = pymupdf.paper_rect("a4")
-                new_p = dst.new_page(width=a4_rect.width, height=a4_rect.height)
+                # 4. 원본 페이지와 '동일한 크기'로 새 페이지를 생성한다.
+                # page.rect는 회전이 적용되지 않은 원본 크기를 나타낸다.
+                new_p = dst.new_page(
+                    width=page.rect.width,
+                    height=page.rect.height,
+                )
+                
+                # 5. 원본 페이지의 회전 값을 그대로 새 페이지에 설정한다.
+                new_p.set_rotation(page.rotation)
+                
+                # 6. 생성된 페이지에 압축된 이미지를 삽입한다.
+                # new_p.rect는 페이지의 사각형 영역을 나타낸다.
                 new_p.insert_image(new_p.rect, stream=img_buf.read())
                 
             except Exception as e:
