@@ -63,6 +63,10 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     """PDF 뷰어 위젯"""
     page_change_requested = pyqtSignal(int)
     page_aspect_ratio_changed = pyqtSignal(bool)  # is_landscape: 가로가 긴 페이지 여부
+    
+    # --- 정보 패널 연동을 위한 신호 ---
+    pdf_loaded = pyqtSignal(str, float, int)  # file_path, file_size_mb, total_pages
+    page_info_updated = pyqtSignal(int, float, float, int)  # page_num, width, height, rotation
 
     def __init__(self):
         super().__init__()
@@ -157,12 +161,34 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.rendering_jobs.clear()
         self.current_page = -1
 
+        # --- 파일 정보 시그널 발생 ---
+        if self.renderer:
+            file_path = self.renderer.pdf_path
+            try:
+                file_size = Path(file_path).stat().st_size / (1024 * 1024)
+            except (FileNotFoundError, TypeError):
+                file_size = 0.0
+            
+            total_pages = self.renderer.get_page_count()
+            self.pdf_loaded.emit(file_path, file_size, total_pages)
+
     def show_page(self, page_num: int):
         """지정된 페이지를 뷰에 표시한다. 캐시를 확인하고, 없으면 백그라운드 렌더링을 시작한다."""
         if not self.renderer or not self.pdf_path or page_num < 0 or page_num >= self.renderer.get_page_count():
             return
 
         self.current_page = page_num
+        
+        # --- 페이지 정보 시그널 발생 ---
+        try:
+            page = self.renderer.doc.load_page(page_num)
+            rect = page.rect
+            rotation = page.rotation
+            self.page_info_updated.emit(page_num, rect.width, rect.height, rotation)
+        except Exception:
+            # 오류 발생 시 기본값으로 전송
+            self.page_info_updated.emit(page_num, 0, 0, 0)
+
 
         if page_num in self.page_cache:
             # 캐시에 있으면 바로 표시

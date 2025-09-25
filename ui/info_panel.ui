@@ -1,442 +1,137 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>RNSectionWidget</class>
- <widget class="QWidget" name="RNSectionWidget">
+ <class>info_panel</class>
+ <widget class="QWidget" name="info_panel">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>239</width>
-    <height>683</height>
+    <width>250</width>
+    <height>400</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="spacing">
-    <number>5</number>
-   </property>
-   <property name="leftMargin">
-    <number>0</number>
-   </property>
-   <property name="topMargin">
-    <number>0</number>
-   </property>
-   <property name="rightMargin">
-    <number>0</number>
-   </property>
-   <property name="bottomMargin">
-    <number>0</number>
-   </property>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QLabel" name="rn_title_label">
-       <property name="text">
-        <string>RN번호/파일명</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QLineEdit" name="rn_input">
-     <property name="placeholderText">
-      <string>예: RN123456789_홍길동</string>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>파일 정보</string>
      </property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>파일 경로:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLabel" name="label_file_path">
+        <property name="text">
+         <string>N/A</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>파일 크기:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLabel" name="label_file_size">
+        <property name="text">
+         <string>N/A</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_total_pages">
+        <property name="text">
+         <string>총 페이지:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLabel" name="label_total_pages_val">
+        <property name="text">
+         <string>N/A</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
-     <item>
-      <widget class="QPushButton" name="rn_confirm_btn">
-       <property name="text">
-        <string>확인</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="rn_edit_btn">
-       <property name="text">
-        <string>수정</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="region_title_row">
-     <item>
-      <widget class="QLabel" name="region_title_label">
-       <property name="text">
-        <string>지역</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QLineEdit" name="region_input"/>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="region_btn_row">
-     <item>
-      <widget class="QPushButton" name="region_confirm_btn">
-       <property name="text">
-        <string>확인</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="region_edit_btn">
-       <property name="text">
-        <string>수정</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="delivery_title_row">
-     <item>
-      <widget class="QLabel" name="delivery_title_label">
-       <property name="text">
-        <string>인도일</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QLineEdit" name="delivery_input"/>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="release_title_row">
-     <item>
-      <widget class="QLabel" name="release_title_label">
-       <property name="text">
-        <string>출고예정일</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QLineEdit" name="release_input"/>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="release_btn_row">
-     <item>
-      <widget class="QPushButton" name="release_confirm_btn">
-       <property name="text">
-        <string>확인</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="release_edit_btn">
-       <property name="text">
-        <string>수정</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QLabel" name="release_last_modified_label">
-     <property name="styleSheet">
-      <string notr="true">color: red; font-size: 8pt;</string>
+    <widget class="QGroupBox" name="groupBox_2">
+     <property name="title">
+      <string>현재 페이지 정보</string>
      </property>
-     <property name="text">
-      <string/>
-     </property>
+     <layout class="QFormLayout" name="formLayout_2">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="text">
+         <string>페이지 번호:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLabel" name="label_current_page">
+        <property name="text">
+         <string>N/A</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_9">
+        <property name="text">
+         <string>페이지 크기:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLabel" name="label_page_dims">
+        <property name="text">
+         <string>N/A</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_11">
+        <property name="text">
+         <string>회전 값 (원본):</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLabel" name="label_page_rotation">
+        <property name="text">
+         <string>N/A</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="release_insert_btn">
-     <property name="text">
-      <string>삽입</string>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
      </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="car_type_label">
-     <property name="text">
-      <string>차종</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QComboBox" name="car_type_combo">
-     <item>
-      <property name="text">
-       <string>선택</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Model 3 RWD</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Model 3 LongRange</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Model 3 Performance</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Model Y New RWD</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Model Y New LongRange</string>
-      </property>
-     </item>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="subsidy_label">
-     <property name="text">
-      <string>보조금 금액:</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLineEdit" name="subsidy_input">
-     <property name="styleSheet">
-      <string notr="true">QLineEdit:read-only { background-color: #f0f0f0; }</string>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QPushButton" name="subsidy_insert_btn">
-     <property name="text">
-      <string>삽입</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="stamp_label">
-     <property name="text">
-      <string>스탬프</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="stamp_btn_row">
-     <item>
-      <widget class="QPushButton" name="ingam_btn">
-       <property name="text">
-        <string>도장</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="wonbon_btn">
-       <property name="text">
-        <string>원본대조필</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="m_pan_btn">
-       <property name="text">
-        <string>명판</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="gongdan_stamp_btn_row">
-     <item>
-      <widget class="QPushButton" name="gongdan_ingam_btn">
-       <property name="text">
-        <string>공단_도장</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="gongdan_m_pan_btn">
-       <property name="text">
-        <string>공단_명판</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QCheckBox" name="m_pan_before_checkbox">
-     <property name="text">
-      <string>원본지자체 백업</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="shape_label">
-     <property name="text">
-      <string>도형 선택:</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QComboBox" name="shape_combo">
-     <item>
-      <property name="text">
-       <string>체크</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>원</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>네모</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>덮개</string>
-      </property>
-     </item>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLineEdit" name="size_input">
-     <property name="text">
-      <string>10</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QPushButton" name="shape_insert_btn">
-     <property name="text">
-      <string>도형 삽입</string>
-     </property>
-    </widget>
-   </item>
-
-    <item>
-    <widget class="QLabel" name="text_label">
-     <property name="text">
-      <string>텍스트:</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QTextEdit" name="text_input">
-     <property name="maximumSize">
+     <property name="sizeHint" stdset="0">
       <size>
-       <width>16777215</width>
-       <height>56</height>
+       <width>20</width>
+       <height>40</height>
       </size>
      </property>
-     <property name="placeholderText">
-      <string>삽입 텍스트 입력</string>
-     </property>
-    </widget>
+    </spacer>
    </item>
-   <item>
-    <layout class="QHBoxLayout" name="font_row">
-     <item>
-      <widget class="QLineEdit" name="text_fontsize_input">
-       <property name="maximumSize">
-        <size>
-         <width>60</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>10</string>
-       </property>
-       <property name="placeholderText">
-        <string>5~13</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="text_insert_btn">
-       <property name="maximumSize">
-        <size>
-         <width>60</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>삽입</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-
-   <item>
-    <widget class="QLabel" name="pen_label">
-     <property name="text">
-      <string>펜 설정:</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="pen_layout">
-     <item>
-      <widget class="QSpinBox" name="pen_width_input">
-       <property name="maximumSize">
-        <size>
-         <width>60</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="minimum">
-        <number>1</number>
-       </property>
-       <property name="maximum">
-        <number>20</number>
-       </property>
-       <property name="value">
-        <number>10</number>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="pen_color_btn">
-       <property name="maximumSize">
-        <size>
-         <width>80</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">background-color: black; color: white;</string>
-       </property>
-       <property name="text">
-        <string>검은색</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QPushButton" name="draw_btn">
-     <property name="text">
-      <string>그리기</string>
-     </property>
-    </widget>
-   </item>
-
-
   </layout>
  </widget>
  <resources/>

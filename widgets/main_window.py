@@ -8,9 +8,10 @@ from qt_material import apply_stylesheet
 
 from core.pdf_render import PdfRender
 from widgets.floating_toolbar import PdfSaveWorker
-from .pdf_load_widget import PdfLoadWidget
-from .pdf_view_widget import PdfViewWidget
-from .thumbnail_view_widget import ThumbnailViewWidget
+from widgets.pdf_load_widget import PdfLoadWidget
+from widgets.pdf_view_widget import PdfViewWidget
+from widgets.thumbnail_view_widget import ThumbnailViewWidget
+from widgets.info_panel_widget import InfoPanelWidget
 
 
 class MainWindow(QMainWindow):
@@ -34,6 +35,7 @@ class MainWindow(QMainWindow):
         self.thumbnail_widget = ThumbnailViewWidget()
         self.pdf_load_widget = PdfLoadWidget()
         self.pdf_view_widget = PdfViewWidget()
+        self.info_panel = InfoPanelWidget()
 
         self.main_content_stack = QStackedWidget()
         self.main_content_stack.addWidget(self.pdf_load_widget)
@@ -48,6 +50,7 @@ class MainWindow(QMainWindow):
         
         layout = QHBoxLayout(central_widget)
         layout.addWidget(self.main_splitter)
+        layout.addWidget(self.info_panel)
 
         self.setStatusBar(QStatusBar(self))
 
@@ -61,7 +64,11 @@ class MainWindow(QMainWindow):
         
         # 툴바의 저장 요청 시그널 연결
         self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._request_save_pdf)
-    
+        
+        # 정보 패널 업데이트 연결
+        self.pdf_view_widget.pdf_loaded.connect(self.info_panel.update_file_info)
+        self.pdf_view_widget.page_info_updated.connect(self.info_panel.update_page_info)
+
     def adjust_viewer_layout(self, is_landscape: bool):
         """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
         self.set_splitter_sizes(is_landscape)
@@ -154,11 +161,16 @@ class MainWindow(QMainWindow):
         
         self.thumbnail_widget.set_renderer(self.renderer)
         self.pdf_view_widget.set_renderer(self.renderer)
+        self.info_panel.set_renderer(self.renderer)
         
         if self.renderer.get_page_count() > 0:
             self.go_to_page(0)
 
         self.main_content_stack.setCurrentWidget(self.pdf_view_widget)
+        self.pdf_load_widget.show()
+        self.thumbnail_widget.clear()
+        self.pdf_view_widget.hide()
+        self.info_panel.clear_info()
 
     def go_to_page(self, page_num: int):
         """지정된 페이지로 이동한다."""
@@ -166,6 +178,7 @@ class MainWindow(QMainWindow):
             self._current_page = page_num
             self.pdf_view_widget.show_page(page_num)
             self.thumbnail_widget.set_current_page(page_num)
+            self.info_panel.update_page_info(page_num, self.renderer.get_page_count())
     
     def change_page(self, delta: int):
         """현재 페이지에서 delta만큼 페이지를 이동한다."""
