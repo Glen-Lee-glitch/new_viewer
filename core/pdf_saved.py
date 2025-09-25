@@ -142,7 +142,7 @@ def compress_pdf_file(
         src.close()
         dst.close()
 
-def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3):
+def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3, rotations=None):
     """
     여러 단계의 압축을 시도하여 PDF를 목표 크기로 압축하는 함수
     
@@ -150,6 +150,7 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3)
         input_path (str): 입력 PDF 파일 경로
         output_path (str): 출력 PDF 파일 경로
         target_size_mb (int): 목표 파일 크기 (MB)
+        rotations (dict, optional): {page_num: rotation_angle} 형태의 딕셔너리. Defaults to None.
     
     Returns:
         bool: 압축 성공 여부
@@ -157,15 +158,40 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3)
     import os
     import shutil
     
-    # 1) 원본이 목표 크기 이하면 그대로 사용
-    orig_mb = os.path.getsize(input_path) / (1024 * 1024)
+    rotations = rotations if rotations is not None else {}
+    rotated_input_path = input_path
+
+    # 1) 회전 정보가 있으면, 먼저 회전을 적용한 임시 파일을 생성한다.
+    if rotations:
+        try:
+            doc = pymupdf.open(input_path)
+            for page_num, rotation_angle in rotations.items():
+                if 0 <= page_num < len(doc):
+                    page = doc.load_page(page_num)
+                    # 원본 회전값에 사용자 회전값을 더함
+                    new_rotation = (page.rotation + rotation_angle) % 360
+                    page.set_rotation(new_rotation)
+            
+            # 회전이 적용된 새 임시 파일을 사용
+            rotated_input_path = input_path + ".rotated.tmp"
+            doc.save(rotated_input_path, garbage=4, deflate=True)
+            doc.close()
+        except Exception as e:
+            print(f"[오류] PDF 회전 적용 실패: {e}")
+            # 회전 실패 시 원본을 그대로 사용
+            rotated_input_path = input_path
+
+    # 2) 원본(또는 회전된 파일)이 목표 크기 이하면 그대로 사용
+    orig_mb = os.path.getsize(rotated_input_path) / (1024 * 1024)
     if orig_mb <= target_size_mb:
-        shutil.move(input_path, output_path)
+        shutil.move(rotated_input_path, output_path)
+        # .rotated.tmp 파일이 생성되었다면 여기서 input_path는 원본 임시파일이므로 삭제하면 안됨
+        # PdfSaveWorker의 finally 블록에서 모든 .tmp 파일을 정리함
         return True
 
-    # 2) 1단계 압축 시도 (중간 품질)
+    # 3) 1단계 압축 시도 (중간 품질)
     compressed_mb = compress_pdf_file(
-        input_path=input_path,
+        input_path=rotated_input_path,
         output_path=output_path,
         jpeg_quality=83,   # 중간 품질
         dpi=146,           # 중간 해상도
@@ -175,9 +201,9 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3)
     if compressed_mb is not None and compressed_mb <= target_size_mb:
         return True
 
-    # 3) 2단계 압축 시도 (낮은 품질)
+    # 4) 2단계 압축 시도 (낮은 품질)
     compressed_mb = compress_pdf_file(
-        input_path=input_path,
+        input_path=rotated_input_path,
         output_path=output_path,
         jpeg_quality=75,   # 낮은 품질
         dpi=125,           # 낮은 해상도
@@ -187,9 +213,9 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3)
     if compressed_mb is not None and compressed_mb <= target_size_mb:
         return True
 
-    # 4) 3단계 압축 시도 (최저 품질)
+    # 5) 3단계 압축 시도 (최저 품질)
     compressed_mb = compress_pdf_file(
-        input_path=input_path,
+        input_path=rotated_input_path,
         output_path=output_path,
         jpeg_quality=68,   # 최저 품질
         dpi=100,            # 최저 해상도
@@ -199,10 +225,10 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3)
     if compressed_mb is not None and compressed_mb <= target_size_mb:
         return True
 
-    # 5) 모든 압축 실패시 원본 저장
+    # 6) 모든 압축 실패시 회전된 버전(또는 원본) 저장
     try:
-        shutil.move(input_path, output_path)
-        return False  # 압축 실패했지만 원본은 저장됨
+        shutil.move(rotated_input_path, output_path)
+        return False  # 압축 실패했지만 회전된 버전은 저장됨
     except Exception as e:
-        print(f"[오류] 원본 파일 이동 실패: {e}")
+        print(f"[오류] 최종 파일 이동 실패: {e}")
         return False

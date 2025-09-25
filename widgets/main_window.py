@@ -131,19 +131,13 @@ class MainWindow(QMainWindow):
         self._start_save_process(self.pdf_view_widget.get_current_pdf_path())
 
     def _start_save_process(self, input_path: str):
-        """파일 대화상자를 열고 저장 프로세스를 시작한다."""
-        # 제안된 파일명 생성 (원본 파일명 + _compressed)
-        original_path = Path(input_path)
-        suggested_filename = f"{original_path.stem}_compressed.pdf"
-        
-        # 'test' 폴더 경로 설정
-        test_dir = Path(__file__).parent.parent / "test"
-        test_dir.mkdir(exist_ok=True) # 폴더가 없으면 생성
-        
+        """실제 PDF 저장 프로세스를 시작한다."""
+        # 파일 저장 경로 얻기
+        default_filename = Path(input_path).stem + "_edited.pdf"
         save_path, _ = QFileDialog.getSaveFileName(
             self,
-            "압축하여 다른 이름으로 저장",
-            str(test_dir / suggested_filename),
+            "PDF 저장",
+            default_filename,
             "PDF Files (*.pdf)"
         )
 
@@ -153,18 +147,22 @@ class MainWindow(QMainWindow):
 
         self.statusBar.showMessage(f"'{Path(save_path).name}' 파일 저장 중...", 0)
         
+        # 페이지별 회전 정보 가져오기
+        rotations = self.pdf_view_widget.get_page_rotations()
+
         # 백그라운드에서 압축 및 저장 실행
-        worker = PdfSaveWorker(input_path, save_path)
+        worker = PdfSaveWorker(input_path, save_path, rotations)
         worker.signals.finished.connect(self._on_save_finished)
         worker.signals.error.connect(lambda msg: self.statusBar.showMessage(f"저장 오류: {msg}", 5000))
-        self.pdf_view_widget.toolbar.thread_pool.start(worker)
+        self.thread_pool.start(worker)
 
-    def _on_save_finished(self, output_path: str, success: bool):
+    def _on_save_finished(self, path, success):
+        self.statusBar.clearMessage()
         """저장 완료 시 호출될 슬롯"""
         if success:
-            message = f"성공적으로 '{Path(output_path).name}'에 압축 저장되었습니다."
+            message = f"성공적으로 '{Path(path).name}'에 압축 저장되었습니다."
         else:
-            message = f"'{Path(output_path).name}'에 원본 파일을 저장했습니다 (압축 실패)."
+            message = f"'{Path(path).name}'에 원본 파일을 저장했습니다 (압축 실패)."
         
         self.statusBar.showMessage(message, 8000)
         QMessageBox.information(self, "저장 완료", message)

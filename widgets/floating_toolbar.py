@@ -22,11 +22,12 @@ class PdfSaveWorker(QRunnable):
     """
     QThreadPool에서 PDF 압축 및 저장을 실행하기 위한 Worker
     """
-    def __init__(self, input_path: str, output_path: str):
+    def __init__(self, input_path: str, output_path: str, rotations: dict | None = None):
         super().__init__()
         self.signals = WorkerSignals()
         self.input_path = input_path
         self.output_path = output_path
+        self.rotations = rotations if rotations is not None else {}
 
     def run(self):
         try:
@@ -37,7 +38,8 @@ class PdfSaveWorker(QRunnable):
             success = compress_pdf_with_multiple_stages(
                 input_path=temp_input_path,
                 output_path=self.output_path,
-                target_size_mb=3
+                target_size_mb=3,
+                rotations=self.rotations
             )
             self.signals.finished.emit(self.output_path, success)
         except Exception as e:

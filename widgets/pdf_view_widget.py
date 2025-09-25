@@ -83,7 +83,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.page_cache = {}  # 페이지 캐시: {page_num: QPixmap}
         self.rendering_jobs = set()  # 현재 렌더링 중인 페이지 번호
         self.current_page = -1
-        self.current_rotation = 0  # 현재 회전 각도 (0, 90, 180, 270)
+        self.page_rotations = {}  # 페이지별 사용자 회전 각도 저장 {page_num: rotation}
 
         self.init_ui()
 
@@ -160,6 +160,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.page_cache.clear()
         self.rendering_jobs.clear()
         self.current_page = -1
+        self.page_rotations = {} # 새 파일 로드 시 회전 정보 초기화
 
         # --- 파일 정보 시그널 발생 ---
         if self.renderer:
@@ -212,7 +213,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
         self.rendering_jobs.add(page_num)
         # 현재 회전 각도를 워커에 전달
-        worker = PdfRenderWorker(self.pdf_path, page_num, zoom_factor=2.0, user_rotation=self.current_rotation)
+        user_rotation = self.page_rotations.get(page_num, 0)
+        worker = PdfRenderWorker(self.pdf_path, page_num, zoom_factor=2.0, user_rotation=user_rotation)
         worker.signals.finished.connect(self._on_page_rendered)
         worker.signals.error.connect(self._on_render_error)
         self.thread_pool.start(worker)
@@ -265,7 +267,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             return
         
         # 회전 각도 업데이트 (90도씩 증가, 360도에서 0으로 리셋)
-        self.current_rotation = (self.current_rotation + 90) % 360
+        current_user_rotation = self.page_rotations.get(self.current_page, 0)
+        new_user_rotation = (current_user_rotation + 90) % 360
+        self.page_rotations[self.current_page] = new_user_rotation
         
         # 현재 페이지를 다시 렌더링 (회전 적용)
         if self.current_page >= 0:
@@ -356,3 +360,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     def get_current_pdf_path(self) -> str | None:
         """현재 열려있는 PDF 파일의 경로를 반환한다."""
         return self.pdf_path
+
+    def get_page_rotations(self) -> dict:
+        """사용자가 적용한 페이지별 회전 정보를 반환한다."""
+        return self.page_rotations
