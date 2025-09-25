@@ -66,6 +66,7 @@ class PdfRenderWorker(QRunnable):
             if self._is_a4_size(width_cm, height_cm):
                 page_to_render = original_page
             else:
+                print(f"페이지 {self.page_num + 1} 크기 조정 완료")
                 # 큰 페이지를 A4로 변환
                 temp_doc = pymupdf.open()  # 새 인메모리 PDF 문서
                 a4_rect = pymupdf.paper_rect("a4")
