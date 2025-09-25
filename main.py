@@ -3,7 +3,7 @@
 PDF Viewer 메인 애플리케이션
 """
 import sys
-from core.widgets import create_app
+from widgets.widgets import create_app
 
 def main():
     """메인 함수"""

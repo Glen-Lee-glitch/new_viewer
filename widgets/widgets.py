@@ -9,8 +9,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QEvent, QPoint
 from PyQt6.QtGui import QPixmap, QPainter, QIcon
 from PyQt6 import uic
-from .pdf_render import PdfRender
+from core.pdf_render import PdfRender
 from qt_material import apply_stylesheet
+from .pdf_view_widget import PdfViewWidget
 
 class ZoomableGraphicsView(QGraphicsView):
     """Ctrl + 마우스 휠로 확대/축소가 가능한 QGraphicsView"""
@@ -37,81 +38,6 @@ class ZoomableGraphicsView(QGraphicsView):
         else:
             # Ctrl 키가 눌리지 않으면 기본 스크롤 동작을 수행
             super().wheelEvent(event)
-
-class FloatingToolbarWidget(QWidget):
-    """pdf_view_widget 위에 떠다니는 이동 가능한 툴바."""
-    stamp_menu_requested = pyqtSignal()
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        ui_path = Path(__file__).parent.parent / "ui" / "floating_toolbar.ui"
-        uic.loadUi(str(ui_path), self)
-        
-        # 창 테두리 없애기 (parent 위젯에 자연스럽게 떠있도록)
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        # 스타일 스코프 고정
-        self.setObjectName("floatingToolbar")
-        self._apply_styles()
-        
-        self._is_dragging = False
-        self._drag_start_position = None
-
-        # 스탬프 버튼 클릭 시 오버레이 표시 요청
-        if hasattr(self, 'pushButton_stamp'):
-            try:
-                self.pushButton_stamp.clicked.connect(self.stamp_menu_requested.emit)
-            except Exception:
-                pass
-
-    def mousePressEvent(self, event):
-        # 'drag_handle_frame' 위에서 마우스를 눌렀는지 확인
-        if self.drag_handle_frame.underMouse():
-            if event.button() == Qt.MouseButton.LeftButton:
-                self._is_dragging = True
-                self._drag_start_position = event.globalPosition().toPoint() - self.pos()
-                self.setCursor(Qt.CursorShape.SizeAllCursor) # 커서를 '+' 모양으로 변경
-                event.accept()
-
-    def mouseMoveEvent(self, event):
-        if self._is_dragging:
-            self.move(event.globalPosition().toPoint() - self._drag_start_position)
-            event.accept()
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._is_dragging = False
-            self.setCursor(Qt.CursorShape.ArrowCursor) # 커서를 원래대로 복원
-            event.accept()
-
-    def _apply_styles(self):
-        """FloatingToolbar 전용 QSS 스타일을 적용한다."""
-        self.setStyleSheet(
-            """
-            #floatingToolbar QPushButton {
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-weight: 500;
-                min-height: 28px;
-            }
-            #floatingToolbar QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.08);
-            }
-            #floatingToolbar QPushButton:pressed {
-                background-color: rgba(255, 255, 255, 0.14);
-            }
-            #floatingToolbar QPushButton#pushButton_stamp {
-                background-color: #E91E63; /* pink 500 */
-                color: white;
-            }
-            #floatingToolbar QPushButton#pushButton_setting {
-                background-color: #607D8B; /* blue grey 500 */
-                color: white;
-            }
-            #floatingToolbar #drag_handle_frame {
-                background-color: rgba(255, 255, 255, 0.25);
-                border-radius: 3px;
-            }
-            """
-        )
 
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
@@ -166,83 +92,6 @@ class PdfLoadWidget(QWidget):
     def import_from_email(self):
         """메일에서 PDF 가져오기 (향후 구현)"""
         QMessageBox.information(self, "알림", "메일 가져오기 기능은 향후 구현 예정입니다.")
-
-class PdfViewWidget(QWidget):
-    """PDF 뷰어 위젯"""
-    page_change_requested = pyqtSignal(int)
-    
-    def __init__(self):
-        super().__init__()
-        self.renderer: PdfRender | None = None
-        self.scene = QGraphicsScene(self)
-        self.current_page_item: QGraphicsPixmapItem | None = None
-        self.init_ui()
-        
-        # --- 툴바 추가 ---
-        self.toolbar = FloatingToolbarWidget(self)
-        self.toolbar.show()
-
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-
-    def init_ui(self):
-        """UI 파일을 로드하고 초기화"""
-        ui_path = Path(__file__).parent.parent / "ui" / "pdf_view_widget.ui"
-        uic.loadUi(str(ui_path), self)
-        
-        # Graphics View 설정
-        if hasattr(self, 'pdf_graphics_view'):
-            self.pdf_graphics_view.setScene(self.scene)
-            self.setup_graphics_view()
-    
-    def setup_graphics_view(self):
-        """Graphics View 초기 설정"""
-        view = self.pdf_graphics_view
-        view.setRenderHints(
-            QPainter.RenderHint.Antialiasing |
-            QPainter.RenderHint.SmoothPixmapTransform |
-            QPainter.RenderHint.TextAntialiasing
-        )
-        view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-    
-    def resizeEvent(self, event):
-        """뷰어 크기가 변경될 때 툴바 위치를 재조정한다."""
-        super().resizeEvent(event)
-        # 툴바를 상단 중앙에 배치 (가로 중앙, 세로 상단에서 10px)
-        x = (self.width() - self.toolbar.width()) // 2
-        y = 10
-        self.toolbar.move(x, y)
-    
-    def keyPressEvent(self, event):
-        """키보드 'Q', 'E'를 눌러 페이지를 변경한다."""
-        if event.key() == Qt.Key.Key_Q:
-            self.page_change_requested.emit(-1)
-        elif event.key() == Qt.Key.Key_E:
-            self.page_change_requested.emit(1)
-        else:
-            super().keyPressEvent(event)
-    
-    def set_renderer(self, renderer: PdfRender | None):
-        """PDF 렌더러를 설정한다."""
-        self.renderer = renderer
-        self.scene.clear()
-        self.current_page_item = None
-
-    def show_page(self, page_num: int):
-        """지정된 페이지를 뷰에 렌더링한다."""
-        if not self.renderer:
-            return
-
-        try:
-            pixmap = self.renderer.render_page(page_num, zoom_factor=2.0)
-            if self.current_page_item:
-                self.current_page_item.setPixmap(pixmap)
-            else:
-                self.current_page_item = self.scene.addPixmap(pixmap)
-            
-            self.pdf_graphics_view.fitInView(self.scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
-        except (IndexError, RuntimeError) as e:
-            QMessageBox.warning(self, "오류", f"페이지 {page_num + 1}을(를) 표시할 수 없습니다: {e}")
 
 class ThumbnailViewWidget(QWidget):
     """썸네일 뷰어 위젯"""

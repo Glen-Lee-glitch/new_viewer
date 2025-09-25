@@ -33,7 +33,7 @@
   <customwidget>
    <class>ZoomableGraphicsView</class>
    <extends>QGraphicsView</extends>
-   <header>core.widgets</header>
+   <header>widgets.widgets</header>
   </customwidget>
  </customwidgets>
  <resources/>
