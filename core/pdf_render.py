@@ -1,4 +1,4 @@
-import fitz  # PyMuPDF
+import pymupdf  # PyMuPDF
 from PyQt6.QtGui import QPixmap, QImage, QIcon
 from PyQt6.QtCore import Qt
 
@@ -24,7 +24,7 @@ class PdfRender:
             ValueError: 문서 로드 실패 시
         """
         try:
-            self.doc = fitz.open(pdf_path)
+            self.doc = pymupdf.open(pdf_path)
         except Exception as exc:  # 파일 경로/형식 문제 포함
             raise ValueError(f"PDF 로드 실패: {exc}")
 
@@ -56,7 +56,7 @@ class PdfRender:
 
         page = self.doc.load_page(page_num)
         # alpha=False로 불필요한 알파 채널 방지(성능/메모리), 주석 해제 시 투명 포함 가능
-        mat = fitz.Matrix(zoom_factor, zoom_factor)
+        mat = pymupdf.Matrix(zoom_factor, zoom_factor)
         pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
 
         # PyMuPDF pixmap -> QImage -> QPixmap
@@ -93,7 +93,7 @@ class PdfRender:
             target_render_width = max(max_width * 2, max_width)  # 최소 2배 oversampling
             zoom = max(1.0, target_render_width / rect.width)
 
-        mat = fitz.Matrix(zoom, zoom)
+        mat = pymupdf.Matrix(zoom, zoom)
         pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
 
         image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
