@@ -2,7 +2,8 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QWidget, QGraphicsDropShadowEffect
+from PyQt6.QtGui import QColor
 
 class FloatingToolbarWidget(QWidget):
     """pdf_view_widget 위에 떠다니는 이동 가능한 툴바."""
@@ -14,6 +15,12 @@ class FloatingToolbarWidget(QWidget):
         
         # 창 테두리 없애기 (parent 위젯에 자연스럽게 떠있도록)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        # 배경 투명화
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        # 그림자 효과 추가
+        self._add_shadow_effect()
+        
         # 스타일 스코프 고정
         self.setObjectName("floatingToolbar")
         self._apply_styles()
@@ -27,14 +34,31 @@ class FloatingToolbarWidget(QWidget):
                 self.pushButton_stamp.clicked.connect(self.stamp_menu_requested.emit)
             except Exception:
                 pass
+                
+        # 드래그 핸들에 마우스 호버 효과 적용
+        if hasattr(self, 'drag_handle_label'):
+            self.drag_handle_label.setCursor(Qt.CursorShape.SizeAllCursor)
+
+    def _add_shadow_effect(self):
+        """툴바에 그림자 효과를 추가한다."""
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setXOffset(0)
+        shadow.setYOffset(3)
+        shadow.setColor(QColor(0, 0, 0, 120))
+        self.setGraphicsEffect(shadow)
 
     def mousePressEvent(self, event):
-        # 'drag_handle_frame' 위에서 마우스를 눌렀는지 확인
-        if self.drag_handle_frame.underMouse():
+        # 'drag_handle_label' 위에서 마우스를 눌렀는지 확인
+        if hasattr(self, 'drag_handle_label') and self.drag_handle_label.underMouse():
             if event.button() == Qt.MouseButton.LeftButton:
                 self._is_dragging = True
                 self._drag_start_position = event.globalPosition().toPoint() - self.pos()
-                self.setCursor(Qt.CursorShape.SizeAllCursor) # 커서를 '+' 모양으로 변경
+                # 드래그 중 시각적 피드백
+                self.drag_handle_label.setStyleSheet(
+                    self.drag_handle_label.styleSheet() + 
+                    "QLabel { color: rgba(255, 255, 255, 1.0); }"
+                )
                 event.accept()
 
     def mouseMoveEvent(self, event):
@@ -45,7 +69,20 @@ class FloatingToolbarWidget(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_dragging = False
-            self.setCursor(Qt.CursorShape.ArrowCursor) # 커서를 원래대로 복원
+            # 드래그 핸들 스타일을 원래대로 복원
+            if hasattr(self, 'drag_handle_label'):
+                self.drag_handle_label.setStyleSheet(
+                    """
+                    QLabel {
+                        color: rgba(255, 255, 255, 0.6);
+                        font-size: 14px;
+                        font-weight: bold;
+                        background: transparent;
+                        border: none;
+                        letter-spacing: -2px;
+                    }
+                    """
+                )
             event.accept()
 
     def _apply_styles(self):
@@ -53,28 +90,44 @@ class FloatingToolbarWidget(QWidget):
         self.setStyleSheet(
             """
             #floatingToolbar QPushButton {
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-weight: 500;
-                min-height: 28px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                color: #ffffff;
+                font-size: 16px;
+                font-weight: normal;
+                padding: 0px;
+                margin: 0px;
             }
             #floatingToolbar QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.15);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                transform: translateY(-1px);
             }
             #floatingToolbar QPushButton:pressed {
-                background-color: rgba(255, 255, 255, 0.14);
+                background: rgba(255, 255, 255, 0.25);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                transform: translateY(0px);
             }
             #floatingToolbar QPushButton#pushButton_stamp {
-                background-color: #E91E63; /* pink 500 */
-                color: white;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #FF6B9D, stop:1 #E91E63);
+                border: 1px solid #AD1457;
+            }
+            #floatingToolbar QPushButton#pushButton_stamp:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #FF8AB0, stop:1 #F06292);
+                border: 1px solid #C2185B;
             }
             #floatingToolbar QPushButton#pushButton_setting {
-                background-color: #607D8B; /* blue grey 500 */
-                color: white;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #78909C, stop:1 #546E7A);
+                border: 1px solid #37474F;
             }
-            #floatingToolbar #drag_handle_frame {
-                background-color: rgba(255, 255, 255, 0.25);
-                border-radius: 3px;
+            #floatingToolbar QPushButton#pushButton_setting:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #90A4AE, stop:1 #607D8B);
+                border: 1px solid #455A64;
             }
             """
         )
