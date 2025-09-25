@@ -34,14 +34,14 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self.pdf_load_widget)
-        splitter.addWidget(self.pdf_view_widget)
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.addWidget(self.pdf_load_widget)
+        self.main_splitter.addWidget(self.pdf_view_widget)
         
-        splitter.setSizes([600, 600])
+        self.main_splitter.setSizes([600, 600])
 
         main_layout.addWidget(self.thumbnail_viewer, 1)
-        main_layout.addWidget(splitter, 4)
+        main_layout.addWidget(self.main_splitter, 4)
         main_layout.addWidget(self.info_panel, 1)
         
         # --- 초기 위젯 상태 설정 ---
@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         self.thumbnail_viewer.page_selected.connect(self.go_to_page)
         self.thumbnail_viewer.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
-        self.pdf_view_widget.page_aspect_ratio_changed.connect(self.adjust_viewer_layout)
+        self.pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
         
         # 툴바의 저장 요청 시그널 연결
         self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._request_save_pdf)
@@ -112,18 +112,6 @@ class MainWindow(QMainWindow):
             # 세로 페이지: 뷰어 75%, 썸네일 25% (기존과 유사)
             self.main_splitter.setSizes([int(self.width() * 0.25), int(self.width() * 0.75)])
     
-    def resizeEvent(self, event):
-        """창 크기가 변경될 때 분할기 크기를 재조정한다."""
-        super().resizeEvent(event)
-        # 현재 페이지의 비율에 맞는 분할기 크기를 다시 적용
-        if self.pdf_view_widget.current_page_item:
-            pixmap = self.pdf_view_widget.current_page_item.pixmap()
-            is_landscape = pixmap.width() > pixmap.height()
-            self.set_splitter_sizes(is_landscape)
-        else:
-            # 문서가 로드되지 않았을 때는 기본값(세로) 적용
-            self.set_splitter_sizes(is_landscape=False)
-
     def _update_page_navigation(self, current_page: int, total_pages: int):
         """페이지 네비게이션 상태(라벨, 버튼 활성화)를 업데이트한다."""
         if total_pages > 0:
@@ -188,15 +176,19 @@ class MainWindow(QMainWindow):
 
     def load_document(self, pdf_path: str):
         """PDF 문서를 로드하고 뷰를 전환한다."""
+        # 기존 문서가 열려있으면 자원을 해제한다.
+        if self.renderer:
+            self.renderer.close()
+
         try:
-            self.renderer.close()
+            self.renderer = PdfRender()
             self.renderer.load_pdf(pdf_path)
-            self.setWindowTitle(f"PDF Viewer - {Path(pdf_path).name}")
-        except (ValueError, FileNotFoundError) as e:
-            QMessageBox.critical(self, "문서 로드 실패", str(e))
-            self.renderer.close()
-            self.setWindowTitle("PDF Viewer")
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"PDF 문서를 여는 데 실패했습니다: {e}")
+            self.renderer = None
             return
+
+        self.setWindowTitle(f"PDF Viewer - {Path(pdf_path).name}")
         
         self.thumbnail_viewer.set_renderer(self.renderer)
         self.pdf_view_widget.set_renderer(self.renderer)
