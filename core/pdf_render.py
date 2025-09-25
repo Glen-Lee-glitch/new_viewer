@@ -13,6 +13,7 @@ class PdfRender:
     def __init__(self):
         self.doc = None
         self.page_count = 0
+        self.pdf_path: str | None = None
 
     def load_pdf(self, pdf_path: str) -> None:
         """PDF 문서를 로드한다.
@@ -25,6 +26,7 @@ class PdfRender:
         """
         try:
             self.doc = pymupdf.open(pdf_path)
+            self.pdf_path = pdf_path
         except Exception as exc:  # 파일 경로/형식 문제 포함
             raise ValueError(f"PDF 로드 실패: {exc}")
 
