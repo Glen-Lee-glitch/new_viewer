@@ -9,9 +9,10 @@ from PyQt6.QtWidgets import (QGraphicsPixmapItem, QGraphicsScene,
 from core.pdf_render import PdfRender
 from .floating_toolbar import FloatingToolbarWidget
 from .zoomable_graphics_view import ZoomableGraphicsView
+from core.edit_mixin import ViewModeMixin
 
 
-class PdfViewWidget(QWidget):
+class PdfViewWidget(QWidget, ViewModeMixin):
     """PDF 뷰어 위젯"""
     page_change_requested = pyqtSignal(int)
     
@@ -25,6 +26,10 @@ class PdfViewWidget(QWidget):
         # --- 툴바 추가 ---
         self.toolbar = FloatingToolbarWidget(self)
         self.toolbar.show()
+        
+        # --- 툴바 시그널 연결 ---
+        self.toolbar.fit_to_width_requested.connect(self.set_fit_to_width)
+        self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -84,6 +89,6 @@ class PdfViewWidget(QWidget):
             else:
                 self.current_page_item = self.scene.addPixmap(pixmap)
             
-            self.pdf_graphics_view.fitInView(self.scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            self.set_fit_to_page()
         except (IndexError, RuntimeError) as e:
             QMessageBox.warning(self, "오류", f"페이지 {page_num + 1}을(를) 표시할 수 없습니다: {e}")

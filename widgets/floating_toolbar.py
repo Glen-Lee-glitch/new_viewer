@@ -8,6 +8,9 @@ from PyQt6.QtGui import QColor
 class FloatingToolbarWidget(QWidget):
     """pdf_view_widget 위에 떠다니는 이동 가능한 툴바."""
     stamp_menu_requested = pyqtSignal()
+    fit_to_width_requested = pyqtSignal()
+    fit_to_page_requested = pyqtSignal()
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         ui_path = Path(__file__).parent.parent / "ui" / "floating_toolbar.ui"
@@ -34,6 +37,10 @@ class FloatingToolbarWidget(QWidget):
                 self.pushButton_stamp.clicked.connect(self.stamp_menu_requested.emit)
             except Exception:
                 pass
+        
+        # 보기 모드 버튼 연결
+        if hasattr(self, 'pushButton_3'):
+            self.pushButton_3.clicked.connect(self.fit_to_width_requested.emit)
                 
         # 드래그 핸들에 마우스 호버 효과 적용
         if hasattr(self, 'drag_handle_label'):
