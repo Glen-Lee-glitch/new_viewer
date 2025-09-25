@@ -69,11 +69,11 @@ class PdfRenderWorker(QRunnable):
         height_cm = rect.height * 0.0352778
         
         if self._is_a4_size(width_cm, height_cm):
-            # A4 크기 범위: 낮은 배율로 선명도 유지
-            return 1.5
+            # A4 크기 범위: 기본 배율로 자연스러운 화질 유지
+            return 1.0
         else:
             # 큰 페이지: 높은 배율로 세부사항 유지
-            return 3.0
+            return 2.5
 
     def run(self):
         """백그라운드 스레드에서 렌더링 실행"""
@@ -252,8 +252,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         """주어진 QPixmap을 씬에 표시한다."""
         self.scene.clear()
         self.current_page_item = self.scene.addPixmap(pixmap)
-        # TODO: 현재 뷰 모드(fit_to_page, fit_to_width)에 맞게 스케일 조정 필요
-        self.set_fit_to_page()  # 기본값
+        
+        # 현재 페이지만을 기준으로 fit 모드 적용
+        self._fit_current_page_to_view()
 
     def _show_loading_message(self):
         """로딩 중 메시지를 표시한다."""
@@ -266,3 +267,68 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         """현재 페이지의 이전/다음 페이지를 미리 렌더링한다."""
         self._start_render_job(page_num + 1)
         self._start_render_job(page_num - 1)
+
+    def _fit_current_page_to_view(self):
+        """현재 페이지만을 기준으로 뷰에 맞춤 (기본값: fit to page)"""
+        self._fit_current_page_to_page()
+
+    def _fit_current_page_to_page(self):
+        """현재 페이지 전체가 보이도록 뷰를 조정 (Fit to Page)"""
+        if not hasattr(self, 'pdf_graphics_view') or not self.current_page_item:
+            return
+
+        view = self.pdf_graphics_view
+        
+        # 스크롤바 정책 설정
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        # 현재 페이지 아이템만을 기준으로 fitInView 적용
+        view.fitInView(self.current_page_item, Qt.AspectRatioMode.KeepAspectRatio)
+
+    def _fit_current_page_to_width(self):
+        """현재 페이지의 폭이 뷰어의 폭에 맞도록 뷰를 조정 (Fit to Width)"""
+        if not hasattr(self, 'pdf_graphics_view') or not self.current_page_item:
+            return
+
+        view = self.pdf_graphics_view
+        page_rect = self.current_page_item.boundingRect()
+
+        if page_rect.width() == 0:
+            return
+
+        # 폭 맞춤 시에는 세로 스크롤바가 필요할 수 있음
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        # 뷰포트의 가용 너비 계산
+        viewport_width = view.viewport().width()
+        
+        # 스케일 팩터 계산
+        scale_factor = viewport_width / page_rect.width()
+        
+        # 스케일 적용 후 세로 스크롤바가 생길 것으로 예상되면, 스크롤바 폭을 제외하고 다시 계산
+        scaled_height = page_rect.height() * scale_factor
+        if scaled_height > view.viewport().height():
+            scrollbar_width = view.style().pixelMetric(view.style().PixelMetric.PM_ScrollBarExtent)
+            viewport_width -= scrollbar_width
+        
+        # 최종 스케일 팩터 계산 및 적용
+        scale_factor = viewport_width / page_rect.width()
+        
+        from PyQt6.QtGui import QTransform
+        transform = QTransform()
+        transform.scale(scale_factor, scale_factor)
+        view.setTransform(transform)
+
+        # 페이지를 뷰 중앙에 배치
+        view.centerOn(self.current_page_item)
+
+    # ViewModeMixin의 메서드를 오버라이드하여 현재 페이지 기준으로 동작하도록 수정
+    def set_fit_to_page(self):
+        """페이지 전체가 보이도록 뷰를 조정 (현재 페이지 기준)"""
+        self._fit_current_page_to_page()
+
+    def set_fit_to_width(self):
+        """페이지의 폭이 뷰어의 폭에 맞도록 뷰를 조정 (현재 페이지 기준)"""
+        self._fit_current_page_to_width()
