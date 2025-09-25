@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
         # 백그라운드에서 압축 및 저장 실행
         worker = PdfSaveWorker(input_path, save_path)
         worker.signals.finished.connect(self._on_save_finished)
-        worker.signals.error.connect(self._on_save_error)
+        worker.signals.error.connect(lambda msg: self.statusBar().showMessage(f"저장 오류: {msg}", 5000))
         self.pdf_view_widget.toolbar.thread_pool.start(worker)
 
     def _on_save_finished(self, output_path: str, success: bool):
@@ -200,7 +200,7 @@ class MainWindow(QMainWindow):
         event.accept()
 
 def create_app():
-    """애플리케이션 생성 함수"""
+    """QApplication을 생성하고 메인 윈도우를 반환한다."""
     app = QApplication(sys.argv)
     try:
         apply_stylesheet(app, theme='dark_teal.xml')
