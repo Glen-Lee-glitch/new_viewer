@@ -47,27 +47,12 @@ class PdfRenderWorker(QRunnable):
         return vertical_match or horizontal_match
 
     def run(self):
-        """백그라운드 스레드에서 렌더링 실행. 원본 페이지를 회전값 0 기준으로 렌더링."""
+        """백그라운드 스레드에서 렌더링 실행. 핵심 로직은 PdfRender 클래스에 위임."""
         try:
-            doc = pymupdf.open(self.pdf_path)
-            if self.page_num < 0 or self.page_num >= len(doc):
-                raise IndexError("페이지 번호가 범위를 벗어났습니다.")
-
-            page = doc.load_page(self.page_num)
-            
-            # 페이지 회전 값을 무시하고 0도 기준으로 렌더링
-            zoom_matrix = pymupdf.Matrix(self.zoom_factor, self.zoom_factor)
-            
-            # page.derotation_matrix는 페이지의 기존 회전 값을 상쇄하는 행렬.
-            # 이 행렬을 먼저 적용한 후 줌을 적용하여, 회전되지 않은 원본을 렌더링.
-            final_matrix = page.derotation_matrix * zoom_matrix
-            pix = page.get_pixmap(matrix=final_matrix, alpha=False, annots=True)
-
-            image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
-            qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, image_format).copy()
-            pixmap = QPixmap.fromImage(qimage)
-
-            doc.close()
+            # PdfRender의 스레드 안전 메서드를 호출
+            pixmap = PdfRender.render_page_thread_safe(
+                self.pdf_path, self.page_num, self.zoom_factor
+            )
             self.signals.finished.emit(self.page_num, pixmap)
 
         except Exception as e:

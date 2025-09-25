@@ -124,3 +124,29 @@ class PdfRender:
     def get_page_count(self) -> int:
         """페이지 수 반환."""
         return self.page_count
+
+    @staticmethod
+    def render_page_thread_safe(pdf_path: str, page_num: int, zoom_factor: float = 2.0) -> QPixmap:
+        """
+        특정 PDF 파일의 한 페이지만을 스레드에 안전한 방식으로 렌더링한다.
+        회전값을 0으로 간주하여 물리적 방향 그대로 렌더링한다.
+        """
+        doc = None
+        try:
+            doc = pymupdf.open(pdf_path)
+            if page_num < 0 or page_num >= len(doc):
+                raise IndexError(f"잘못된 페이지 번호: {page_num}")
+
+            page = doc.load_page(page_num)
+            
+            zoom_matrix = pymupdf.Matrix(zoom_factor, zoom_factor)
+            final_matrix = page.derotation_matrix * zoom_matrix
+            pix = page.get_pixmap(matrix=final_matrix, alpha=False, annots=True)
+
+            image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
+            qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, image_format).copy()
+            return QPixmap.fromImage(qimage)
+        
+        finally:
+            if doc:
+                doc.close()
