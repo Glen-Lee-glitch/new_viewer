@@ -3,7 +3,8 @@ from pathlib import Path
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
-                             QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar)
+                             QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar,
+                             QPushButton, QLabel)
 from qt_material import apply_stylesheet
 
 from core.pdf_render import PdfRender
@@ -19,46 +20,68 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.renderer = PdfRender()
-        self._current_page = -1
-        self.init_ui()
-        self.setup_connections()
-    
-    def init_ui(self):
-        """메인 윈도우 UI 초기화"""
-        self.setWindowTitle("PDF Viewer")
-        self.setGeometry(100, 100, 1400, 800)
+        self.renderer: PdfRender | None = None
+        self.current_page = -1
         
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        
-        self.thumbnail_widget = ThumbnailViewWidget()
-        self.pdf_load_widget = PdfLoadWidget()
+        # --- 위젯 인스턴스 생성 ---
+        self.thumbnail_viewer = ThumbnailViewWidget()
         self.pdf_view_widget = PdfViewWidget()
+        self.pdf_load_widget = PdfLoadWidget()
         self.info_panel = InfoPanelWidget()
 
-        self.main_content_stack = QStackedWidget()
-        self.main_content_stack.addWidget(self.pdf_load_widget)
-        self.main_content_stack.addWidget(self.pdf_view_widget)
-
-        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.main_splitter.addWidget(self.thumbnail_widget)
-        self.main_splitter.addWidget(self.main_content_stack)
+        # --- 메인 레이아웃 설정 ---
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QHBoxLayout(central_widget)
         
-        # 초기 분할기 크기 설정 (세로 페이지 기준)
-        self.set_splitter_sizes(is_landscape=False)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(self.pdf_load_widget)
+        splitter.addWidget(self.pdf_view_widget)
         
-        layout = QHBoxLayout(central_widget)
-        layout.addWidget(self.main_splitter)
-        layout.addWidget(self.info_panel)
+        splitter.setSizes([600, 600])
 
-        self.setStatusBar(QStatusBar(self))
+        main_layout.addWidget(self.thumbnail_viewer, 1)
+        main_layout.addWidget(splitter, 4)
+        main_layout.addWidget(self.info_panel, 1)
+        
+        # --- 초기 위젯 상태 설정 ---
+        self.pdf_view_widget.hide()
+        self.thumbnail_viewer.hide()
+        self.info_panel.hide()
 
-    def setup_connections(self):
-        """시그널-슬롯 연결"""
+        # --- 메뉴바 및 액션 설정 ---
+        self._setup_menus()
+
+        # --- 상태바 및 페이지 네비게이션 UI 설정 ---
+        self.statusBar = QStatusBar(self)
+        self.setStatusBar(self.statusBar)
+        
+        nav_widget = QWidget()
+        nav_layout = QHBoxLayout(nav_widget)
+        nav_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.pushButton_prev = QPushButton("이전")
+        self.pushButton_next = QPushButton("다음")
+        self.label_page_nav = QLabel("N/A")
+        
+        nav_layout.addWidget(self.pushButton_prev)
+        nav_layout.addWidget(self.label_page_nav)
+        nav_layout.addWidget(self.pushButton_next)
+        
+        self.statusBar.addPermanentWidget(nav_widget)
+
+        # --- 시그널 연결 ---
+        self._setup_connections()
+
+    def _setup_menus(self):
+        """메뉴바를 설정합니다."""
+        pass # 메뉴바 설정 로직 추가
+
+    def _setup_connections(self):
+        """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
         self.pdf_load_widget.pdf_selected.connect(self.load_document)
-        self.thumbnail_widget.page_selected.connect(self.go_to_page)
-        self.thumbnail_widget.page_change_requested.connect(self.change_page)
+        self.thumbnail_viewer.page_selected.connect(self.go_to_page)
+        self.thumbnail_viewer.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_aspect_ratio_changed.connect(self.adjust_viewer_layout)
         
@@ -68,6 +91,13 @@ class MainWindow(QMainWindow):
         # 정보 패널 업데이트 연결
         self.pdf_view_widget.pdf_loaded.connect(self.info_panel.update_file_info)
         self.pdf_view_widget.page_info_updated.connect(self.info_panel.update_page_info)
+
+        # 페이지 네비게이션 버튼 클릭 시그널 연결
+        self.pushButton_prev.clicked.connect(lambda: self.change_page(-1))
+        self.pushButton_next.clicked.connect(lambda: self.change_page(1))
+        
+        # PdfViewWidget의 내부 페이지 변경 요청 -> 실제 페이지 변경 로직 실행
+        self.pdf_view_widget.page_change_requested.connect(self.change_page)
 
     def adjust_viewer_layout(self, is_landscape: bool):
         """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
@@ -168,35 +198,49 @@ class MainWindow(QMainWindow):
             self.setWindowTitle("PDF Viewer")
             return
         
-        self.thumbnail_widget.set_renderer(self.renderer)
+        self.thumbnail_viewer.set_renderer(self.renderer)
         self.pdf_view_widget.set_renderer(self.renderer)
-        
+
         if self.renderer.get_page_count() > 0:
             self.go_to_page(0)
 
-        self.main_content_stack.setCurrentWidget(self.pdf_view_widget)
+        self.pdf_load_widget.hide()
+        self.pdf_view_widget.show()
+        self.thumbnail_viewer.show()
+        self.info_panel.show()
+        
+    def _on_pdf_closed(self):
+        """PDF 파일이 닫혔을 때의 UI 상태를 처리한다."""
+        self.setWindowTitle("PDF Viewer")
+        self.renderer = None
+        self.current_page = -1
+
         self.pdf_load_widget.show()
-        self.thumbnail_widget.clear()
+        self.thumbnail_viewer.clear()
         self.pdf_view_widget.hide()
         self.info_panel.clear_info()
+        self.thumbnail_viewer.hide()
+        self.info_panel.hide()
+        self._update_page_navigation(0, 0)
 
     def go_to_page(self, page_num: int):
         """지정된 페이지 번호로 뷰를 이동시킨다."""
         if self.renderer and 0 <= page_num < self.renderer.get_page_count():
-            self._current_page = page_num
+            self.current_page = page_num
             self.pdf_view_widget.show_page(page_num)
-            self.thumbnail_widget.set_current_page(page_num)
-            self._update_page_navigation(self._current_page, self.renderer.get_page_count())
+            self.thumbnail_viewer.set_current_page(page_num)
+            self._update_page_navigation(self.current_page, self.renderer.get_page_count())
     
     def change_page(self, delta: int):
         """현재 페이지에서 delta만큼 페이지를 이동시킨다."""
-        if self._current_page != -1:
-            new_page = self._current_page + delta
+        if self.renderer and self.current_page != -1:
+            new_page = self.current_page + delta
             self.go_to_page(new_page)
 
     def closeEvent(self, event):
         """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
-        self.renderer.close()
+        if self.renderer:
+            self.renderer.close()
         event.accept()
 
 def create_app():
