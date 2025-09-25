@@ -1,4 +1,5 @@
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QGraphicsView
 
 
@@ -10,7 +11,6 @@ class ZoomableGraphicsView(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
     def wheelEvent(self, event):
         """마우스 휠 이벤트를 재정의하여 확대/축소 기능 구현"""
@@ -26,6 +26,19 @@ class ZoomableGraphicsView(QGraphicsView):
             self.scale(zoom_factor, zoom_factor)
         else:
             super().wheelEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent):
+        """마우스 클릭 시 Ctrl 키 상태에 따라 드래그 모드 변경"""
+        if event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        else:
+            self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        """마우스 버튼에서 손을 떼면 드래그 모드를 원래대로 복원"""
+        super().mouseReleaseEvent(event)
+        self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
 
 
 

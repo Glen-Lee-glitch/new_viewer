@@ -135,7 +135,6 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             QPainter.RenderHint.SmoothPixmapTransform |
             QPainter.RenderHint.TextAntialiasing
         )
-        view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
     
     def resizeEvent(self, event):
