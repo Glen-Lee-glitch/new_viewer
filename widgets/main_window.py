@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThreadPool
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
                              QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar,
                              QPushButton, QLabel)
@@ -20,8 +20,12 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("PDF Viewer")
+        self.setGeometry(100, 100, 1200, 800)
+
         self.renderer: PdfRender | None = None
         self.current_page = -1
+        self.thread_pool = QThreadPool()
         
         # --- 위젯 인스턴스 생성 ---
         self.thumbnail_viewer = ThumbnailViewWidget()
