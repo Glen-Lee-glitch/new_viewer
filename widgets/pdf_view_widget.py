@@ -76,6 +76,7 @@ class PdfRenderWorker(QRunnable):
 class PdfViewWidget(QWidget, ViewModeMixin):
     """PDF 뷰어 위젯"""
     page_change_requested = pyqtSignal(int)
+    page_aspect_ratio_changed = pyqtSignal(bool)  # is_landscape: 가로가 긴 페이지 여부
 
     def __init__(self):
         super().__init__()
@@ -225,6 +226,10 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.scene.clear()
         self.current_page_item = self.scene.addPixmap(pixmap)
         
+        # 페이지 비율을 감지하고 시그널을 발생시킨다.
+        is_landscape = pixmap.width() > pixmap.height()
+        self.page_aspect_ratio_changed.emit(is_landscape)
+
         # 현재 페이지만을 기준으로 fit 모드 적용
         self._fit_current_page_to_view()
 

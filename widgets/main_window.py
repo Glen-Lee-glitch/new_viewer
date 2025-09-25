@@ -39,13 +39,15 @@ class MainWindow(QMainWindow):
         self.main_content_stack.addWidget(self.pdf_load_widget)
         self.main_content_stack.addWidget(self.pdf_view_widget)
 
-        main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_splitter.addWidget(self.thumbnail_widget)
-        main_splitter.addWidget(self.main_content_stack)
-        main_splitter.setSizes([200, 1200])
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.addWidget(self.thumbnail_widget)
+        self.main_splitter.addWidget(self.main_content_stack)
+        
+        # 초기 분할기 크기 설정 (세로 페이지 기준)
+        self.set_splitter_sizes(is_landscape=False)
         
         layout = QHBoxLayout(central_widget)
-        layout.addWidget(main_splitter)
+        layout.addWidget(self.main_splitter)
 
         self.setStatusBar(QStatusBar(self))
 
@@ -55,10 +57,36 @@ class MainWindow(QMainWindow):
         self.thumbnail_widget.page_selected.connect(self.go_to_page)
         self.thumbnail_widget.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
+        self.pdf_view_widget.page_aspect_ratio_changed.connect(self.adjust_viewer_layout)
         
         # 툴바의 저장 요청 시그널 연결
         self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._request_save_pdf)
     
+    def adjust_viewer_layout(self, is_landscape: bool):
+        """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
+        self.set_splitter_sizes(is_landscape)
+
+    def set_splitter_sizes(self, is_landscape: bool):
+        """가로/세로 모드에 따라 QSplitter의 크기를 설정한다."""
+        if is_landscape:
+            # 가로 페이지: 뷰어 85%, 썸네일 15%
+            self.main_splitter.setSizes([int(self.width() * 0.15), int(self.width() * 0.85)])
+        else:
+            # 세로 페이지: 뷰어 75%, 썸네일 25% (기존과 유사)
+            self.main_splitter.setSizes([int(self.width() * 0.25), int(self.width() * 0.75)])
+    
+    def resizeEvent(self, event):
+        """창 크기가 변경될 때 분할기 크기를 재조정한다."""
+        super().resizeEvent(event)
+        # 현재 페이지의 비율에 맞는 분할기 크기를 다시 적용
+        if self.pdf_view_widget.current_page_item:
+            pixmap = self.pdf_view_widget.current_page_item.pixmap()
+            is_landscape = pixmap.width() > pixmap.height()
+            self.set_splitter_sizes(is_landscape)
+        else:
+            # 문서가 로드되지 않았을 때는 기본값(세로) 적용
+            self.set_splitter_sizes(is_landscape=False)
+
     def _request_save_pdf(self):
         """PDF 저장 요청을 처리한다."""
         current_path = self.pdf_view_widget.get_current_pdf_path()
