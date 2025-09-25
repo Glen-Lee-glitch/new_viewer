@@ -94,14 +94,23 @@ class MainWindow(QMainWindow):
             # 문서가 로드되지 않았을 때는 기본값(세로) 적용
             self.set_splitter_sizes(is_landscape=False)
 
+    def _update_page_navigation(self, current_page: int, total_pages: int):
+        """페이지 네비게이션 상태(라벨, 버튼 활성화)를 업데이트한다."""
+        if total_pages > 0:
+            self.label_page_nav.setText(f"{current_page + 1} / {total_pages}")
+        else:
+            self.label_page_nav.setText("N/A")
+
+        self.pushButton_prev.setEnabled(total_pages > 0 and current_page > 0)
+        self.pushButton_next.setEnabled(total_pages > 0 and current_page < total_pages - 1)
+
     def _request_save_pdf(self):
-        """PDF 저장 요청을 처리한다."""
-        current_path = self.pdf_view_widget.get_current_pdf_path()
-        if not current_path:
+        """PDF 저장 요청을 처리하고 파일 대화상자를 연다."""
+        if not self.pdf_view_widget.get_current_pdf_path():
             self.statusBar().showMessage("저장할 PDF 파일이 열려있지 않습니다.", 5000)
             return
         
-        self._start_save_process(current_path)
+        self._start_save_process(self.pdf_view_widget.get_current_pdf_path())
 
     def _start_save_process(self, input_path: str):
         """파일 대화상자를 열고 저장 프로세스를 시작한다."""
