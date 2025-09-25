@@ -11,10 +11,11 @@ def compress_pdf_file(
         jpeg_quality: int = 65,
         dpi: int = 120,
         size_threshold_kb: int = 300,  # 페이지 당 300 KB 이상만 재압축
-        user_rotations: dict = None  # 사용자가 적용한 페이지별 회전 정보
+        user_rotations: dict = None,  # 사용자가 적용한 페이지별 회전 정보
+        force_resize_pages: set = None # 강제 크기 조정을 적용할 페이지 번호
 ):
     """
-    이미지·스캔으로 추정되는 '무거운' 페이지만 재렌더링-압축하고,
+    이미지·스캔으로 추정되거나 강제 조정이 요청된 페이지만 재렌더링-압축하고,
     나머지 페이지는 그대로 복사한다.
     return: 새 PDF 용량(MB) ― 실패 시 None
     """
@@ -24,8 +25,12 @@ def compress_pdf_file(
     src = pymupdf.open(input_path)
     dst = pymupdf.open()                     # 결과 PDF
     user_rotations = user_rotations or {}
+    force_resize_pages = force_resize_pages or set()
     try:
         for i, page in enumerate(src):
+            # 강제 크기 조정이 요청된 페이지인지 확인
+            is_forced = i in force_resize_pages
+            
             image_list = []
             image_size = 0
             # --- 개선된 용량 추정 --------------------------
@@ -55,14 +60,14 @@ def compress_pdf_file(
             except Exception:
                 total_size = 0
 
-            # 페이지에 이미지가 없거나, 이미지 자체의 크기가 임계값 미만이면 '압축 불필요'로 간주
-            if not image_list or image_size / 1024 < size_threshold_kb:
+            # 조건: (이미지가 없거나 이미지 크기가 임계값 미만) 이고 (강제 조정이 아닐 때) -> 복사
+            if (not image_list or image_size / 1024 < size_threshold_kb) and not is_forced:
                 dst.insert_pdf(src, from_page=i, to_page=i)
                 continue
             
             # -------------------------------------------
 
-            # ── 여기부터 '무거운' 페이지만 이미지-재렌더링 ──
+            # ── 여기부터 '무거운' 페이지 또는 '강제 조정' 페이지만 이미지-재렌더링 ──
             try:
                 # === 뷰어 표시 형태 그대로 저장하는 로직 ===
                 # 뷰어에서 보이는 A4 세로 기준 통일된 형태로 정규화하여 저장한다.
@@ -161,7 +166,7 @@ def compress_pdf_file(
         src.close()
         dst.close()
 
-def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3, rotations=None):
+def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3, rotations=None, force_resize_pages=None):
     """
     여러 단계의 압축을 시도하여 PDF를 목표 크기로 압축하는 함수
     
@@ -170,6 +175,7 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
         output_path (str): 출력 PDF 파일 경로
         target_size_mb (int): 목표 파일 크기 (MB)
         rotations (dict, optional): {page_num: rotation_angle} 형태의 딕셔너리. Defaults to None.
+        force_resize_pages (set, optional): 강제 크기 조정을 적용할 페이지 번호. Defaults to None.
     
     Returns:
         bool: 압축 성공 여부
@@ -178,10 +184,11 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
     import shutil
     
     rotations = rotations if rotations is not None else {}
+    force_resize_pages = force_resize_pages if force_resize_pages is not None else set()
 
-    # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전 정보가 있으면 압축 시도)
+    # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전 정보나 강제 조정이 있으면 압축 시도)
     orig_mb = os.path.getsize(input_path) / (1024 * 1024)
-    if orig_mb <= target_size_mb and not rotations:
+    if orig_mb <= target_size_mb and not rotations and not force_resize_pages:
         shutil.copy2(input_path, output_path)
         return True
 
@@ -192,7 +199,8 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
         jpeg_quality=83,   # 중간 품질
         dpi=146,           # 중간 해상도
         size_threshold_kb=300,
-        user_rotations=rotations
+        user_rotations=rotations,
+        force_resize_pages=force_resize_pages
     )
     print(f"1단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
@@ -205,7 +213,8 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
         jpeg_quality=75,   # 낮은 품질
         dpi=125,           # 낮은 해상도
         size_threshold_kb=0,  # 모든 페이지 강제 이미지화
-        user_rotations=rotations
+        user_rotations=rotations,
+        force_resize_pages=force_resize_pages
     )
     print(f"2단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
@@ -218,7 +227,8 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
         jpeg_quality=68,   # 최저 품질
         dpi=100,            # 최저 해상도
         size_threshold_kb=0,  # 모든 페이지 강제 이미지화
-        user_rotations=rotations
+        user_rotations=rotations,
+        force_resize_pages=force_resize_pages
     )
     print(f"3단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:

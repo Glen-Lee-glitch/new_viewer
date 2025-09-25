@@ -153,9 +153,11 @@ class MainWindow(QMainWindow):
         
         # 페이지별 회전 정보 가져오기
         rotations = self.pdf_view_widget.get_page_rotations()
+        # 페이지별 강제 크기 조정 정보 가져오기
+        force_resize_pages = self.pdf_view_widget.get_force_resize_pages()
 
         # 백그라운드에서 압축 및 저장 실행
-        worker = PdfSaveWorker(input_path, save_path, rotations)
+        worker = PdfSaveWorker(input_path, save_path, rotations, force_resize_pages)
         worker.signals.finished.connect(self._on_save_finished)
         worker.signals.error.connect(lambda msg: self.statusBar.showMessage(f"저장 오류: {msg}", 5000))
         self.thread_pool.start(worker)

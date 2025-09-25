@@ -22,12 +22,13 @@ class PdfSaveWorker(QRunnable):
     """
     QThreadPool에서 PDF 압축 및 저장을 실행하기 위한 Worker
     """
-    def __init__(self, input_path: str, output_path: str, rotations: dict | None = None):
+    def __init__(self, input_path: str, output_path: str, rotations: dict | None = None, force_resize_pages: set | None = None):
         super().__init__()
         self.signals = WorkerSignals()
         self.input_path = input_path
         self.output_path = output_path
         self.rotations = rotations if rotations is not None else {}
+        self.force_resize_pages = force_resize_pages if force_resize_pages is not None else set()
 
     def run(self):
         try:
@@ -39,7 +40,8 @@ class PdfSaveWorker(QRunnable):
                 input_path=temp_input_path,
                 output_path=self.output_path,
                 target_size_mb=3,
-                rotations=self.rotations
+                rotations=self.rotations,
+                force_resize_pages=self.force_resize_pages
             )
             self.signals.finished.emit(self.output_path, success)
         except Exception as e:
@@ -56,7 +58,7 @@ class FloatingToolbarWidget(QWidget):
     fit_to_page_requested = pyqtSignal()
     rotate_90_requested = pyqtSignal()
     save_pdf_requested = pyqtSignal()
-    rotate_90_requested = pyqtSignal()
+    resize_page_requested = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -80,6 +82,10 @@ class FloatingToolbarWidget(QWidget):
 
         self.thread_pool = QThreadPool()
         
+        # 크기 조정 버튼 연결
+        if hasattr(self, 'pushButton_2'):
+            self.pushButton_2.clicked.connect(self.resize_page_requested.emit)
+            
         # 스탬프 버튼 클릭 시 오버레이 표시 요청
         if hasattr(self, 'pushButton_stamp'):
             try:

@@ -84,6 +84,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.rendering_jobs = set()  # 현재 렌더링 중인 페이지 번호
         self.current_page = -1
         self.page_rotations = {}  # 페이지별 사용자 회전 각도 저장 {page_num: rotation}
+        self.force_resize_pages = set() # 사용자가 수동으로 크기 조정을 요청한 페이지 번호
 
         self.init_ui()
 
@@ -95,12 +96,25 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.stamp_overlay = StampOverlayWidget(self)
 
         # --- 툴바 시그널 연결 ---
+        self.toolbar.resize_page_requested.connect(self._toggle_force_resize)
         self.toolbar.stamp_menu_requested.connect(self._toggle_stamp_overlay)
         self.toolbar.fit_to_width_requested.connect(self.set_fit_to_width)
         self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
         self.toolbar.rotate_90_requested.connect(self._rotate_current_page)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def _toggle_force_resize(self):
+        """현재 페이지를 강제 크기 조정 목록에 추가하거나 제거한다."""
+        if self.current_page < 0:
+            return
+            
+        if self.current_page in self.force_resize_pages:
+            self.force_resize_pages.remove(self.current_page)
+            print(f"페이지 {self.current_page + 1}: 크기 조정 해제")
+        else:
+            self.force_resize_pages.add(self.current_page)
+            print(f"페이지 {self.current_page + 1}: 크기 조정 적용")
 
     def _toggle_stamp_overlay(self):
         """스탬프 오버레이를 토글한다."""
@@ -161,6 +175,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.rendering_jobs.clear()
         self.current_page = -1
         self.page_rotations = {} # 새 파일 로드 시 회전 정보 초기화
+        self.force_resize_pages.clear() # 새 파일 로드 시 크기 조정 정보 초기화
 
         # --- 파일 정보 시그널 발생 ---
         if self.renderer:
@@ -424,3 +439,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     def get_page_rotations(self) -> dict:
         """사용자가 적용한 페이지별 회전 정보를 반환한다."""
         return self.page_rotations
+
+    def get_force_resize_pages(self) -> set:
+        """사용자가 수동으로 크기 조정을 요청한 페이지 목록을 반환한다."""
+        return self.force_resize_pages
