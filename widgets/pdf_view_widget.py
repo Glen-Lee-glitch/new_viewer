@@ -129,6 +129,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     def setup_graphics_view(self):
         """Graphics View 초기 설정"""
         view = self.pdf_graphics_view
+        view.setAlignment(Qt.AlignmentFlag.AlignCenter)  # 뷰의 콘텐츠를 항상 중앙에 정렬
         view.setRenderHints(
             QPainter.RenderHint.Antialiasing |
             QPainter.RenderHint.SmoothPixmapTransform |
