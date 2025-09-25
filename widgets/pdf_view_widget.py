@@ -47,7 +47,7 @@ class PdfRenderWorker(QRunnable):
         return vertical_match or horizontal_match
 
     def run(self):
-        """백그라운드 스레드에서 렌더링 실행. 썸네일 생성 로직과 유사하게 원본 비율을 유지."""
+        """백그라운드 스레드에서 렌더링 실행. 원본 페이지를 회전값 0 기준으로 렌더링."""
         try:
             doc = pymupdf.open(self.pdf_path)
             if self.page_num < 0 or self.page_num >= len(doc):
@@ -55,12 +55,13 @@ class PdfRenderWorker(QRunnable):
 
             page = doc.load_page(self.page_num)
             
-            # 페이지 회전 값은 get_pixmap에서 자동으로 처리됨
-            # 따라서 별도의 회전 로직은 필요 없음
-
-            # 고품질 렌더링을 위한 매트릭스 생성
-            mat = pymupdf.Matrix(self.zoom_factor, self.zoom_factor)
-            pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
+            # 페이지 회전 값을 무시하고 0도 기준으로 렌더링
+            zoom_matrix = pymupdf.Matrix(self.zoom_factor, self.zoom_factor)
+            
+            # page.derotation_matrix는 페이지의 기존 회전 값을 상쇄하는 행렬.
+            # 이 행렬을 먼저 적용한 후 줌을 적용하여, 회전되지 않은 원본을 렌더링.
+            final_matrix = page.derotation_matrix * zoom_matrix
+            pix = page.get_pixmap(matrix=final_matrix, alpha=False, annots=True)
 
             image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
             qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, image_format).copy()
