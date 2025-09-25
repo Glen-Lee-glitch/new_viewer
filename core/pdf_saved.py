@@ -23,6 +23,9 @@ def compress_pdf_file(
     src = pymupdf.open(input_path)
     dst = pymupdf.open()                     # 결과 PDF
     try:
+        # A4 페이지의 인치 크기 (세로 기준)
+        a4_inch_height = 11.69
+        
         for i, page in enumerate(src):
             # --- 개선된 용량 추정 --------------------------
             # 페이지와 관련된 모든 객체의 크기를 측정
@@ -61,7 +64,14 @@ def compress_pdf_file(
 
             # ── 여기부터 '무거운' 페이지만 이미지-재렌더링 ──
             try:
-                pix = page.get_pixmap(dpi=dpi, alpha=False)
+                # 페이지 크기에 따른 적응형 DPI 계산
+                page_height_inch = page.rect.height / 72  # 포인트 -> 인치
+                
+                # A4보다 얼마나 큰지에 따라 DPI를 반비례하여 줄임
+                # (최소 30 DPI는 보장하여 너무 낮은 화질 방지)
+                adaptive_dpi = max(30, int(dpi * (a4_inch_height / page_height_inch))) if page_height_inch > 0 else dpi
+                
+                pix = page.get_pixmap(dpi=adaptive_dpi, alpha=False)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
                 # 저장-품질 조정
