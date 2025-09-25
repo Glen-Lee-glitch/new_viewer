@@ -47,86 +47,26 @@ class PdfRenderWorker(QRunnable):
         return vertical_match or horizontal_match
 
     def run(self):
-        """백그라운드 스레드에서 렌더링 실행. 큰 페이지는 A4로 변환 후 렌더링."""
+        """백그라운드 스레드에서 렌더링 실행. 썸네일 생성 로직과 유사하게 원본 비율을 유지."""
         try:
             doc = pymupdf.open(self.pdf_path)
             if self.page_num < 0 or self.page_num >= len(doc):
                 raise IndexError("페이지 번호가 범위를 벗어났습니다.")
 
-            original_page = doc.load_page(self.page_num)
+            page = doc.load_page(self.page_num)
             
-            # 페이지 크기 확인 (포인트 -> cm)
-            rect = original_page.rect
-            width_cm = rect.width * 0.0352778
-            height_cm = rect.height * 0.0352778
-            
-            page_to_render = None
-            temp_doc = None
+            # 페이지 회전 값은 get_pixmap에서 자동으로 처리됨
+            # 따라서 별도의 회전 로직은 필요 없음
 
-            if self._is_a4_size(width_cm, height_cm):
-                page_to_render = original_page
-            else:
-                # --- A4 변환 로직 시작 ---
-                print(f"페이지 {self.page_num + 1} 크기 조정 완료")
-                temp_doc = pymupdf.open()
-                a4_rect = pymupdf.paper_rect("a4")
-
-                # 1. 최종 결과물이 될 A4 페이지의 방향을 '시각적' 기준으로 결정
-                rotation = original_page.rotation
-                if rotation == 90 or rotation == 270:
-                    visual_width, visual_height = rect.height, rect.width
-                else:
-                    visual_width, visual_height = rect.width, rect.height
-                
-                if visual_width > visual_height:
-                    # 시각적으로 가로가 길면 -> A4 가로 용지 생성
-                    new_page = temp_doc.new_page(width=a4_rect.height, height=a4_rect.width)
-                else:
-                    # 시각적으로 세로가 길면 -> A4 세로 용지 생성
-                    new_page = temp_doc.new_page(width=a4_rect.width, height=a4_rect.height)
-
-                # 2. '물리적' 크기 기준으로 삽입될 영역(target_box)을 계산
-                #    show_pdf_page는 물리적 크기 기준으로 작동하기 때문
-                physical_aspect = rect.width / rect.height if rect.height > 0 else 1
-                a4_aspect = new_page.rect.width / new_page.rect.height if new_page.rect.height > 0 else 1
-
-                if physical_aspect > a4_aspect:
-                    # 물리적으로 원본이 더 가로로 길면 -> 너비에 맞춤
-                    scale = new_page.rect.width / rect.width
-                    new_w = new_page.rect.width
-                    new_h = rect.height * scale
-                else:
-                    # 물리적으로 원본이 더 세로로 길면 -> 높이에 맞춤
-                    scale = new_page.rect.height / rect.height
-                    new_h = new_page.rect.height
-                    new_w = rect.width * scale
-
-                # 3. 계산된 영역을 A4 페이지 중앙에 배치
-                x_offset = (new_page.rect.width - new_w) / 2
-                y_offset = (new_page.rect.height - new_h) / 2
-                target_box = pymupdf.Rect(x_offset, y_offset, x_offset + new_w, y_offset + new_h)
-
-                # 4. 물리적 원본을 target_box에 삽입 (아직 회전 안됨)
-                new_page.show_pdf_page(target_box, doc, self.page_num)
-                
-                # 5. 새 페이지 전체에 원본 회전 값을 적용 (최종 방향 결정)
-                new_page.set_rotation(rotation)
-                page_to_render = new_page
-                # --- A4 변환 로직 종료 ---
-
-            # 최종 페이지 렌더링
+            # 고품질 렌더링을 위한 매트릭스 생성
             mat = pymupdf.Matrix(self.zoom_factor, self.zoom_factor)
-            pix = page_to_render.get_pixmap(matrix=mat, alpha=False, annots=True)
+            pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
 
             image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
             qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, image_format).copy()
             pixmap = QPixmap.fromImage(qimage)
 
-            # 리소스 정리
             doc.close()
-            if temp_doc:
-                temp_doc.close()
-
             self.signals.finished.emit(self.page_num, pixmap)
 
         except Exception as e:
