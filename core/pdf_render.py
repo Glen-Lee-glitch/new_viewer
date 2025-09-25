@@ -124,12 +124,13 @@ class PdfRender:
     def get_page_count(self) -> int:
         """페이지 수 반환."""
         return self.page_count
-
+    
     @staticmethod
     def render_page_thread_safe(pdf_path: str, page_num: int, zoom_factor: float = 2.0, user_rotation: int = 0) -> QPixmap:
         """
-        특정 PDF 파일의 한 페이지만을 스레드에 안전한 방식으로 렌더링한다.
-        회전값을 0으로 간주하여 물리적 방향 그대로 렌더링한 후, 사용자 회전을 적용한다.
+        모든 페이지를 A4 세로(Portrait) 기준으로 정규화하여 렌더링한다.
+        - 페이지의 원본 크기/회전값과 관계없이 일관된 A4 세로 레이아웃으로 보이도록 처리한다.
+        - 고화질을 위해 zoom_factor를 내부적으로 사용하여 A4보다 크게 렌더링 후 QTransform으로 회전한다.
         """
         doc = None
         try:
@@ -138,9 +139,27 @@ class PdfRender:
                 raise IndexError(f"잘못된 페이지 번호: {page_num}")
 
             page = doc.load_page(page_num)
+
+            # 1. 목표 A4 크기 정의 (고화질 렌더링을 위해 zoom_factor 적용)
+            a4_rect = pymupdf.paper_rect("a4")
+            target_rect = pymupdf.Rect(0, 0, a4_rect.width * zoom_factor, a4_rect.height * zoom_factor)
+
+            # 2. 페이지의 시각적 크기를 나타내는 사각형 계산
+            r = page.rect
+            if page.rotation in [90, 270]:
+                source_rect = pymupdf.Rect(0, 0, r.height, r.width)
+            else:
+                source_rect = pymupdf.Rect(0, 0, r.width, r.height)
             
-            zoom_matrix = pymupdf.Matrix(zoom_factor, zoom_factor)
-            final_matrix = page.derotation_matrix * zoom_matrix
+            # 3. 시각적 크기를 목표 A4 크기에 맞추는 변환 매트릭스 계산
+            fit_matrix = pymupdf.Matrix.new(from_rect=source_rect, to_rect=target_rect)
+
+            # 4. 페이지의 원본 회전을 적용하는 매트릭스 생성
+            rotation_matrix = pymupdf.Matrix(page.rotation)
+            
+            # 5. 두 매트릭스를 결합 (회전 후 맞춤)
+            final_matrix = rotation_matrix * fit_matrix
+
             pix = page.get_pixmap(matrix=final_matrix, alpha=False, annots=True)
 
             image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
@@ -148,7 +167,7 @@ class PdfRender:
             
             pixmap = QPixmap.fromImage(qimage)
 
-            # 사용자 회전이 있으면 QTransform을 사용하여 QPixmap을 직접 회전
+            # 6. 사용자 인터페이스 회전 적용
             if user_rotation != 0:
                 transform = QTransform().rotate(user_rotation)
                 pixmap = pixmap.transformed(transform, Qt.TransformationMode.SmoothTransformation)

@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
     def _request_save_pdf(self):
         """PDF 저장 요청을 처리하고 파일 대화상자를 연다."""
         if not self.pdf_view_widget.get_current_pdf_path():
-            self.statusBar().showMessage("저장할 PDF 파일이 열려있지 않습니다.", 5000)
+            self.statusBar.showMessage("저장할 PDF 파일이 열려있지 않습니다.", 5000)
             return
         
         self._start_save_process(self.pdf_view_widget.get_current_pdf_path())
@@ -148,15 +148,15 @@ class MainWindow(QMainWindow):
         )
 
         if not save_path:
-            self.statusBar().showMessage("저장이 취소되었습니다.", 3000)
+            self.statusBar.showMessage("저장이 취소되었습니다.", 3000)
             return
 
-        self.statusBar().showMessage(f"'{Path(save_path).name}' 파일 저장 중...", 0)
+        self.statusBar.showMessage(f"'{Path(save_path).name}' 파일 저장 중...", 0)
         
         # 백그라운드에서 압축 및 저장 실행
         worker = PdfSaveWorker(input_path, save_path)
         worker.signals.finished.connect(self._on_save_finished)
-        worker.signals.error.connect(lambda msg: self.statusBar().showMessage(f"저장 오류: {msg}", 5000))
+        worker.signals.error.connect(lambda msg: self.statusBar.showMessage(f"저장 오류: {msg}", 5000))
         self.pdf_view_widget.toolbar.thread_pool.start(worker)
 
     def _on_save_finished(self, output_path: str, success: bool):
@@ -166,12 +166,12 @@ class MainWindow(QMainWindow):
         else:
             message = f"'{Path(output_path).name}'에 원본 파일을 저장했습니다 (압축 실패)."
         
-        self.statusBar().showMessage(message, 8000)
+        self.statusBar.showMessage(message, 8000)
         QMessageBox.information(self, "저장 완료", message)
 
     def _on_save_error(self, error_msg: str):
         """저장 중 오류 발생 시 호출될 슬롯"""
-        self.statusBar().showMessage(f"오류 발생: {error_msg}", 8000)
+        self.statusBar.showMessage(f"오류 발생: {error_msg}", 8000)
         QMessageBox.critical(self, "저장 오류", f"PDF 저장 중 오류가 발생했습니다:\n{error_msg}")
 
     def load_document(self, pdf_path: str):
