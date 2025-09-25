@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (QGraphicsPixmapItem, QGraphicsScene,
 
 from core.pdf_render import PdfRender
 from .floating_toolbar import FloatingToolbarWidget
+from .zoomable_graphics_view import ZoomableGraphicsView
 
 
 class PdfViewWidget(QWidget):
