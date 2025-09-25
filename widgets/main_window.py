@@ -3,10 +3,11 @@ from pathlib import Path
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
-                             QMessageBox, QSplitter, QStackedWidget, QWidget)
+                             QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar)
 from qt_material import apply_stylesheet
 
 from core.pdf_render import PdfRender
+from widgets.floating_toolbar import PdfSaveWorker
 from .pdf_load_widget import PdfLoadWidget
 from .pdf_view_widget import PdfViewWidget
 from .thumbnail_view_widget import ThumbnailViewWidget
@@ -46,13 +47,71 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(central_widget)
         layout.addWidget(main_splitter)
 
+        self.setStatusBar(QStatusBar(self))
+
     def setup_connections(self):
         """시그널-슬롯 연결"""
         self.pdf_load_widget.pdf_selected.connect(self.load_document)
         self.thumbnail_widget.page_selected.connect(self.go_to_page)
         self.thumbnail_widget.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
+        
+        # 툴바의 저장 요청 시그널 연결
+        self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._request_save_pdf)
     
+    def _request_save_pdf(self):
+        """PDF 저장 요청을 처리한다."""
+        current_path = self.pdf_view_widget.get_current_pdf_path()
+        if not current_path:
+            self.statusBar().showMessage("저장할 PDF 파일이 열려있지 않습니다.", 5000)
+            return
+        
+        self._start_save_process(current_path)
+
+    def _start_save_process(self, input_path: str):
+        """파일 대화상자를 열고 저장 프로세스를 시작한다."""
+        # 제안된 파일명 생성 (원본 파일명 + _compressed)
+        original_path = Path(input_path)
+        suggested_filename = f"{original_path.stem}_compressed.pdf"
+        
+        # 'test' 폴더 경로 설정
+        test_dir = Path(__file__).parent.parent / "test"
+        test_dir.mkdir(exist_ok=True) # 폴더가 없으면 생성
+        
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "압축하여 다른 이름으로 저장",
+            str(test_dir / suggested_filename),
+            "PDF Files (*.pdf)"
+        )
+
+        if not save_path:
+            self.statusBar().showMessage("저장이 취소되었습니다.", 3000)
+            return
+
+        self.statusBar().showMessage(f"'{Path(save_path).name}' 파일 저장 중...", 0)
+        
+        # 백그라운드에서 압축 및 저장 실행
+        worker = PdfSaveWorker(input_path, save_path)
+        worker.signals.finished.connect(self._on_save_finished)
+        worker.signals.error.connect(self._on_save_error)
+        self.pdf_view_widget.toolbar.thread_pool.start(worker)
+
+    def _on_save_finished(self, output_path: str, success: bool):
+        """저장 완료 시 호출될 슬롯"""
+        if success:
+            message = f"성공적으로 '{Path(output_path).name}'에 압축 저장되었습니다."
+        else:
+            message = f"'{Path(output_path).name}'에 원본 파일을 저장했습니다 (압축 실패)."
+        
+        self.statusBar().showMessage(message, 8000)
+        QMessageBox.information(self, "저장 완료", message)
+
+    def _on_save_error(self, error_msg: str):
+        """저장 중 오류 발생 시 호출될 슬롯"""
+        self.statusBar().showMessage(f"오류 발생: {error_msg}", 8000)
+        QMessageBox.critical(self, "저장 오류", f"PDF 저장 중 오류가 발생했습니다:\n{error_msg}")
+
     def load_document(self, pdf_path: str):
         """PDF 문서를 로드하고 뷰를 전환한다."""
         try:

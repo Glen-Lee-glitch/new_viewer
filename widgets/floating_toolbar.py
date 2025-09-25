@@ -1,15 +1,58 @@
 from pathlib import Path
+import os
+import shutil
 
 from PyQt6 import uic
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QRunnable, QThreadPool
 from PyQt6.QtWidgets import QWidget, QGraphicsDropShadowEffect
 from PyQt6.QtGui import QColor
+
+from core.pdf_saved import compress_pdf_with_multiple_stages
+
+class WorkerSignals(QObject):
+    """
+    백그라운드 작업 스레드의 시그널을 정의합니다.
+    (진행률, 완료, 오류 등)
+    """
+    finished = pyqtSignal(str, bool)  # 저장 경로, 성공 여부
+    error = pyqtSignal(str)
+
+
+class PdfSaveWorker(QRunnable):
+    """
+    QThreadPool에서 PDF 압축 및 저장을 실행하기 위한 Worker
+    """
+    def __init__(self, input_path: str, output_path: str):
+        super().__init__()
+        self.signals = WorkerSignals()
+        self.input_path = input_path
+        self.output_path = output_path
+
+    def run(self):
+        try:
+            # 원본 파일을 output_path로 복사 (shutil.move 대신)
+            temp_input_path = self.output_path + ".tmp"
+            shutil.copy2(self.input_path, temp_input_path)
+            
+            success = compress_pdf_with_multiple_stages(
+                input_path=temp_input_path,
+                output_path=self.output_path,
+                target_size_mb=3
+            )
+            self.signals.finished.emit(self.output_path, success)
+        except Exception as e:
+            self.signals.error.emit(str(e))
+        finally:
+            if os.path.exists(temp_input_path):
+                os.remove(temp_input_path)
+
 
 class FloatingToolbarWidget(QWidget):
     """pdf_view_widget 위에 떠다니는 이동 가능한 툴바."""
     stamp_menu_requested = pyqtSignal()
     fit_to_width_requested = pyqtSignal()
     fit_to_page_requested = pyqtSignal()
+    save_pdf_requested = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -31,6 +74,8 @@ class FloatingToolbarWidget(QWidget):
         self._is_dragging = False
         self._drag_start_position = None
 
+        self.thread_pool = QThreadPool()
+        
         # 스탬프 버튼 클릭 시 오버레이 표시 요청
         if hasattr(self, 'pushButton_stamp'):
             try:
@@ -41,6 +86,9 @@ class FloatingToolbarWidget(QWidget):
         # 보기 모드 버튼 연결
         if hasattr(self, 'pushButton_3'):
             self.pushButton_3.clicked.connect(self.fit_to_width_requested.emit)
+        
+        if hasattr(self, 'pushButton_5'):
+            self.pushButton_5.clicked.connect(self.save_pdf_requested.emit)
                 
         # 드래그 핸들에 마우스 호버 효과 적용
         if hasattr(self, 'drag_handle_label'):

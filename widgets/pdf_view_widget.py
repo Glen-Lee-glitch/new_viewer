@@ -316,3 +316,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     def set_fit_to_width(self):
         """페이지의 폭이 뷰어의 폭에 맞도록 뷰를 조정 (현재 페이지 기준)"""
         self._fit_current_page_to_width()
+
+    def get_current_pdf_path(self) -> str | None:
+        """현재 열려있는 PDF 파일의 경로를 반환한다."""
+        return self.pdf_path
