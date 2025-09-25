@@ -11,6 +11,7 @@ from core.edit_mixin import ViewModeMixin
 from core.pdf_render import PdfRender
 
 from .floating_toolbar import FloatingToolbarWidget
+from .stamp_overlay_widget import StampOverlayWidget
 from .zoomable_graphics_view import ZoomableGraphicsView
 
 
@@ -68,6 +69,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.scene = QGraphicsScene(self)
         self.current_page_item: QGraphicsPixmapItem | None = None
         
+        # --- 오버레이 위젯 ---
+        self.stamp_overlay = None
+
         # --- 비동기 처리 및 캐싱 설정 ---
         self.thread_pool = QThreadPool.globalInstance()
         self.page_cache = {}  # 페이지 캐시: {page_num: QPixmap}
@@ -80,12 +84,23 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.toolbar = FloatingToolbarWidget(self)
         self.toolbar.show()
 
+        # --- 스탬프 오버레이 추가 ---
+        self.stamp_overlay = StampOverlayWidget(self)
+
         # --- 툴바 시그널 연결 ---
+        self.toolbar.stamp_menu_requested.connect(self._toggle_stamp_overlay)
         self.toolbar.fit_to_width_requested.connect(self.set_fit_to_width)
         self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
+    def _toggle_stamp_overlay(self):
+        """스탬프 오버레이를 토글한다."""
+        if self.stamp_overlay.isVisible():
+            self.stamp_overlay.hide()
+        else:
+            self.stamp_overlay.show_overlay(self.size())
+    
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
         ui_path = Path(__file__).parent.parent / "ui" / "pdf_view_widget.ui"
@@ -114,6 +129,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         x = (self.width() - self.toolbar.width()) // 2
         y = 10
         self.toolbar.move(x, y)
+        if self.stamp_overlay and self.stamp_overlay.isVisible():
+            self.stamp_overlay.setGeometry(0, 0, self.width(), self.height())
     
     def keyPressEvent(self, event):
         """키보드 'Q', 'E'를 눌러 페이지를 변경한다."""
