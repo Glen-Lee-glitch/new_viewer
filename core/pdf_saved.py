@@ -10,7 +10,8 @@ def compress_pdf_file(
         output_path: str,
         jpeg_quality: int = 65,
         dpi: int = 120,
-        size_threshold_kb: int = 300  # 페이지 당 300 KB 이상만 재압축
+        size_threshold_kb: int = 300,  # 페이지 당 300 KB 이상만 재압축
+        user_rotations: dict = None  # 사용자가 적용한 페이지별 회전 정보
 ):
     """
     이미지·스캔으로 추정되는 '무거운' 페이지만 재렌더링-압축하고,
@@ -22,10 +23,8 @@ def compress_pdf_file(
 
     src = pymupdf.open(input_path)
     dst = pymupdf.open()                     # 결과 PDF
+    user_rotations = user_rotations or {}
     try:
-        # A4 페이지의 인치 크기 (세로 기준)
-        a4_inch_height = 11.69
-        
         for i, page in enumerate(src):
             image_list = []
             image_size = 0
@@ -65,35 +64,83 @@ def compress_pdf_file(
 
             # ── 여기부터 '무거운' 페이지만 이미지-재렌더링 ──
             try:
-                # === WYSIWYG 원칙에 따른 렌더링 로직 ===
-                # 페이지의 원본 비율과 크기를 '그대로' 유지하며 압축한다.
+                # === 뷰어 표시 형태 그대로 저장하는 로직 ===
+                # 뷰어에서 보이는 A4 세로 기준 통일된 형태로 정규화하여 저장한다.
 
-                # 1. 렌더링 해상도(DPI)에 따른 확대/축소 매트릭스 생성
-                # 이 매트릭스는 페이지 크기나 비율을 바꾸지 않고, 렌더링 품질만 결정한다.
-                zoom_matrix = pymupdf.Matrix(dpi / 72, dpi / 72)
+                # 1. A4 세로 기준 크기 정의 (포인트 단위)
+                a4_rect = pymupdf.paper_rect("a4")  # 595.2 x 841.8 포인트
+                a4_width, a4_height = a4_rect.width, a4_rect.height
                 
-                # 2. get_pixmap()은 페이지의 원본 회전을 자동으로 처리하여 렌더링한다.
-                pix = page.get_pixmap(matrix=zoom_matrix, alpha=False, annots=True)
+                # 2. 페이지의 실제 시각적 표시 크기 계산
+                # 회전이 적용된 후 사용자가 실제로 보게 되는 크기를 기준으로 해야 함
+                user_rotation = user_rotations.get(i, 0)
+                total_rotation = (page.rotation + user_rotation) % 360
+                
+                # 페이지를 실제로 렌더링해서 시각적 크기를 얻어야 함
+                # get_pixmap()을 통해 회전이 적용된 실제 표시 크기를 확인
+                temp_matrix = pymupdf.Matrix(1.0, 1.0)  # 1:1 스케일로 임시 렌더링
+                if user_rotation != 0:
+                    rotation_matrix = pymupdf.Matrix(user_rotation)
+                    temp_matrix = rotation_matrix * temp_matrix
+                
+                temp_pix = page.get_pixmap(matrix=temp_matrix, alpha=False, annots=False)
+                
+                # 실제 시각적 표시 크기 (픽셀 단위를 포인트로 변환)
+                display_width = temp_pix.width * 72 / 72  # 72 DPI 기준
+                display_height = temp_pix.height * 72 / 72
+                
+                # 3. A4 세로 크기에 맞추되 비율을 유지하며 여백 최소화 스케일 계산
+                scale_x = a4_width / display_width
+                scale_y = a4_height / display_height
+                
+                # 잘림 없이 전체가 들어가도록 더 작은 스케일 사용
+                fit_scale = min(scale_x, scale_y)
+                
+                # 여백 최소화: A4 크기의 98%까지 사용 (최소 여백만 유지)
+                margin_utilization = 0.98
+                fit_scale = fit_scale * margin_utilization
+                
+                # 4. 최종 변환 매트릭스 생성
+                # 먼저 DPI 품질 향상을 위한 줌 적용
+                quality_zoom = dpi / 72
+                # 그 다음 A4 정규화를 위한 스케일 적용
+                final_scale = fit_scale * quality_zoom
+                
+                # 5. 최종 렌더링 (실제 시각적 크기를 기준으로 계산된 스케일 적용)
+                # 최종 스케일 매트릭스 생성
+                final_matrix = pymupdf.Matrix(final_scale, final_scale)
+                
+                # 사용자 회전이 있다면 추가 회전 매트릭스 생성
+                if user_rotation != 0:
+                    rotation_matrix = pymupdf.Matrix(user_rotation)
+                    # 회전 후 스케일 적용 (뷰어와 동일한 순서)
+                    final_matrix = rotation_matrix * final_matrix
+                
+                pix = page.get_pixmap(matrix=final_matrix, alpha=False, annots=True)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-                # 3. JPEG 이미지 버퍼 생성
+                # 6. JPEG 이미지 버퍼 생성
                 img_buf = io.BytesIO()
                 img.save(img_buf, format="JPEG", quality=jpeg_quality, optimize=True, progressive=True)
                 img_buf.seek(0)
 
-                # 4. 원본 페이지와 '동일한 크기'로 새 페이지를 생성한다.
-                # page.rect는 회전이 적용되지 않은 원본 크기를 나타낸다.
-                new_p = dst.new_page(
-                    width=page.rect.width,
-                    height=page.rect.height,
-                )
+                # 7. A4 세로 크기의 새 페이지 생성 (회전값 0으로 리셋)
+                new_p = dst.new_page(width=a4_width, height=a4_height)
+                # 회전값은 0으로 설정 (뷰어에서 보이는 형태가 이미 올바른 방향)
+                new_p.set_rotation(0)
                 
-                # 5. 원본 페이지의 회전 값을 그대로 새 페이지에 설정한다.
-                new_p.set_rotation(page.rotation)
+                # 8. 렌더링된 이미지를 A4 페이지 중앙에 배치
+                # 이미지 크기 계산
+                img_width = pix.width / quality_zoom
+                img_height = pix.height / quality_zoom
                 
-                # 6. 생성된 페이지에 압축된 이미지를 삽입한다.
-                # new_p.rect는 페이지의 사각형 영역을 나타낸다.
-                new_p.insert_image(new_p.rect, stream=img_buf.read())
+                # 중앙 배치를 위한 오프셋 계산
+                x_offset = (a4_width - img_width) / 2
+                y_offset = (a4_height - img_height) / 2
+                
+                # 이미지 삽입 영역 정의
+                insert_rect = pymupdf.Rect(x_offset, y_offset, x_offset + img_width, y_offset + img_height)
+                new_p.insert_image(insert_rect, stream=img_buf.read())
                 
             except Exception as e:
                 # 실패하면 그대로 복사(품질 보존 우선)
@@ -131,76 +178,56 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
     import shutil
     
     rotations = rotations if rotations is not None else {}
-    rotated_input_path = input_path
 
-    # 1) 회전 정보가 있으면, 먼저 회전을 적용한 임시 파일을 생성한다.
-    if rotations:
-        try:
-            doc = pymupdf.open(input_path)
-            for page_num, rotation_angle in rotations.items():
-                if 0 <= page_num < len(doc):
-                    page = doc.load_page(page_num)
-                    # 원본 회전값에 사용자 회전값을 더함
-                    new_rotation = (page.rotation + rotation_angle) % 360
-                    page.set_rotation(new_rotation)
-            
-            # 회전이 적용된 새 임시 파일을 사용
-            rotated_input_path = input_path + ".rotated.tmp"
-            doc.save(rotated_input_path, garbage=4, deflate=True)
-            doc.close()
-        except Exception as e:
-            print(f"[오류] PDF 회전 적용 실패: {e}")
-            # 회전 실패 시 원본을 그대로 사용
-            rotated_input_path = input_path
-
-    # 2) 원본(또는 회전된 파일)이 목표 크기 이하면 그대로 사용
-    orig_mb = os.path.getsize(rotated_input_path) / (1024 * 1024)
-    if orig_mb <= target_size_mb:
-        shutil.move(rotated_input_path, output_path)
-        # .rotated.tmp 파일이 생성되었다면 여기서 input_path는 원본 임시파일이므로 삭제하면 안됨
-        # PdfSaveWorker의 finally 블록에서 모든 .tmp 파일을 정리함
+    # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전 정보가 있으면 압축 시도)
+    orig_mb = os.path.getsize(input_path) / (1024 * 1024)
+    if orig_mb <= target_size_mb and not rotations:
+        shutil.copy2(input_path, output_path)
         return True
 
-    # 3) 1단계 압축 시도 (중간 품질)
+    # 2) 1단계 압축 시도 (중간 품질)
     compressed_mb = compress_pdf_file(
-        input_path=rotated_input_path,
+        input_path=input_path,
         output_path=output_path,
         jpeg_quality=83,   # 중간 품질
         dpi=146,           # 중간 해상도
-        size_threshold_kb=300
+        size_threshold_kb=300,
+        user_rotations=rotations
     )
     print(f"1단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
         return True
 
-    # 4) 2단계 압축 시도 (낮은 품질)
+    # 3) 2단계 압축 시도 (낮은 품질)
     compressed_mb = compress_pdf_file(
-        input_path=rotated_input_path,
+        input_path=input_path,
         output_path=output_path,
         jpeg_quality=75,   # 낮은 품질
         dpi=125,           # 낮은 해상도
-        size_threshold_kb=0  # 모든 페이지 강제 이미지화
+        size_threshold_kb=0,  # 모든 페이지 강제 이미지화
+        user_rotations=rotations
     )
     print(f"2단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
         return True
 
-    # 5) 3단계 압축 시도 (최저 품질)
+    # 4) 3단계 압축 시도 (최저 품질)
     compressed_mb = compress_pdf_file(
-        input_path=rotated_input_path,
+        input_path=input_path,
         output_path=output_path,
         jpeg_quality=68,   # 최저 품질
         dpi=100,            # 최저 해상도
-        size_threshold_kb=0  # 모든 페이지 강제 이미지화
+        size_threshold_kb=0,  # 모든 페이지 강제 이미지화
+        user_rotations=rotations
     )
     print(f"3단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
         return True
 
-    # 6) 모든 압축 실패시 회전된 버전(또는 원본) 저장
+    # 5) 모든 압축 실패시 원본 저장
     try:
-        shutil.move(rotated_input_path, output_path)
-        return False  # 압축 실패했지만 회전된 버전은 저장됨
+        shutil.copy2(input_path, output_path)
+        return False  # 압축 실패했지만 원본은 저장됨
     except Exception as e:
-        print(f"[오류] 최종 파일 이동 실패: {e}")
+        print(f"[오류] 최종 파일 복사 실패: {e}")
         return False

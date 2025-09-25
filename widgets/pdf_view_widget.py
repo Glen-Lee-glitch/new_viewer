@@ -242,11 +242,16 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.scene.clear()
         self.current_page_item = self.scene.addPixmap(pixmap)
         
-        # 페이지 비율을 감지하고 시그널을 발생시킨다.
-        is_landscape = pixmap.width() > pixmap.height()
+        # A4 세로 기준으로 페이지 비율을 평가
+        # A4 세로 비율: 21:29.7 ≈ 1:1.414
+        a4_portrait_ratio = 29.7 / 21.0
+        page_ratio = pixmap.height() / pixmap.width()
+        
+        # 페이지가 A4 세로보다 가로가 상대적으로 긴지 판단
+        is_landscape = page_ratio < a4_portrait_ratio
         self.page_aspect_ratio_changed.emit(is_landscape)
 
-        # 현재 페이지만을 기준으로 fit 모드 적용
+        # A4 세로 기준 통일된 뷰 적용
         self._fit_current_page_to_view()
 
     def _show_loading_message(self):
@@ -281,20 +286,14 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             self._start_render_job(self.current_page)
 
     def _fit_current_page_to_view(self):
-        """현재 페이지만을 기준으로 뷰에 맞춤 (페이지 비율에 따라 자동 선택)"""
+        """A4 세로 기준 통일된 뷰로 페이지를 표시 (모든 페이지 타입 고려)"""
         if not self.current_page_item:
             return
         
-        # 현재 페이지의 가로/세로 비율 확인
-        page_rect = self.current_page_item.boundingRect()
-        is_landscape = page_rect.width() > page_rect.height()
-        
-        if is_landscape:
-            # 가로가 긴 페이지 -> 폭에 맞춤 (전체가 보이도록)
-            self._fit_current_page_to_width()
-        else:
-            # 세로가 긴 페이지 -> 전체 맞춤
-            self._fit_current_page_to_page()
+        # 모든 페이지를 A4 세로 기준으로 통일된 방식으로 표시
+        # 페이지가 뷰포트보다 크면 축소하여 전체가 보이도록 하고,
+        # 작으면 적절한 크기로 확대하여 표시
+        self._fit_to_a4_portrait_standard()
 
     def _fit_current_page_to_page(self):
         """현재 페이지 전체가 보이도록 뷰를 조정 (Fit to Page)"""
@@ -348,14 +347,75 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         # 페이지를 뷰 중앙에 배치
         view.centerOn(self.current_page_item)
 
-    # ViewModeMixin의 메서드를 오버라이드하여 현재 페이지 기준으로 동작하도록 수정
+    def _fit_to_a4_portrait_standard(self):
+        """A4 세로 기준으로 통일된 뷰 제공 - 모든 페이지 타입을 고려한 최적화"""
+        if not hasattr(self, 'pdf_graphics_view') or not self.current_page_item:
+            return
+
+        view = self.pdf_graphics_view
+        page_rect = self.current_page_item.boundingRect()
+        
+        # 뷰포트 크기
+        viewport_rect = view.viewport().rect()
+        
+        # A4 세로 비율 (21:29.7 ≈ 1:1.414)
+        a4_portrait_ratio = 29.7 / 21.0
+        
+        # 뷰포트를 A4 세로 비율에 맞춘 가상 영역 계산
+        viewport_width = viewport_rect.width()
+        viewport_height = viewport_rect.height()
+        
+        # 뷰포트가 A4 세로보다 더 가로로 넓다면, 세로를 기준으로 가로를 제한
+        ideal_width = viewport_height / a4_portrait_ratio
+        if ideal_width < viewport_width:
+            effective_viewport_width = ideal_width
+            effective_viewport_height = viewport_height
+        else:
+            # 뷰포트가 A4 세로보다 더 세로로 길다면, 가로를 기준으로 세로를 제한
+            effective_viewport_width = viewport_width
+            effective_viewport_height = viewport_width * a4_portrait_ratio
+        
+        # 스크롤바 정책: 페이지가 효과적 뷰포트보다 크면 스크롤바 표시
+        if (page_rect.width() > effective_viewport_width * 0.95 or 
+            page_rect.height() > effective_viewport_height * 0.95):
+            view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        else:
+            view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        # 페이지가 효과적 뷰포트에 맞도록 스케일 계산
+        scale_x = effective_viewport_width / page_rect.width()
+        scale_y = effective_viewport_height / page_rect.height()
+        
+        # 페이지가 잘리지 않도록 더 작은 스케일을 사용 (축소 우선)
+        scale_factor = min(scale_x, scale_y)
+        
+        # 여백 최소화: A4 크기의 98%까지 사용 (저장 시와 동일한 로직)
+        margin_utilization = 0.98
+        scale_factor = scale_factor * margin_utilization
+        
+        # 너무 작아지지 않도록 최소 스케일 제한 (선택적)
+        min_scale = 0.1
+        scale_factor = max(scale_factor, min_scale)
+        
+        # 변환 매트릭스 적용
+        from PyQt6.QtGui import QTransform
+        transform = QTransform()
+        transform.scale(scale_factor, scale_factor)
+        view.setTransform(transform)
+        
+        # 페이지를 뷰 중앙에 배치
+        view.centerOn(self.current_page_item)
+
+    # ViewModeMixin의 메서드를 오버라이드하여 A4 세로 기준 통일된 뷰 사용
     def set_fit_to_page(self):
-        """페이지 전체가 보이도록 뷰를 조정 (현재 페이지 기준)"""
-        self._fit_current_page_to_page()
+        """A4 세로 기준 통일된 뷰로 페이지 전체가 보이도록 조정"""
+        self._fit_to_a4_portrait_standard()
 
     def set_fit_to_width(self):
-        """페이지의 폭이 뷰어의 폭에 맞도록 뷰를 조정 (현재 페이지 기준)"""
-        self._fit_current_page_to_width()
+        """A4 세로 기준 통일된 뷰로 페이지 폭에 맞도록 조정"""
+        self._fit_to_a4_portrait_standard()
 
     def get_current_pdf_path(self) -> str | None:
         """현재 열려있는 PDF 파일의 경로를 반환한다."""
