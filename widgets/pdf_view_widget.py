@@ -29,12 +29,51 @@ class WorkerSignals(QObject):
 class PdfRenderWorker(QRunnable):
     """단일 PDF 페이지를 렌더링하는 Worker 스레드"""
 
-    def __init__(self, pdf_path: str, page_num: int, zoom_factor: float = 3.0):
+    def __init__(self, pdf_path: str, page_num: int, zoom_factor: float = None):
         super().__init__()
         self.pdf_path = pdf_path
         self.page_num = page_num
-        self.zoom_factor = zoom_factor
+        self.zoom_factor = zoom_factor  # None이면 자동으로 계산
         self.signals = WorkerSignals()
+
+    @staticmethod
+    def _is_a4_size(width_cm: float, height_cm: float, tolerance: float = 2.0) -> bool:
+        """페이지가 A4 크기 범위 내인지 확인한다.
+        
+        Args:
+            width_cm: 페이지 너비 (cm)
+            height_cm: 페이지 높이 (cm)  
+            tolerance: 허용 오차 (cm)
+        
+        Returns:
+            A4 크기 범위 내이면 True
+        """
+        # A4 크기: 21.0 x 29.7 cm (세로 방향) 또는 29.7 x 21.0 cm (가로 방향)
+        a4_width, a4_height = 21.0, 29.7
+        
+        # 세로 방향 A4 확인
+        vertical_match = (abs(width_cm - a4_width) <= tolerance and 
+                         abs(height_cm - a4_height) <= tolerance)
+        
+        # 가로 방향 A4 확인  
+        horizontal_match = (abs(width_cm - a4_height) <= tolerance and
+                           abs(height_cm - a4_width) <= tolerance)
+        
+        return vertical_match or horizontal_match
+
+    def _calculate_adaptive_zoom(self, page) -> float:
+        """페이지 크기에 따라 적응적 줌 팩터를 계산한다."""
+        rect = page.rect
+        # 포인트를 cm로 변환 (1 포인트 = 0.0352778 cm)
+        width_cm = rect.width * 0.0352778
+        height_cm = rect.height * 0.0352778
+        
+        if self._is_a4_size(width_cm, height_cm):
+            # A4 크기 범위: 낮은 배율로 선명도 유지
+            return 1.5
+        else:
+            # 큰 페이지: 높은 배율로 세부사항 유지
+            return 3.0
 
     def run(self):
         """백그라운드 스레드에서 렌더링 실행"""
@@ -44,7 +83,11 @@ class PdfRenderWorker(QRunnable):
                 raise IndexError("페이지 번호가 범위를 벗어났습니다.")
 
             page = doc.load_page(self.page_num)
-            mat = pymupdf.Matrix(self.zoom_factor, self.zoom_factor)
+            
+            # 줌 팩터 결정
+            zoom_factor = self.zoom_factor if self.zoom_factor is not None else self._calculate_adaptive_zoom(page)
+            
+            mat = pymupdf.Matrix(zoom_factor, zoom_factor)
             pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
 
             image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
@@ -181,7 +224,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             return
 
         self.rendering_jobs.add(page_num)
-        worker = PdfRenderWorker(self.pdf_path, page_num, zoom_factor=3.0)
+        # zoom_factor=None으로 설정하여 페이지 크기에 따라 자동으로 계산되도록 함
+        worker = PdfRenderWorker(self.pdf_path, page_num, zoom_factor=None)
         worker.signals.finished.connect(self._on_page_rendered)
         worker.signals.error.connect(self._on_render_error)
         self.thread_pool.start(worker)
