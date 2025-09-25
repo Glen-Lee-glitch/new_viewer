@@ -9,7 +9,6 @@ from qt_material import apply_stylesheet
 from core.pdf_render import PdfRender
 from .pdf_load_widget import PdfLoadWidget
 from .pdf_view_widget import PdfViewWidget
-from .stamp_overlay_widget import StampOverlayWidget
 from .thumbnail_view_widget import ThumbnailViewWidget
 
 
@@ -21,7 +20,6 @@ class MainWindow(QMainWindow):
         self.renderer = PdfRender()
         self._current_page = -1
         self.init_ui()
-        self.stamp_overlay = StampOverlayWidget(self)
         self.setup_connections()
     
     def init_ui(self):
@@ -54,8 +52,6 @@ class MainWindow(QMainWindow):
         self.thumbnail_widget.page_selected.connect(self.go_to_page)
         self.thumbnail_widget.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
-        if hasattr(self.pdf_view_widget, 'toolbar'):
-            self.pdf_view_widget.toolbar.stamp_menu_requested.connect(self.show_stamp_overlay)
     
     def load_document(self, pdf_path: str):
         """PDF 문서를 로드하고 뷰를 전환한다."""
@@ -89,15 +85,6 @@ class MainWindow(QMainWindow):
         if self._current_page != -1:
             new_page = self._current_page + delta
             self.go_to_page(new_page)
-
-    def show_stamp_overlay(self):
-        """스탬프 오버레이를 메인 윈도우 크기에 맞춰 표시한다."""
-        self.stamp_overlay.show_overlay(self.size())
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if hasattr(self, 'stamp_overlay') and self.stamp_overlay.isVisible():
-            self.stamp_overlay.setGeometry(0, 0, self.width(), self.height())
 
     def closeEvent(self, event):
         """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
