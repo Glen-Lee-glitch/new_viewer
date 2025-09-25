@@ -1,6 +1,6 @@
 import pymupdf  # PyMuPDF
 from PyQt6.QtGui import QPixmap, QImage, QIcon
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QBuffer, QIODevice
 
 
 class PdfRender:
@@ -152,10 +152,11 @@ class PdfRender:
                 import io
                 
                 # QImage를 PIL Image로 변환
-                buffer = io.BytesIO()
-                qimage.save(buffer, 'PNG')
+                buffer = QBuffer()
+                buffer.open(QIODevice.OpenModeFlag.ReadWrite)
+                qimage.save(buffer, "PNG") # QIODevice를 사용
                 buffer.seek(0)
-                pil_image = Image.open(buffer)
+                pil_image = Image.open(io.BytesIO(buffer.data()))
                 
                 # PIL로 회전 (반시계방향이므로 음수 적용)
                 rotated_image = pil_image.rotate(-user_rotation, expand=True)
