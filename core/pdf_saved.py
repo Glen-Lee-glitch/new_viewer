@@ -28,6 +28,7 @@ def compress_pdf_file(
     force_resize_pages = force_resize_pages or set()
     try:
         for i, page in enumerate(src):
+            user_rotation = user_rotations.get(i, 0)
             # 강제 크기 조정이 요청된 페이지인지 확인
             is_forced = i in force_resize_pages
             
@@ -61,7 +62,7 @@ def compress_pdf_file(
                 total_size = 0
 
             # 조건: (이미지가 없거나 이미지 크기가 임계값 미만) 이고 (강제 조정이 아닐 때) -> 복사
-            if (not image_list or image_size / 1024 < size_threshold_kb) and not is_forced:
+            if (not image_list or image_size / 1024 < size_threshold_kb) and not is_forced and user_rotation == 0:
                 dst.insert_pdf(src, from_page=i, to_page=i)
                 continue
             
@@ -78,7 +79,6 @@ def compress_pdf_file(
                 
                 # 2. 페이지의 실제 시각적 표시 크기 계산
                 # 회전이 적용된 후 사용자가 실제로 보게 되는 크기를 기준으로 해야 함
-                user_rotation = user_rotations.get(i, 0)
                 total_rotation = (page.rotation + user_rotation) % 360
                 
                 # 페이지를 실제로 렌더링해서 시각적 크기를 얻어야 함
@@ -94,16 +94,21 @@ def compress_pdf_file(
                 display_width = temp_pix.width * 72 / 72  # 72 DPI 기준
                 display_height = temp_pix.height * 72 / 72
                 
-                # 3. A4 세로 크기에 맞추되 비율을 유지하며 여백 최소화 스케일 계산
-                scale_x = a4_width / display_width
-                scale_y = a4_height / display_height
-                
+                # 3. A4 크기에 맞추되 비율을 유지하며 여백 최소화 스케일 계산
+                # 회전 각도에 따라 목표 페이지 크기 결정
+                is_landscape = (user_rotation % 180 == 90)  # 90도나 270도면 가로 방향
+                if is_landscape:
+                    # A4 가로 방향 사용
+                    target_width, target_height = a4_height, a4_width
+                else:
+                    # A4 세로 방향 사용
+                    target_width, target_height = a4_width, a4_height
+
+                scale_x = target_width / display_width
+                scale_y = target_height / display_height
+
                 # 잘림 없이 전체가 들어가도록 더 작은 스케일 사용
                 fit_scale = min(scale_x, scale_y)
-                
-                # 여백 최소화: A4 크기의 98%까지 사용 (최소 여백만 유지)
-                margin_utilization = 0.98
-                fit_scale = fit_scale * margin_utilization
                 
                 # 4. 최종 변환 매트릭스 생성
                 # 먼저 DPI 품질 향상을 위한 줌 적용
@@ -129,20 +134,31 @@ def compress_pdf_file(
                 img.save(img_buf, format="JPEG", quality=jpeg_quality, optimize=True, progressive=True)
                 img_buf.seek(0)
 
-                # 7. A4 세로 크기의 새 페이지 생성 (회전값 0으로 리셋)
-                new_p = dst.new_page(width=a4_width, height=a4_height)
+                # 7. 회전 각도에 따라 A4 페이지 방향 결정 (90도/270도는 가로, 0도/180도는 세로)
+                if is_landscape:
+                    # A4 가로 방향으로 페이지 생성 (너비와 높이 교체)
+                    new_p = dst.new_page(width=a4_height, height=a4_width)
+                else:
+                    # A4 세로 방향으로 페이지 생성
+                    new_p = dst.new_page(width=a4_width, height=a4_height)
                 # 회전값은 0으로 설정 (뷰어에서 보이는 형태가 이미 올바른 방향)
                 new_p.set_rotation(0)
                 
-                # 8. 렌더링된 이미지를 A4 페이지 중앙에 배치
+                # 8. 렌더링된 이미지를 페이지 중앙에 배치
                 # 이미지 크기 계산
                 img_width = pix.width / quality_zoom
                 img_height = pix.height / quality_zoom
-                
-                # 중앙 배치를 위한 오프셋 계산
-                x_offset = (a4_width - img_width) / 2
-                y_offset = (a4_height - img_height) / 2
-                
+
+                # 중앙 배치를 위한 오프셋 계산 (가로/세로 방향에 따라 다름)
+                if is_landscape:
+                    # A4 가로 방향일 때
+                    x_offset = (a4_height - img_width) / 2
+                    y_offset = (a4_width - img_height) / 2
+                else:
+                    # A4 세로 방향일 때
+                    x_offset = (a4_width - img_width) / 2
+                    y_offset = (a4_height - img_height) / 2
+
                 # 이미지 삽입 영역 정의
                 insert_rect = pymupdf.Rect(x_offset, y_offset, x_offset + img_width, y_offset + img_height)
                 new_p.insert_image(insert_rect, stream=img_buf.read())
