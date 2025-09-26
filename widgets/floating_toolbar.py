@@ -57,6 +57,7 @@ class FloatingToolbarWidget(QWidget):
     rotate_90_requested = pyqtSignal()
     save_pdf_requested = pyqtSignal()
     resize_page_requested = pyqtSignal()
+    crop_requested = pyqtSignal() # 자르기 신호 추가
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -101,6 +102,10 @@ class FloatingToolbarWidget(QWidget):
         
         if hasattr(self, 'pushButton_5'):
             self.pushButton_5.clicked.connect(self.save_pdf_requested.emit)
+        
+        # 자르기 버튼 연결
+        if hasattr(self, 'pushButton_6'):
+            self.pushButton_6.clicked.connect(self.crop_requested.emit)
                 
         # 드래그 핸들에 마우스 호버 효과 적용
         if hasattr(self, 'drag_handle_label'):

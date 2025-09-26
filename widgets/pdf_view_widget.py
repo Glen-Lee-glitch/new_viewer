@@ -13,7 +13,7 @@ from core.pdf_render import PdfRender
 from .floating_toolbar import FloatingToolbarWidget
 from .stamp_overlay_widget import StampOverlayWidget
 from .zoomable_graphics_view import ZoomableGraphicsView
-from PyQt6.QtWidgets import QApplication # Added for QApplication.instance()
+from .crop_dialog import CropDialog # CropDialog 임포트
 
 
 # --- 백그라운드 렌더링을 위한 Worker ---
@@ -102,8 +102,29 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.toolbar.fit_to_width_requested.connect(self.set_fit_to_width)
         self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
         self.toolbar.rotate_90_requested.connect(self._rotate_current_page)
+        self.toolbar.crop_requested.connect(self._open_crop_dialog) # 자르기 신호 연결
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def _open_crop_dialog(self):
+        """자르기 다이얼로그를 연다."""
+        if self.current_page < 0 or not self.current_page_item:
+            QMessageBox.warning(self, "알림", "자르기할 페이지가 선택되지 않았습니다.")
+            return
+
+        # 현재 뷰에 표시된 QPixmap을 가져옴
+        current_pixmap = self.current_page_item.pixmap()
+        
+        dialog = CropDialog(self)
+        dialog.set_page_pixmap(current_pixmap)
+        
+        # 다이얼로그 실행
+        if dialog.exec():
+            # TODO: '자르기 적용' 눌렀을 때의 로직 구현
+            print("자르기 적용됨")
+        else:
+            # '취소' 눌렀을 때
+            print("자르기 취소됨")
 
     def _toggle_force_resize(self):
         """현재 페이지를 강제 크기 조정 목록에 추가하거나 제거한다."""
