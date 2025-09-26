@@ -66,7 +66,6 @@ def compress_pdf_file(
                 dst.insert_pdf(src, from_page=i, to_page=i)
                 continue
             
-            # -------------------------------------------
 
             # ── 여기부터 '무거운' 페이지 또는 '강제 조정' 페이지만 이미지-재렌더링 ──
             try:

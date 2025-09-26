@@ -24,6 +24,7 @@ class BatchTestSignals(QObject):
     error = pyqtSignal(str, str) # file_name, error_message
     finished = pyqtSignal()
     load_pdf = pyqtSignal(str) # UI에 PDF 로드를 요청하는 시그널
+    rotate_page = pyqtSignal() # UI에 페이지 회전을 요청하는 시그널
     save_pdf = pyqtSignal()   # UI에 PDF 저장을 요청하는 시그널
 
 
@@ -71,16 +72,23 @@ class PdfBatchTestWorker(QRunnable):
                 self.signals.progress.emit(f"'{pdf_file.name}' 로드 요청...")
                 self.signals.load_pdf.emit(str(pdf_file))
                 
-                # 2. 2초 대기 (실제 로드는 메인 스레드에서 일어남)
+                # 2. 2초 대기
                 time.sleep(2)
-
                 if self._is_stopped: return
 
-                # 3. UI에 PDF 저장 요청
+                # 3. UI에 첫 페이지 90도 회전 요청
+                self.signals.progress.emit(f"'{pdf_file.name}'의 첫 페이지를 90도 회전합니다...")
+                self.signals.rotate_page.emit()
+                
+                # 회전 후 잠시 대기
+                time.sleep(1)
+                if self._is_stopped: return
+
+                # 4. UI에 PDF 저장 요청
                 self.signals.progress.emit(f"'{pdf_file.name}' 저장 요청...")
                 self.signals.save_pdf.emit()
                 
-                # 4. 3초 대기 (실제 저장은 메인 스레드에서 일어남)
+                # 5. 3초 대기
                 time.sleep(3)
 
             except Exception as e:
@@ -193,9 +201,21 @@ class MainWindow(QMainWindow):
         self.test_worker.signals.error.connect(self._on_batch_test_error)
         self.test_worker.signals.finished.connect(self._on_batch_test_finished)
         self.test_worker.signals.load_pdf.connect(self.load_document_for_test)
+        self.test_worker.signals.rotate_page.connect(self._rotate_first_page_for_test)
         self.test_worker.signals.save_pdf.connect(self._save_document_for_test)
         
         self.thread_pool.start(self.test_worker)
+
+    def _rotate_first_page_for_test(self):
+        """테스트 목적으로 첫 페이지를 90도 회전한다."""
+        try:
+            if self.renderer and self.renderer.get_page_count() > 0:
+                # PdfViewWidget의 현재 페이지(첫 페이지) 회전 기능을 호출
+                self.pdf_view_widget.rotate_current_page_by_90()
+        except Exception as e:
+            if not self.test_worker._is_stopped and self.pdf_view_widget.get_current_pdf_path():
+                filename = Path(self.pdf_view_widget.get_current_pdf_path()).name
+                self.test_worker.signals.error.emit(filename, f"페이지 회전 중 오류: {e}")
 
     def load_document_for_test(self, pdf_path: str):
         """테스트 목적으로 문서를 UI에 로드한다."""
