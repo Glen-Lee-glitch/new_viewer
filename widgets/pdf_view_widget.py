@@ -3,7 +3,7 @@ from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal)
 from PyQt6.QtGui import QImage, QPainter, QPixmap
-from PyQt6.QtWidgets import (QGraphicsPixmapItem, QGraphicsScene,
+from PyQt6.QtWidgets import (QApplication, QGraphicsPixmapItem, QGraphicsScene,
                                  QGraphicsView, QMessageBox, QWidget)
 
 import pymupdf
@@ -173,6 +173,33 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             print(f"자르기 적용 오류: {e}")
             import traceback
             traceback.print_exc()
+
+    def apply_default_crop_to_current_page_sync(self):
+        """(공개 메소드, 동기식) 현재 페이지에 기본 자르기를 적용하고 렌더링이 끝날 때까지 기다린다."""
+        if self.current_page < 0 or not self.renderer or not self.renderer.get_pdf_bytes():
+            return
+        
+        # 1. 기본 자르기 영역 계산 (다이얼로그를 직접 사용하되 보여주지 않음)
+        pdf_bytes = self.renderer.get_pdf_bytes()
+        page_num = self.current_page
+        user_rotation = self.page_rotations.get(page_num, 0)
+        preview_pixmap = PdfRender.render_page_thread_safe(
+            pdf_bytes, page_num, zoom_factor=2.0, user_rotation=user_rotation
+        )
+        
+        temp_dialog = CropDialog(self)
+        temp_dialog.set_page_pixmap(preview_pixmap)
+        crop_rect_normalized = temp_dialog.get_crop_rect_in_page_coords()
+        
+        if crop_rect_normalized.isEmpty():
+            print(f"페이지 {page_num + 1}의 기본 자르기 영역을 계산할 수 없습니다.")
+            return
+
+        # 2. 자르기 적용 (기존 메소드 재사용)
+        self._apply_crop_to_current_page(crop_rect_normalized)
+        
+        # 3. 화면 업데이트를 강제로 처리하고 기다림
+        QApplication.instance().processEvents()
 
     def _toggle_force_resize(self):
         """현재 페이지를 강제 크기 조정 목록에 추가하거나 제거한다."""

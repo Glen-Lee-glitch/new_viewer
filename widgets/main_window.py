@@ -24,6 +24,7 @@ class BatchTestSignals(QObject):
     error = pyqtSignal(str, str) # file_name, error_message
     finished = pyqtSignal()
     load_pdf = pyqtSignal(str) # UI에 PDF 로드를 요청하는 시그널
+    crop_page = pyqtSignal()   # UI에 자르기 적용을 요청하는 시그널
     save_pdf = pyqtSignal()   # UI에 PDF 저장을 요청하는 시그널
 
 class PdfBatchTestWorker(QRunnable):
@@ -74,11 +75,19 @@ class PdfBatchTestWorker(QRunnable):
                 time.sleep(2)
                 if self._is_stopped: return
 
-                # 3. UI에 PDF 저장 요청
+                # 3. UI에 자르기 적용 요청
+                self.signals.progress.emit(f"'{pdf_file.name}'의 첫 페이지에 기본 자르기를 적용합니다...")
+                self.signals.crop_page.emit()
+
+                # 자르기 후 1초 대기
+                time.sleep(1)
+                if self._is_stopped: return
+
+                # 4. UI에 PDF 저장 요청
                 self.signals.progress.emit(f"'{pdf_file.name}' 저장 요청...")
                 self.signals.save_pdf.emit()
                 
-                # 4. 3초 대기
+                # 5. 3초 대기
                 time.sleep(3)
 
             except Exception as e:
@@ -190,42 +199,65 @@ class MainWindow(QMainWindow):
         self.test_worker.signals.error.connect(self._on_batch_test_error)
         self.test_worker.signals.finished.connect(self._on_batch_test_finished)
         self.test_worker.signals.load_pdf.connect(self.load_document_for_test)
+        self.test_worker.signals.crop_page.connect(self._apply_crop_for_test)
         self.test_worker.signals.save_pdf.connect(self._save_document_for_test)
         
         self.thread_pool.start(self.test_worker)
 
+    def _apply_crop_for_test(self):
+        """테스트 목적으로 현재 페이지에 기본 자르기를 적용한다."""
+        try:
+            if self.renderer and self.renderer.get_page_count() > 0:
+                if self.pdf_view_widget.current_page != 0:
+                    self.go_to_page(0)
+                
+                print(f"[DEBUG] 자르기 명령: 첫 페이지({self.pdf_view_widget.current_page + 1}p)에 기본 자르기를 적용합니다.")
+                self.pdf_view_widget.apply_default_crop_to_current_page_sync()
+
+        except Exception as e:
+            if not self.test_worker._is_stopped and self.pdf_view_widget.get_current_pdf_path():
+                filename = Path(self.pdf_view_widget.get_current_pdf_path()).name
+                self.test_worker.signals.error.emit(filename, f"페이지 자르기 중 오류: {e}")
+
     def load_document_for_test(self, pdf_path: str):
         """테스트 목적으로 문서를 UI에 로드한다."""
-        self.load_document(pdf_path)
+        if isinstance(pdf_path, str):
+            self.load_document([pdf_path])
+        else:
+            self.load_document(pdf_path)
 
     def _save_document_for_test(self):
         """테스트 목적으로 현재 문서를 저장한다."""
-        if not self.pdf_view_widget.get_current_pdf_path():
-            # 이 경우는 거의 없지만, 방어 코드
+        if not self.renderer or not self.renderer.get_pdf_bytes():
             return
 
-        input_path = self.pdf_view_widget.get_current_pdf_path()
+        input_bytes = self.renderer.get_pdf_bytes()
         output_dir = Path(r'C:\Users\HP\Desktop\files\결과')
-        output_file = output_dir / f"{Path(input_path).stem}_tested.pdf"
+        
+        default_filename = "untitled_tested.pdf"
+        if self.renderer.pdf_path:
+            default_filename = f"{Path(self.renderer.pdf_path[0]).stem}_tested.pdf"
+            
+        output_file = output_dir / default_filename
 
-        # 기존 저장 로직과 유사하게 실행
         rotations = self.pdf_view_widget.get_page_rotations()
         force_resize_pages = self.pdf_view_widget.get_force_resize_pages()
 
-        # 저장은 백그라운드에서 실행되지만, 여기서는 테스트의 일부로 직접 호출
-        # 실제 저장 워커를 또 만들면 복잡해지므로, compress 함수를 직접 호출
         try:
             compress_pdf_with_multiple_stages(
-                input_path=input_path,
+                input_bytes=input_bytes,
                 output_path=str(output_file),
                 target_size_mb=3,
                 rotations=rotations,
                 force_resize_pages=force_resize_pages
             )
         except Exception as e:
-            # 테스트 워커에 오류 전파
             if not self.test_worker._is_stopped:
-                self.test_worker.signals.error.emit(Path(input_path).name, str(e))
+                # 저장 중 오류가 발생하면 원본 파일명을 특정하기 어려우므로, 현재 열린 파일명을 기준으로 함
+                error_filename = "Unknown"
+                if self.renderer.pdf_path:
+                    error_filename = Path(self.renderer.pdf_path[0]).name
+                self.test_worker.signals.error.emit(error_filename, str(e))
 
 
     def _on_batch_test_error(self, filename: str, error_msg: str):
