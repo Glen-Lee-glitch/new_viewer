@@ -23,11 +23,18 @@ class PdfRender:
         source_doc = None
         new_doc = None
         try:
-            source_doc = pymupdf.open(pdf_path)
+            # 원본 문서를 열고, 내부 구조 문제 해결을 위해 "clean" 작업을 수행
+            temp_doc = pymupdf.open(pdf_path)
+            clean_bytes = temp_doc.tobytes(garbage=4, deflate=True)
+            temp_doc.close()
+            
+            source_doc = pymupdf.open(stream=clean_bytes, filetype="pdf")
             new_doc = pymupdf.open() # 새 인메모리 문서
 
             for page in source_doc:
-                is_landscape = page.rect.width > page.rect.height
+                # page.bound()를 사용하여 회전이 적용된 실제 페이지 크기를 기준으로 방향 결정
+                bounds = page.bound()
+                is_landscape = bounds.width > bounds.height
 
                 # A4 페이지 크기 결정 (세로/가로)
                 if is_landscape:
