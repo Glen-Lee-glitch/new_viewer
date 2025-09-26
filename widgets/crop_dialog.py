@@ -31,6 +31,9 @@ class ResizableCropRectItem(QGraphicsRectItem):
         self.setFlag(QGraphicsRectItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsRectItem.GraphicsItemFlag.ItemIsMovable)
 
+    def set_bounds(self, bounds_rect: QRectF):
+        self._bounds_rect = bounds_rect
+
     def handle_rect(self) -> QRectF:
         """리사이즈 핸들의 사각형 영역을 반환한다."""
         rect = self.rect()
@@ -66,21 +69,45 @@ class ResizableCropRectItem(QGraphicsRectItem):
             
             current_rect = self.rect()
             new_bottom_right = event.pos()
-            
-            new_width = new_bottom_right.x() - current_rect.left()
-            new_height = new_bottom_right.y() - current_rect.top()
-            
-            # A4 세로 종횡비 강제
+
+            new_top_left = current_rect.topLeft()
+            new_width = new_bottom_right.x() - new_top_left.x()
+            new_height = new_bottom_right.y() - new_top_left.y()
+
+            if new_width <= 0: new_width = 1
+            if new_height <= 0: new_height = 1
+
             if new_width / new_height > A4_PORTRAIT_RATIO:
                 new_height = new_width / A4_PORTRAIT_RATIO
             else:
                 new_width = new_height * A4_PORTRAIT_RATIO
+
+            new_rect = QRectF(new_top_left, QSizeF(new_width, new_height))
             
-            self.setRect(QRectF(current_rect.topLeft(), QSizeF(new_width, new_height)))
-            self.update()
+            if hasattr(self, '_bounds_rect') and self._bounds_rect and not self._bounds_rect.contains(new_rect):
+                if new_rect.right() > self._bounds_rect.right():
+                    new_width = self._bounds_rect.right() - new_rect.left()
+                    new_height = new_width / A4_PORTRAIT_RATIO
+                if new_rect.bottom() > self._bounds_rect.bottom():
+                    new_height = self._bounds_rect.bottom() - new_rect.top()
+                    new_width = new_height * A4_PORTRAIT_RATIO
+                new_rect.setSize(QSizeF(new_width, new_height))
+
+            self.setRect(new_rect)
         else:
-            # 크기 조절이 아닐 경우, 부모 클래스의 이동 로직을 사용
             super().mouseMoveEvent(event)
+            
+            if hasattr(self, '_bounds_rect') and self._bounds_rect:
+                # sceneBoundingRect()는 아이템의 위치(pos)와 사각형(rect)을 모두 고려한 절대 좌표를 반환
+                scene_bounds = self.sceneBoundingRect()
+                if scene_bounds.left() < self._bounds_rect.left():
+                    self.setX(self.x() + self._bounds_rect.left() - scene_bounds.left())
+                if scene_bounds.top() < self._bounds_rect.top():
+                    self.setY(self.y() + self._bounds_rect.top() - scene_bounds.top())
+                if scene_bounds.right() > self._bounds_rect.right():
+                    self.setX(self.x() + self._bounds_rect.right() - scene_bounds.right())
+                if scene_bounds.bottom() > self._bounds_rect.bottom():
+                    self.setY(self.y() + self._bounds_rect.bottom() - scene_bounds.bottom())
 
     def mouseReleaseEvent(self, event):
         """마우스 버튼을 놓으면 리사이징을 종료한다."""
@@ -141,8 +168,11 @@ class CropDialog(QDialog):
         crop_top_left = page_rect.center() - QPointF(crop_width / 2, crop_height / 2)
         initial_crop_rect = QRectF(crop_top_left, QSizeF(crop_width, crop_height))
 
-        self.crop_rect_item = ResizableCropRectItem(initial_crop_rect)
+        self.crop_rect_item = ResizableCropRectItem(QRectF(0, 0, initial_crop_rect.width(), initial_crop_rect.height()))
+        self.crop_rect_item.set_bounds(page_rect)
+        self.crop_rect_item.setPos(initial_crop_rect.topLeft())
         self.scene.addItem(self.crop_rect_item)
+
 
     def _fit_view_with_margin(self):
         """뷰 크기에 맞춰 10px 여백을 두고 이미지를 꽉 채운다."""
@@ -166,10 +196,12 @@ class CropDialog(QDialog):
         view.centerOn(self.pixmap_item)
 
     def showEvent(self, event):
+        """다이얼로그가 처음 표시될 때 호출된다."""
         super().showEvent(event)
         self._fit_view_with_margin()
 
     def resizeEvent(self, event):
+        """다이얼로그 크기가 변경될 때마다 호출된다."""
         super().resizeEvent(event)
         self._fit_view_with_margin()
 
@@ -178,18 +210,22 @@ class CropDialog(QDialog):
         if not self.crop_rect_item or not self.pixmap_item:
             return QRectF()
         
-        # 자르기 영역의 scene 좌표
-        crop_rect = self.crop_rect_item.rect()
-        
-        # 페이지 이미지의 scene 좌표
+        # sceneBoundingRect는 아이템의 위치(pos)와 사각형(rect)을 모두 고려한 절대 좌표를 반환
+        crop_scene_rect = self.crop_rect_item.sceneBoundingRect()
         page_rect = self.pixmap_item.boundingRect()
         
+        if page_rect.width() == 0 or page_rect.height() == 0:
+            return QRectF()
+            
         # 페이지 좌표계로 정규화 (0.0 ~ 1.0)
         normalized_rect = QRectF(
-            (crop_rect.x() - page_rect.x()) / page_rect.width(),
-            (crop_rect.y() - page_rect.y()) / page_rect.height(),
-            crop_rect.width() / page_rect.width(),
-            crop_rect.height() / page_rect.height()
+            (crop_scene_rect.x() - page_rect.x()) / page_rect.width(),
+            (crop_scene_rect.y() - page_rect.y()) / page_rect.height(),
+            crop_scene_rect.width() / page_rect.width(),
+            crop_scene_rect.height() / page_rect.height()
         )
         
-        return normalized_rect
+        # 정규화된 값이 0.0 ~ 1.0 범위 내에 있도록 보정
+        final_rect = normalized_rect.intersected(QRectF(0, 0, 1, 1))
+        
+        return final_rect

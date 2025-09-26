@@ -155,6 +155,11 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             # 자르기 적용
             self.renderer.apply_crop_to_page(self.current_page, crop_tuple)
             
+            # --- 중요 ---
+            # 자르기가 적용되면 PDF 데이터 자체가 변경되므로, 기존의 모든 페이지 캐시는 무효화됩니다.
+            # 캐시를 비워서 모든 페이지(현재 페이지 포함)를 새로운 데이터로 다시 렌더링하도록 강제합니다.
+            self.page_cache.clear()
+            
             # 현재 페이지 다시 렌더링
             self._start_render_job(self.current_page)
             

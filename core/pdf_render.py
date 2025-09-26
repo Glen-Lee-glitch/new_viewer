@@ -304,7 +304,7 @@ class PdfRender:
         except Exception as e:
             traceback.print_exc()
             raise ValueError(f"자르기 적용 중 오류 발생: {e}")
-    
+
     @staticmethod
     def render_page_thread_safe(pdf_bytes: bytes, page_num: int, zoom_factor: float = 2.0, user_rotation: int = 0) -> QPixmap:
         """
