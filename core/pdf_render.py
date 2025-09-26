@@ -288,8 +288,17 @@ class PdfRender:
                         new_page.insert_image(insert_rect, pixmap=pix)
                         
                     else:
-                        # 다른 페이지들은 그대로 복사
-                        new_doc.insert_pdf(source_doc, from_page=i, to_page=i)
+                        # 다른 페이지들은 A4 규격으로 변환하여 복사
+                        page = source_doc.load_page(i)
+                        
+                        # 페이지 방향에 맞춰 A4 크기 결정
+                        bounds = page.bound()
+                        is_landscape = bounds.width > bounds.height
+                        if is_landscape: a4_rect = pymupdf.paper_rect("a4-l")
+                        else: a4_rect = pymupdf.paper_rect("a4")
+                        
+                        new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+                        new_page.show_pdf_page(new_page.rect, source_doc, i)
                 
                 # 새로운 PDF 바이트 생성
                 self.pdf_bytes = new_doc.tobytes(garbage=4, deflate=True)

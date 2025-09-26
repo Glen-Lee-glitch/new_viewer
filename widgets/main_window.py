@@ -25,7 +25,7 @@ class BatchTestSignals(QObject):
     finished = pyqtSignal()
     load_pdf = pyqtSignal(str) # UI에 PDF 로드를 요청하는 시그널
     crop_page = pyqtSignal()   # UI에 자르기 적용을 요청하는 시그널
-    save_pdf = pyqtSignal()   # UI에 PDF 저장을 요청하는 시그널
+    save_pdf = pyqtSignal(str)   # UI에 PDF 저장을 요청하는 시그널 (저장 경로 전달)
 
 class PdfBatchTestWorker(QRunnable):
     """PDF 일괄 열기/저장 테스트를 수행하는 Worker"""
@@ -60,39 +60,44 @@ class PdfBatchTestWorker(QRunnable):
             self.signals.error.emit("", f"테스트할 PDF 파일이 없습니다: {self.input_dir}")
             return
         
-        self.signals.progress.emit(f"총 {len(pdf_files)}개의 PDF 파일 테스트 시작...")
+        # 파일 경로를 (원본, 저장될 경로) 튜플로 관리
+        file_paths_to_process = [
+            (str(p), str(output_path / f"{p.stem}_tested.pdf")) for p in pdf_files
+        ]
+
+        self.signals.progress.emit(f"총 {len(file_paths_to_process)}개의 PDF 파일 테스트 시작...")
         time.sleep(1)
 
-        for pdf_file in pdf_files:
+        for input_file, output_file in file_paths_to_process:
             if self._is_stopped: return
 
             try:
                 # 1. UI에 PDF 로드 요청
-                self.signals.progress.emit(f"'{pdf_file.name}' 로드 요청...")
-                self.signals.load_pdf.emit(str(pdf_file))
+                self.signals.progress.emit(f"'{Path(input_file).name}' 로드 중...")
+                self.signals.load_pdf.emit(input_file)
                 
                 # 2. 2초 대기
                 time.sleep(2)
                 if self._is_stopped: return
 
                 # 3. UI에 자르기 적용 요청
-                self.signals.progress.emit(f"'{pdf_file.name}'의 첫 페이지에 기본 자르기를 적용합니다...")
+                self.signals.progress.emit(f"'{Path(input_file).name}'의 첫 페이지에 기본 자르기를 적용합니다...")
                 self.signals.crop_page.emit()
 
                 # 자르기 후 1초 대기
                 time.sleep(1)
                 if self._is_stopped: return
 
-                # 4. UI에 PDF 저장 요청
-                self.signals.progress.emit(f"'{pdf_file.name}' 저장 요청...")
-                self.signals.save_pdf.emit()
+                # 4. UI에 PDF 저장 요청 (저장 경로 전달)
+                self.signals.progress.emit(f"'{Path(output_file).name}' 저장 요청...")
+                self.signals.save_pdf.emit(output_file)
                 
                 # 5. 3초 대기
                 time.sleep(3)
 
             except Exception as e:
                 if not self._is_stopped:
-                    self.signals.error.emit(pdf_file.name, str(e))
+                    self.signals.error.emit(Path(input_file).name, str(e))
                 return # 오류 발생 시 즉시 중단
         
         if not self._is_stopped:
@@ -226,33 +231,25 @@ class MainWindow(QMainWindow):
         else:
             self.load_document(pdf_path)
 
-    def _save_document_for_test(self):
+    def _save_document_for_test(self, save_path: str):
         """테스트 목적으로 현재 문서를 저장한다."""
         if not self.renderer or not self.renderer.get_pdf_bytes():
             return
 
         input_bytes = self.renderer.get_pdf_bytes()
-        output_dir = Path(r'C:\Users\HP\Desktop\files\결과')
-        
-        default_filename = "untitled_tested.pdf"
-        if self.renderer.pdf_path:
-            default_filename = f"{Path(self.renderer.pdf_path[0]).stem}_tested.pdf"
-            
-        output_file = output_dir / default_filename
-
         rotations = self.pdf_view_widget.get_page_rotations()
         force_resize_pages = self.pdf_view_widget.get_force_resize_pages()
 
         try:
             compress_pdf_with_multiple_stages(
                 input_bytes=input_bytes,
-                output_path=str(output_file),
+                output_path=save_path,
                 target_size_mb=3,
                 rotations=rotations,
                 force_resize_pages=force_resize_pages
             )
         except Exception as e:
-            if not self.test_worker._is_stopped:
+            if not self._is_stopped:
                 # 저장 중 오류가 발생하면 원본 파일명을 특정하기 어려우므로, 현재 열린 파일명을 기준으로 함
                 error_filename = "Unknown"
                 if self.renderer.pdf_path:
