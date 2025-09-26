@@ -130,11 +130,44 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         
         # 다이얼로그 실행
         if dialog.exec():
-            # TODO: '자르기 적용' 눌렀을 때의 로직 구현
-            print("자르기 적용됨")
+            # 자르기 적용
+            crop_rect = dialog.get_crop_rect_in_page_coords()
+            if not crop_rect.isEmpty():
+                self._apply_crop_to_current_page(crop_rect)
         else:
             # '취소' 눌렀을 때
             print("자르기 취소됨")
+
+    def _apply_crop_to_current_page(self, crop_rect_normalized):
+        """현재 페이지에 자르기를 적용하고 화면을 업데이트한다."""
+        if not self.renderer:
+            return
+            
+        try:
+            # 정규화된 QRectF를 튜플로 변환
+            crop_tuple = (
+                crop_rect_normalized.x(),
+                crop_rect_normalized.y(), 
+                crop_rect_normalized.width(),
+                crop_rect_normalized.height()
+            )
+            
+            # 자르기 적용
+            self.renderer.apply_crop_to_page(self.current_page, crop_tuple)
+            
+            # 현재 페이지 다시 렌더링
+            self._start_render_job(self.current_page)
+            
+            # 썸네일 업데이트
+            if hasattr(self, 'thumbnail_updated'):
+                self.thumbnail_updated.emit(self.current_page)
+                
+            print(f"페이지 {self.current_page + 1} 자르기 적용 완료")
+            
+        except Exception as e:
+            print(f"자르기 적용 오류: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _toggle_force_resize(self):
         """현재 페이지를 강제 크기 조정 목록에 추가하거나 제거한다."""

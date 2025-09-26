@@ -172,3 +172,24 @@ class CropDialog(QDialog):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._fit_view_with_margin()
+
+    def get_crop_rect_in_page_coords(self) -> QRectF:
+        """페이지 좌표계에서의 자르기 영역 사각형을 반환한다."""
+        if not self.crop_rect_item or not self.pixmap_item:
+            return QRectF()
+        
+        # 자르기 영역의 scene 좌표
+        crop_rect = self.crop_rect_item.rect()
+        
+        # 페이지 이미지의 scene 좌표
+        page_rect = self.pixmap_item.boundingRect()
+        
+        # 페이지 좌표계로 정규화 (0.0 ~ 1.0)
+        normalized_rect = QRectF(
+            (crop_rect.x() - page_rect.x()) / page_rect.width(),
+            (crop_rect.y() - page_rect.y()) / page_rect.height(),
+            crop_rect.width() / page_rect.width(),
+            crop_rect.height() / page_rect.height()
+        )
+        
+        return normalized_rect

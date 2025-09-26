@@ -222,6 +222,88 @@ class PdfRender:
     def get_page_count(self) -> int:
         """페이지 수 반환."""
         return self.page_count
+
+    def apply_crop_to_page(self, page_num: int, crop_rect_normalized: tuple) -> None:
+        """
+        특정 페이지에 자르기를 적용하고 A4 세로 규격으로 확대한다.
+        
+        Args:
+            page_num: 0-based 페이지 인덱스
+            crop_rect_normalized: (x, y, width, height) 정규화된 자르기 영역 (0.0~1.0)
+        """
+        if not self.pdf_bytes:
+            raise RuntimeError("PDF가 로드되지 않았습니다.")
+        
+        if page_num < 0 or page_num >= self.page_count:
+            raise IndexError(f"잘못된 페이지 번호: {page_num}")
+        
+        x, y, width, height = crop_rect_normalized
+        
+        # 정규화된 값 검증
+        if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0 and 
+                0.0 < width <= 1.0 and 0.0 < height <= 1.0):
+            raise ValueError("자르기 영역이 유효하지 않습니다.")
+        
+        try:
+            # 현재 PDF 바이트에서 새 문서 생성
+            with pymupdf.open(stream=self.pdf_bytes, filetype="pdf") as source_doc:
+                new_doc = pymupdf.open()
+                
+                # 모든 페이지를 복사하되, 지정된 페이지만 자르기 적용
+                for i, page in enumerate(source_doc):
+                    if i == page_num:
+                        # 자르기 적용할 페이지
+                        page_rect = page.rect
+                        
+                        # 정규화된 좌표를 실제 페이지 좌표로 변환
+                        crop_x = page_rect.x0 + x * page_rect.width
+                        crop_y = page_rect.y0 + y * page_rect.height  
+                        crop_width = width * page_rect.width
+                        crop_height = height * page_rect.height
+                        
+                        crop_rect = pymupdf.Rect(
+                            crop_x, crop_y, 
+                            crop_x + crop_width, crop_y + crop_height
+                        )
+                        
+                        # 자르기 영역을 고해상도로 렌더링 (TARGET_DPI 사용)
+                        TARGET_DPI = 200
+                        zoom_factor = TARGET_DPI / 72.0
+                        matrix = pymupdf.Matrix(zoom_factor, zoom_factor)
+                        
+                        # 자르기 영역만 렌더링
+                        pix = page.get_pixmap(matrix=matrix, clip=crop_rect, alpha=False, annots=True)
+                        
+                        # A4 세로 페이지 생성
+                        a4_rect = pymupdf.paper_rect("a4")
+                        new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+                        
+                        # A4 페이지에 자른 이미지를 확대하여 삽입 (2% 여백)
+                        margin = 0.98
+                        target_rect = new_page.rect
+                        margin_x = target_rect.width * (1 - margin) / 2
+                        margin_y = target_rect.height * (1 - margin) / 2
+                        insert_rect = target_rect + (margin_x, margin_y, -margin_x, -margin_y)
+                        
+                        new_page.insert_image(insert_rect, pixmap=pix)
+                        
+                    else:
+                        # 다른 페이지들은 그대로 복사
+                        new_doc.insert_pdf(source_doc, from_page=i, to_page=i)
+                
+                # 새로운 PDF 바이트 생성
+                self.pdf_bytes = new_doc.tobytes(garbage=4, deflate=True)
+                
+                # 문서 객체 갱신
+                if self.doc:
+                    self.doc.close()
+                self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
+                
+                print(f"페이지 {page_num + 1}에 자르기 적용 완료")
+                
+        except Exception as e:
+            traceback.print_exc()
+            raise ValueError(f"자르기 적용 중 오류 발생: {e}")
     
     @staticmethod
     def render_page_thread_safe(pdf_bytes: bytes, page_num: int, zoom_factor: float = 2.0, user_rotation: int = 0) -> QPixmap:
