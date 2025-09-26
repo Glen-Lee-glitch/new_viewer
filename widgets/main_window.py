@@ -27,7 +27,6 @@ class BatchTestSignals(QObject):
     rotate_page = pyqtSignal() # UI에 페이지 회전을 요청하는 시그널
     save_pdf = pyqtSignal()   # UI에 PDF 저장을 요청하는 시그널
 
-
 class PdfBatchTestWorker(QRunnable):
     """PDF 일괄 열기/저장 테스트를 수행하는 Worker"""
     def __init__(self):
@@ -98,7 +97,6 @@ class PdfBatchTestWorker(QRunnable):
         
         if not self._is_stopped:
             self.signals.finished.emit()
-
 
 class MainWindow(QMainWindow):
     """메인 윈도우"""
