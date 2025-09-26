@@ -1,5 +1,8 @@
 import pymupdf
-import traceback # 상세한 오류 추적을 위해 추가
+import traceback
+import io
+import os
+from PIL import Image
 from PyQt6.QtGui import QPixmap, QImage, QIcon, QTransform
 from PyQt6.QtCore import Qt, QBuffer, QIODevice
 
@@ -24,47 +27,79 @@ class PdfRender:
         self.pdf_path: str | None = None
         self.pdf_bytes: bytes | None = None
 
-    def load_pdf(self, pdf_path: str) -> None:
-        """PDF를 로드하고, 모든 페이지를 A4 규격으로 변환하여 메모리에 저장한다."""
-        source_doc = None
-        new_doc = None
-        current_page_num = -1
-        TARGET_DPI = 200 # 목표 해상도 (품질과 속도의 균형점)
-        try:
-            print(f"원본 파일 여는 중: {pdf_path}")
-            source_doc = pymupdf.open(pdf_path)
-            new_doc = pymupdf.open()
-            print("새 인메모리 PDF 문서 생성 완료.")
+    def load_pdf(self, paths: list) -> None:
+        """여러 PDF 및 이미지 파일을 병합하고, 모든 페이지를 A4 규격으로 변환하여 메모리에 저장한다."""
+        if not paths:
+            raise ValueError("입력 파일 경로가 없습니다.")
 
-            for page in source_doc:
-                current_page_num = page.number
-                print(f"--- 페이지 {current_page_num + 1} 변환 시작 ---")
+        merged_doc = None
+        new_doc = None
+        source_doc_for_a4 = None
+        
+        try:
+            # --- 1단계: 모든 입력 파일을 하나의 PDF로 병합 ---
+            merged_doc = pymupdf.open()
+            print("입력 파일 병합 시작...")
+            for path in paths:
+                ext = os.path.splitext(path)[1].lower()
                 
-                # 1. 렌더링 전, 페이지의 최종 시각적 크기(bound)를 먼저 계산
+                if ext == '.pdf':
+                    try:
+                        with pymupdf.open(path) as temp_doc:
+                            merged_doc.insert_pdf(temp_doc)
+                        print(f"  - PDF 병합 성공: {path}")
+                    except Exception as e:
+                        print(f"  - PDF 병합 실패, 재시도...: {path} ({e})")
+                        try: # 정리하여 재시도
+                            with pymupdf.open(path) as temp_doc:
+                                buffer = temp_doc.write(garbage=4, clean=True)
+                            with pymupdf.open("pdf", buffer) as cleaned_doc:
+                                merged_doc.insert_pdf(cleaned_doc)
+                            print(f"  - PDF 병합 재시도 성공: {path}")
+                        except Exception as e2:
+                            print(f"  - PDF 병합 최종 실패: {path} ({e2})")
+
+                elif ext in ['.png', '.jpg', '.jpeg']:
+                    try:
+                        with Image.open(path).convert("RGB") as img:
+                            img_bytes = io.BytesIO()
+                            img.save(img_bytes, format="PDF")
+                            img_bytes.seek(0)
+                            with pymupdf.open("pdf", img_bytes.read()) as img_doc:
+                                merged_doc.insert_pdf(img_doc)
+                            print(f"  - 이미지 -> PDF 변환 및 병합 성공: {path}")
+                    except Exception as e:
+                        print(f"  - 이미지 병합 실패: {path} ({e})")
+
+            if merged_doc.page_count == 0:
+                raise ValueError("병합할 수 있는 유효한 페이지가 없습니다.")
+            
+            print(f"모든 파일 병합 완료. 총 {merged_doc.page_count} 페이지.")
+
+            # --- 2단계: 병합된 PDF를 A4 규격으로 변환 ---
+            print("\nA4 규격으로 변환 시작...")
+            new_doc = pymupdf.open()
+            source_doc_for_a4 = merged_doc # A4 변환의 소스는 병합된 문서
+            TARGET_DPI = 200
+
+            for page in source_doc_for_a4:
+                # (기존의 최적화된 A4 변환 로직과 동일)
                 bounds = page.bound()
                 is_landscape = bounds.width > bounds.height
                 
-                # 2. 최종 캔버스가 될 A4 용지 크기 결정
-                if is_landscape:
-                    a4_rect = pymupdf.paper_rect("a4-l")
-                else:
-                    a4_rect = pymupdf.paper_rect("a4")
+                if is_landscape: a4_rect = pymupdf.paper_rect("a4-l")
+                else: a4_rect = pymupdf.paper_rect("a4")
                 
-                # 3. A4 캔버스에 목표 DPI를 적용했을 때의 픽셀 크기 계산
                 target_pixel_width = a4_rect.width / 72 * TARGET_DPI
                 target_pixel_height = a4_rect.height / 72 * TARGET_DPI
 
-                # 4. 원본 페이지를 목표 픽셀 크기에 맞추기 위한 최적의 줌(zoom) 비율 계산
                 zoom_x = target_pixel_width / bounds.width if bounds.width > 0 else 0
                 zoom_y = target_pixel_height / bounds.height if bounds.height > 0 else 0
                 zoom = min(zoom_x, zoom_y)
 
-                # 5. 계산된 줌 비율로 '딱 필요한 만큼만' 렌더링
                 matrix = pymupdf.Matrix(zoom, zoom)
                 pix = page.get_pixmap(matrix=matrix, alpha=False, annots=True)
-                print(f"  - 최적 해상도로 렌더링 완료 (크기: {pix.width}x{pix.height})")
                 
-                # 6. 새 A4 페이지 생성 및 이미지 삽입
                 new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
                 
                 margin = 0.98
@@ -74,40 +109,25 @@ class PdfRender:
                 target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
 
                 new_page.insert_image(target_rect, pixmap=pix)
-                print(f"--- 페이지 {current_page_num + 1} 변환 성공 ---\n")
 
-            # 변환된 문서를 바이트로 저장
-            print("모든 페이지 변환 완료. PDF 바이트 스트림 생성 중...")
-            self.pdf_bytes = new_doc.tobytes(garbage=4, deflate=True) # 안정성을 위해 저장 시 압축
+            print("A4 규격 변환 완료. 최종 바이트 스트림 생성 중...")
+            self.pdf_bytes = new_doc.tobytes(garbage=4, deflate=True)
             
             if not self.pdf_bytes:
-                raise ValueError("PDF 바이트 스트림 생성에 실패하여 데이터가 비어있습니다.")
+                raise ValueError("최종 PDF 바이트 스트림 생성에 실패했습니다.")
             
-            print(f"PDF 바이트 스트림 생성 성공 (크기: {len(self.pdf_bytes)} bytes). 최종 문서 로드 중...")
-
-            # 바이트 스트림으로부터 최종 문서 로드
+            print(f"최종 문서 생성 성공 (크기: {len(self.pdf_bytes)} bytes).")
+            
             self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
-            self.pdf_path = pdf_path
+            self.pdf_path = paths[0] # 첫 번째 파일을 대표 경로로 사용
             self.page_count = len(self.doc)
-            print("최종 문서 로드 성공!")
 
         except Exception as exc:
-            print("\n" + "="*20 + " PDF 처리 중 심각한 오류 발생 " + "="*20)
-            print(f"오류 발생 지점: 페이지 {current_page_num + 1}")
-            print(f"예외 유형: {type(exc).__name__}")
-            print(f"예외 메시지: {exc}")
-            print("\n--- 상세 Traceback 정보 ---")
-            traceback.print_exc() # 전체 오류 스택 출력
-            print("="*65 + "\n")
-            raise ValueError(f"PDF 로드 및 A4 변환 실패: {exc}")
+            traceback.print_exc()
+            raise ValueError(f"문서 처리 중 오류 발생: {exc}")
         finally:
-            if source_doc:
-                source_doc.close()
-            if new_doc:
-                new_doc.close()
-
-        if self.doc is None or len(self.doc) == 0:
-            raise ValueError("빈 문서이거나 변환 후 페이지가 없습니다.")
+            if merged_doc: merged_doc.close()
+            if new_doc: new_doc.close()
 
     def get_pdf_bytes(self) -> bytes | None:
         """변환된 PDF의 바이트 데이터를 반환한다."""

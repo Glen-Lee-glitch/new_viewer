@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
-    pdf_selected = pyqtSignal(str)  # PDF 파일 경로를 전달하는 시그널
+    pdf_selected = pyqtSignal(list)  # 여러 파일 경로(리스트)를 전달하도록 변경
     
     def __init__(self):
         super().__init__()
@@ -42,16 +42,16 @@ class PdfLoadWidget(QWidget):
             self.center_import_btn.clicked.connect(self.import_from_email)
     
     def open_pdf_file(self):
-        """로컬에서 PDF 파일 열기"""
-        file_path, _ = QFileDialog.getOpenFileName(
+        """로컬에서 PDF 또는 이미지 파일을 연다 (다중 선택 가능)"""
+        paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "PDF 파일 선택",
+            "파일 선택",
             "",
-            "PDF Files (*.pdf);;All Files (*)"
+            "지원 파일 (*.pdf *.png *.jpg *.jpeg);;PDF Files (*.pdf);;Image Files (*.png *.jpg *.jpeg);;All Files (*)"
         )
         
-        if file_path:
-            self.pdf_selected.emit(file_path)
+        if paths:
+            self.pdf_selected.emit(paths)
     
     def import_from_email(self):
         """메일에서 PDF 가져오기 (향후 구현)"""

@@ -360,21 +360,24 @@ class MainWindow(QMainWindow):
         self.statusBar.showMessage(f"오류 발생: {error_msg}", 8000)
         QMessageBox.critical(self, "저장 오류", f"PDF 저장 중 오류가 발생했습니다:\n{error_msg}")
 
-    def load_document(self, pdf_path: str):
-        """PDF 문서를 로드하고 뷰를 전환한다."""
-        # 기존 문서가 열려있으면 자원을 해제한다.
+    def load_document(self, pdf_paths: list):
+        """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
+        if not pdf_paths:
+            return
+
         if self.renderer:
             self.renderer.close()
 
         try:
             self.renderer = PdfRender()
-            self.renderer.load_pdf(pdf_path)
+            self.renderer.load_pdf(pdf_paths) # 경로 리스트를 전달
         except Exception as e:
-            QMessageBox.critical(self, "오류", f"PDF 문서를 여는 데 실패했습니다: {e}")
+            QMessageBox.critical(self, "오류", f"문서를 여는 데 실패했습니다: {e}")
             self.renderer = None
             return
 
-        self.setWindowTitle(f"PDF Viewer - {Path(pdf_path).name}")
+        # 첫 번째 파일 이름을 기준으로 창 제목 설정
+        self.setWindowTitle(f"PDF Viewer - {Path(pdf_paths[0]).name}")
         
         self.thumbnail_viewer.set_renderer(self.renderer)
         self.pdf_view_widget.set_renderer(self.renderer)
