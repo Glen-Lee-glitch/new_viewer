@@ -305,16 +305,22 @@ class MainWindow(QMainWindow):
 
     def _request_save_pdf(self):
         """PDF 저장 요청을 처리하고 파일 대화상자를 연다."""
-        if not self.pdf_view_widget.get_current_pdf_path():
+        if not self.renderer or not self.renderer.get_pdf_bytes():
             self.statusBar.showMessage("저장할 PDF 파일이 열려있지 않습니다.", 5000)
             return
         
-        self._start_save_process(self.pdf_view_widget.get_current_pdf_path())
+        # 원본 파일 경로 대신, 현재 편집된 PDF 바이트 데이터를 직접 전달
+        pdf_bytes = self.renderer.get_pdf_bytes()
+        self._start_save_process(pdf_bytes)
 
-    def _start_save_process(self, input_path: str):
+    def _start_save_process(self, input_bytes: bytes):
         """실제 PDF 저장 프로세스를 시작한다."""
         # 파일 저장 경로 얻기
-        default_filename = Path(input_path).stem + "_edited.pdf"
+        # 원본 경로가 없을 수 있으므로 기본 파일명을 사용
+        default_filename = "untitled_edited.pdf"
+        if self.renderer and self.renderer.pdf_path:
+            default_filename = Path(self.renderer.pdf_path).stem + "_edited.pdf"
+            
         save_path, _ = QFileDialog.getSaveFileName(
             self,
             "PDF 저장",
@@ -334,7 +340,7 @@ class MainWindow(QMainWindow):
         force_resize_pages = self.pdf_view_widget.get_force_resize_pages()
 
         # 백그라운드에서 압축 및 저장 실행
-        worker = PdfSaveWorker(input_path, save_path, rotations, force_resize_pages)
+        worker = PdfSaveWorker(input_bytes, save_path, rotations, force_resize_pages)
         worker.signals.finished.connect(self._on_save_finished)
         worker.signals.error.connect(lambda msg: self.statusBar.showMessage(f"저장 오류: {msg}", 5000))
         self.thread_pool.start(worker)

@@ -21,22 +21,18 @@ class PdfSaveWorker(QRunnable):
     """
     QThreadPool에서 PDF 압축 및 저장을 실행하기 위한 Worker
     """
-    def __init__(self, input_path: str, output_path: str, rotations: dict | None = None, force_resize_pages: set | None = None):
+    def __init__(self, input_bytes: bytes, output_path: str, rotations: dict | None = None, force_resize_pages: set | None = None):
         super().__init__()
         self.signals = WorkerSignals()
-        self.input_path = input_path
+        self.input_bytes = input_bytes
         self.output_path = output_path
         self.rotations = rotations if rotations is not None else {}
         self.force_resize_pages = force_resize_pages if force_resize_pages is not None else set()
 
     def run(self):
         try:
-            # 원본 파일을 output_path로 복사 (shutil.move 대신)
-            temp_input_path = self.output_path + ".tmp"
-            shutil.copy2(self.input_path, temp_input_path)
-            
             success = compress_pdf_with_multiple_stages(
-                input_path=temp_input_path,
+                input_bytes=self.input_bytes,
                 output_path=self.output_path,
                 target_size_mb=3,
                 rotations=self.rotations,
@@ -45,9 +41,6 @@ class PdfSaveWorker(QRunnable):
             self.signals.finished.emit(self.output_path, success)
         except Exception as e:
             self.signals.error.emit(str(e))
-        finally:
-            if os.path.exists(temp_input_path):
-                os.remove(temp_input_path)
 
 class FloatingToolbarWidget(QWidget):
     """pdf_view_widget 위에 떠다니는 이동 가능한 툴바."""

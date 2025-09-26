@@ -6,7 +6,7 @@ import gc
 import os
 
 def compress_pdf_file(
-        input_path: str,
+        input_bytes: bytes,
         output_path: str,
         jpeg_quality: int = 65,
         dpi: int = 120,
@@ -19,10 +19,10 @@ def compress_pdf_file(
     나머지 페이지는 그대로 복사한다.
     return: 새 PDF 용량(MB) ― 실패 시 None
     """
-    if not os.path.exists(input_path):
+    if not input_bytes:
         return None
 
-    src = pymupdf.open(input_path)
+    src = pymupdf.open(stream=input_bytes, filetype="pdf")
     dst = pymupdf.open()                     # 결과 PDF
     user_rotations = user_rotations or {}
     force_resize_pages = force_resize_pages or set()
@@ -183,12 +183,12 @@ def compress_pdf_file(
         src.close()
         dst.close()
 
-def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3, rotations=None, force_resize_pages=None):
+def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_size_mb=3, rotations=None, force_resize_pages=None):
     """
     여러 단계의 압축을 시도하여 PDF를 목표 크기로 압축하는 함수
     
     Args:
-        input_path (str): 입력 PDF 파일 경로
+        input_bytes (bytes): 입력 PDF 바이트 데이터
         output_path (str): 출력 PDF 파일 경로
         target_size_mb (int): 목표 파일 크기 (MB)
         rotations (dict, optional): {page_num: rotation_angle} 형태의 딕셔너리. Defaults to None.
@@ -198,20 +198,20 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
         bool: 압축 성공 여부
     """
     import os
-    import shutil
     
     rotations = rotations if rotations is not None else {}
     force_resize_pages = force_resize_pages if force_resize_pages is not None else set()
 
     # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전 정보나 강제 조정이 있으면 압축 시도)
-    orig_mb = os.path.getsize(input_path) / (1024 * 1024)
+    orig_mb = len(input_bytes) / (1024 * 1024)
     if orig_mb <= target_size_mb and not rotations and not force_resize_pages:
-        shutil.copy2(input_path, output_path)
+        with open(output_path, "wb") as f:
+            f.write(input_bytes)
         return True
 
     # 2) 1단계 압축 시도 (중간 품질)
     compressed_mb = compress_pdf_file(
-        input_path=input_path,
+        input_bytes=input_bytes,
         output_path=output_path,
         jpeg_quality=83,   # 중간 품질
         dpi=146,           # 중간 해상도
@@ -225,7 +225,7 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
 
     # 3) 2단계 압축 시도 (낮은 품질)
     compressed_mb = compress_pdf_file(
-        input_path=input_path,
+        input_bytes=input_bytes,
         output_path=output_path,
         jpeg_quality=75,   # 낮은 품질
         dpi=125,           # 낮은 해상도
@@ -239,7 +239,7 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
 
     # 4) 3단계 압축 시도 (최저 품질)
     compressed_mb = compress_pdf_file(
-        input_path=input_path,
+        input_bytes=input_bytes,
         output_path=output_path,
         jpeg_quality=68,   # 최저 품질
         dpi=100,            # 최저 해상도
@@ -253,7 +253,8 @@ def compress_pdf_with_multiple_stages(input_path, output_path, target_size_mb=3,
 
     # 5) 모든 압축 실패시 원본 저장
     try:
-        shutil.copy2(input_path, output_path)
+        with open(output_path, "wb") as f:
+            f.write(input_bytes)
         return False  # 압축 실패했지만 원본은 저장됨
     except Exception as e:
         print(f"[오류] 최종 파일 복사 실패: {e}")
