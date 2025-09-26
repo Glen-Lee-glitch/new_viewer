@@ -64,7 +64,7 @@ class PdfRender:
                 # 5. 거대 이미지는 압축하여 삽입, 일반 이미지는 그대로 삽입
                 if pix.width * pix.height > LARGE_IMAGE_PIXELS_THRESHOLD:
                     print(f"  - [!] 거대 이미지 감지. JPEG(quality=85)으로 압축하여 삽입합니다.")
-                    jpeg_bytes = pix.tobytes("jpeg", quality=85)
+                    jpeg_bytes = pix.tobytes("jpeg", jpg_quality=85)
                     new_page.insert_image(target_rect, stream=jpeg_bytes)
                 else:
                     print(f"  - 일반 이미지로 A4 캔버스에 삽입합니다.")
