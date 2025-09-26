@@ -28,7 +28,8 @@ class PdfRender:
         """PDF를 로드하고, 모든 페이지를 A4 규격으로 변환하여 메모리에 저장한다."""
         source_doc = None
         new_doc = None
-        current_page_num = -1 # 오류 추적용
+        current_page_num = -1
+        TARGET_DPI = 200 # 목표 해상도 (품질과 속도의 균형점)
         try:
             print(f"원본 파일 여는 중: {pdf_path}")
             source_doc = pymupdf.open(pdf_path)
@@ -39,42 +40,45 @@ class PdfRender:
                 current_page_num = page.number
                 print(f"--- 페이지 {current_page_num + 1} 변환 시작 ---")
                 
-                # 1. 페이지 렌더링
-                pix = page.get_pixmap(dpi=300)
-                print(f"  - 이미지 렌더링 완료 (크기: {pix.width}x{pix.height})")
-
-                # 2. 방향 결정
-                is_landscape = pix.width > pix.height
-                orientation = "가로" if is_landscape else "세로"
+                # 1. 렌더링 전, 페이지의 최종 시각적 크기(bound)를 먼저 계산
+                bounds = page.bound()
+                is_landscape = bounds.width > bounds.height
                 
-                # 3. A4 캔버스 준비
+                # 2. 최종 캔버스가 될 A4 용지 크기 결정
                 if is_landscape:
                     a4_rect = pymupdf.paper_rect("a4-l")
                 else:
                     a4_rect = pymupdf.paper_rect("a4")
+                
+                # 3. A4 캔버스에 목표 DPI를 적용했을 때의 픽셀 크기 계산
+                target_pixel_width = a4_rect.width / 72 * TARGET_DPI
+                target_pixel_height = a4_rect.height / 72 * TARGET_DPI
+
+                # 4. 원본 페이지를 목표 픽셀 크기에 맞추기 위한 최적의 줌(zoom) 비율 계산
+                zoom_x = target_pixel_width / bounds.width if bounds.width > 0 else 0
+                zoom_y = target_pixel_height / bounds.height if bounds.height > 0 else 0
+                zoom = min(zoom_x, zoom_y)
+
+                # 5. 계산된 줌 비율로 '딱 필요한 만큼만' 렌더링
+                matrix = pymupdf.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=matrix, alpha=False, annots=True)
+                print(f"  - 최적 해상도로 렌더링 완료 (크기: {pix.width}x{pix.height})")
+                
+                # 6. 새 A4 페이지 생성 및 이미지 삽입
                 new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
                 
-                # 4. 이미지 삽입 영역 계산
                 margin = 0.98
                 page_rect = new_page.rect
                 margin_x = page_rect.width * (1 - margin) / 2
                 margin_y = page_rect.height * (1 - margin) / 2
                 target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
 
-                # 5. 거대 이미지는 압축하여 삽입, 일반 이미지는 그대로 삽입
-                if pix.width * pix.height > LARGE_IMAGE_PIXELS_THRESHOLD:
-                    print(f"  - [!] 거대 이미지 감지. JPEG(quality=85)으로 압축하여 삽입합니다.")
-                    jpeg_bytes = pix.tobytes("jpeg", jpg_quality=85)
-                    new_page.insert_image(target_rect, stream=jpeg_bytes)
-                else:
-                    print(f"  - 일반 이미지로 A4 캔버스에 삽입합니다.")
-                    new_page.insert_image(target_rect, pixmap=pix)
-
+                new_page.insert_image(target_rect, pixmap=pix)
                 print(f"--- 페이지 {current_page_num + 1} 변환 성공 ---\n")
 
             # 변환된 문서를 바이트로 저장
             print("모든 페이지 변환 완료. PDF 바이트 스트림 생성 중...")
-            self.pdf_bytes = new_doc.tobytes()
+            self.pdf_bytes = new_doc.tobytes(garbage=4, deflate=True) # 안정성을 위해 저장 시 압축
             
             if not self.pdf_bytes:
                 raise ValueError("PDF 바이트 스트림 생성에 실패하여 데이터가 비어있습니다.")
