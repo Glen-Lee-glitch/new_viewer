@@ -62,12 +62,14 @@ def compress_pdf_file(
                 total_size = 0
 
             # 조건: (이미지가 없거나 이미지 크기가 임계값 미만) 이고 (강제 조정이 아닐 때) -> 복사
-            if (not image_list or image_size / 1024 < size_threshold_kb) and not is_forced and user_rotation == 0:
-                dst.insert_pdf(src, from_page=i, to_page=i)
-                continue
-            
+            # 회전이 적용된 페이지는 이 조건을 건너뛰고 재렌더링되도록 user_rotation == 0 조건을 제거
+            if (not image_list or image_size / 1024 < size_threshold_kb) and not is_forced:
+                # 하지만, 회전이 없는 페이지만 복사하도록 내부에서 한 번 더 체크
+                if user_rotation == 0:
+                    dst.insert_pdf(src, from_page=i, to_page=i)
+                    continue
 
-            # ── 여기부터 '무거운' 페이지 또는 '강제 조정' 페이지만 이미지-재렌더링 ──
+            # ── 여기부터 '무거운' 페이지 또는 '강제 조정' 또는 '회전된' 페이지만 이미지-재렌더링 ──
             try:
                 # === 뷰어 표시 형태 그대로 저장하는 로직 ===
                 # 뷰어에서 보이는 A4 세로 기준 통일된 형태로 정규화하여 저장한다.
