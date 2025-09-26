@@ -11,6 +11,9 @@ wheels/
 venv/
 env/
 
+# assets files
+assets/
+
 # UV specific files
 .uv/
 

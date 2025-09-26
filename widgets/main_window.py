@@ -64,10 +64,12 @@ class MainWindow(QMainWindow):
         nav_layout = QHBoxLayout(nav_widget)
         nav_layout.setContentsMargins(0, 0, 0, 0)
         
+        self.test_button = QPushButton("테스트")
         self.pushButton_prev = QPushButton("이전")
         self.pushButton_next = QPushButton("다음")
         self.label_page_nav = QLabel("N/A")
         
+        nav_layout.addWidget(self.test_button)
         nav_layout.addWidget(self.pushButton_prev)
         nav_layout.addWidget(self.label_page_nav)
         nav_layout.addWidget(self.pushButton_next)
