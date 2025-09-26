@@ -32,31 +32,29 @@ class PdfRender:
             new_doc = pymupdf.open() # 새 인메모리 문서
 
             for page in source_doc:
-                # page.bound()를 사용하여 회전이 적용된 실제 페이지 크기를 기준으로 방향 결정
-                bounds = page.bound()
-                is_landscape = bounds.width > bounds.height
+                # 1. 페이지를 고해상도 이미지로 렌더링하여 회전값을 "굽는다".
+                # 이것이 페이지의 최종 시각적 형태가 된다.
+                pix = page.get_pixmap(dpi=300)
 
-                # A4 페이지 크기 결정 (세로/가로)
+                # 2. 렌더링된 이미지의 크기를 기준으로 최종 방향을 결정한다.
+                is_landscape = pix.width > pix.height
+
+                # 3. 최종 방향에 맞는 A4 페이지를 준비한다.
                 if is_landscape:
                     a4_rect = pymupdf.paper_rect("a4-l")
                 else:
                     a4_rect = pymupdf.paper_rect("a4")
                 
-                # 새 A4 페이지 추가
                 new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
 
-                # 원본 페이지를 A4 페이지 중앙에 98% 크기로 맞춤
-                # PyMuPDF의 show_pdf_page는 자동으로 비율을 유지하며 맞춤
+                # 4. 새 A4 페이지 중앙에 렌더링된 이미지를 삽입한다.
                 margin = 0.98
-                
-                # A4 페이지 내부에 여백(margin)을 적용한 목표 사각형(target_rect)을 계산
-                # 이것이 원본 페이지가 삽입될 영역이 됨
                 page_rect = new_page.rect
                 margin_x = page_rect.width * (1 - margin) / 2
                 margin_y = page_rect.height * (1 - margin) / 2
                 target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
 
-                new_page.show_pdf_page(target_rect, source_doc, page.number)
+                new_page.insert_image(target_rect, pixmap=pix)
 
             # 변환된 문서를 바이트로 저장
             self.pdf_bytes = new_doc.tobytes()
