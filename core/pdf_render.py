@@ -6,6 +6,11 @@ from PyQt6.QtCore import Qt, QBuffer, QIODevice
 A4_WIDTH_PT = 595.276
 A4_HEIGHT_PT = 841.890
 
+# 거대 이미지 판별을 위한 픽셀 수 임계값 (5천만 픽셀)
+# 8k UHD (3840x2160)가 약 830만 픽셀인 것을 감안한 넉넉한 값
+LARGE_IMAGE_PIXELS_THRESHOLD = 50_000_000
+
+
 class PdfRender:
     """PyMuPDF 기반 PDF 렌더러.
     - load_pdf: PDF를 로드하며 A4 규격으로 사전 변환
@@ -41,24 +46,30 @@ class PdfRender:
                 # 2. 방향 결정
                 is_landscape = pix.width > pix.height
                 orientation = "가로" if is_landscape else "세로"
-                print(f"  - 페이지 방향 결정: {orientation}")
-
+                
                 # 3. A4 캔버스 준비
                 if is_landscape:
                     a4_rect = pymupdf.paper_rect("a4-l")
                 else:
                     a4_rect = pymupdf.paper_rect("a4")
                 new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
-                print(f"  - A4 {orientation} 캔버스 준비 완료.")
-
-                # 4. 이미지 삽입
+                
+                # 4. 이미지 삽입 영역 계산
                 margin = 0.98
                 page_rect = new_page.rect
                 margin_x = page_rect.width * (1 - margin) / 2
                 margin_y = page_rect.height * (1 - margin) / 2
                 target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
-                new_page.insert_image(target_rect, pixmap=pix)
-                print(f"  - A4 캔버스에 이미지 삽입 완료.")
+
+                # 5. 거대 이미지는 압축하여 삽입, 일반 이미지는 그대로 삽입
+                if pix.width * pix.height > LARGE_IMAGE_PIXELS_THRESHOLD:
+                    print(f"  - [!] 거대 이미지 감지. JPEG(quality=85)으로 압축하여 삽입합니다.")
+                    jpeg_bytes = pix.tobytes("jpeg", quality=85)
+                    new_page.insert_image(target_rect, stream=jpeg_bytes)
+                else:
+                    print(f"  - 일반 이미지로 A4 캔버스에 삽입합니다.")
+                    new_page.insert_image(target_rect, pixmap=pix)
+
                 print(f"--- 페이지 {current_page_num + 1} 변환 성공 ---\n")
 
             # 변환된 문서를 바이트로 저장
