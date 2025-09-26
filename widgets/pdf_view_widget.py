@@ -108,15 +108,25 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
     def _open_crop_dialog(self):
         """자르기 다이얼로그를 연다."""
-        if self.current_page < 0 or not self.current_page_item:
+        if self.current_page < 0 or not self.renderer or not self.renderer.get_pdf_bytes():
             QMessageBox.warning(self, "알림", "자르기할 페이지가 선택되지 않았습니다.")
             return
 
-        # 현재 뷰에 표시된 QPixmap을 가져옴
-        current_pixmap = self.current_page_item.pixmap()
+        # 다이얼로그에 표시할 선명한 미리보기용 이미지를 새로 렌더링한다.
+        pdf_bytes = self.renderer.get_pdf_bytes()
+        page_num = self.current_page
+        user_rotation = self.page_rotations.get(page_num, 0)
+        
+        # zoom_factor=2.0 (약 200DPI)로 선명한 이미지를 생성
+        preview_pixmap = PdfRender.render_page_thread_safe(
+            pdf_bytes,
+            page_num,
+            zoom_factor=2.0,
+            user_rotation=user_rotation
+        )
         
         dialog = CropDialog(self)
-        dialog.set_page_pixmap(current_pixmap)
+        dialog.set_page_pixmap(preview_pixmap)
         
         # 다이얼로그 실행
         if dialog.exec():
