@@ -13,6 +13,7 @@ from core.pdf_render import PdfRender
 from .floating_toolbar import FloatingToolbarWidget
 from .stamp_overlay_widget import StampOverlayWidget
 from .zoomable_graphics_view import ZoomableGraphicsView
+from PyQt6.QtWidgets import QApplication # Added for QApplication.instance()
 
 
 # --- 백그라운드 렌더링을 위한 Worker ---
@@ -281,6 +282,42 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         """현재 페이지의 이전/다음 페이지를 미리 렌더링한다."""
         self._start_render_job(page_num + 1)
         self._start_render_job(page_num - 1)
+
+    def rotate_current_page_by_90_sync(self):
+        """(공개 메소드, 동기식) 현재 페이지를 90도 회전시키고 렌더링이 끝날 때까지 기다린다."""
+        if not self.renderer or self.current_page < 0:
+            return
+
+        # 1. 회전 각도 업데이트
+        current_user_rotation = self.page_rotations.get(self.current_page, 0)
+        new_user_rotation = (current_user_rotation + 90) % 360
+        self.page_rotations[self.current_page] = new_user_rotation
+        
+        # 2. 캐시 제거
+        if self.current_page in self.page_cache:
+            del self.page_cache[self.current_page]
+
+        # 3. 동기 렌더링
+        try:
+            pdf_bytes = self.renderer.get_pdf_bytes()
+            if not pdf_bytes:
+                raise Exception("PDF 바이트 데이터를 가져올 수 없습니다.")
+            
+            # 비동기 워커의 로직을 그대로 가져와서 동기적으로 실행
+            pixmap = PdfRender.render_page_thread_safe(
+                pdf_bytes, self.current_page, zoom_factor=2.0, user_rotation=new_user_rotation
+            )
+            
+            # 4. 캐시에 저장하고 즉시 표시
+            self.page_cache[self.current_page] = pixmap
+            self._display_pixmap(pixmap)
+            
+            # Qt 이벤트 루프가 화면을 업데이트할 시간을 줌
+            QApplication.instance().processEvents()
+
+        except Exception as e:
+            QMessageBox.warning(self, "렌더링 오류", f"페이지 {self.current_page + 1}을(를) 동기 렌더링하는 중 오류 발생: {e}")
+
 
     def rotate_current_page_by_90(self):
         """(공개 메소드) 현재 페이지를 90도 회전시킨다."""

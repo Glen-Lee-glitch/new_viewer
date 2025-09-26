@@ -219,7 +219,8 @@ class MainWindow(QMainWindow):
 
                 # PdfViewWidget의 현재 페이지(첫 페이지) 회전 기능을 호출
                 print(f"[DEBUG] 회전 명령: 첫 페이지({self.pdf_view_widget.current_page + 1}p)를 90도 회전합니다.")
-                self.pdf_view_widget.rotate_current_page_by_90()
+                # 비동기 대신 동기 메소드 호출
+                self.pdf_view_widget.rotate_current_page_by_90_sync()
                 
         except Exception as e:
             if not self.test_worker._is_stopped and self.pdf_view_widget.get_current_pdf_path():
