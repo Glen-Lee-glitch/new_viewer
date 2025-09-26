@@ -23,12 +23,8 @@ class PdfRender:
         source_doc = None
         new_doc = None
         try:
-            # 원본 문서를 열고, 내부 구조 문제 해결을 위해 "clean" 작업을 수행
-            temp_doc = pymupdf.open(pdf_path)
-            clean_bytes = temp_doc.tobytes(garbage=4, deflate=True)
-            temp_doc.close()
-            
-            source_doc = pymupdf.open(stream=clean_bytes, filetype="pdf")
+            # 원본 문서를 직접 연다.
+            source_doc = pymupdf.open(pdf_path)
             new_doc = pymupdf.open() # 새 인메모리 문서
 
             for page in source_doc:
