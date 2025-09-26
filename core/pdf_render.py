@@ -1,4 +1,5 @@
-import pymupdf  # PyMuPDF
+import pymupdf
+import traceback # 상세한 오류 추적을 위해 추가
 from PyQt6.QtGui import QPixmap, QImage, QIcon, QTransform
 from PyQt6.QtCore import Qt, QBuffer, QIODevice
 
@@ -22,45 +23,67 @@ class PdfRender:
         """PDF를 로드하고, 모든 페이지를 A4 규격으로 변환하여 메모리에 저장한다."""
         source_doc = None
         new_doc = None
+        current_page_num = -1 # 오류 추적용
         try:
-            # 원본 문서를 직접 연다.
+            print(f"원본 파일 여는 중: {pdf_path}")
             source_doc = pymupdf.open(pdf_path)
-            new_doc = pymupdf.open() # 새 인메모리 문서
+            new_doc = pymupdf.open()
+            print("새 인메모리 PDF 문서 생성 완료.")
 
             for page in source_doc:
-                # 1. 페이지를 고해상도 이미지로 렌더링하여 회전값을 "굽는다".
-                # 이것이 페이지의 최종 시각적 형태가 된다.
+                current_page_num = page.number
+                print(f"--- 페이지 {current_page_num + 1} 변환 시작 ---")
+                
+                # 1. 페이지 렌더링
                 pix = page.get_pixmap(dpi=300)
+                print(f"  - 이미지 렌더링 완료 (크기: {pix.width}x{pix.height})")
 
-                # 2. 렌더링된 이미지의 크기를 기준으로 최종 방향을 결정한다.
+                # 2. 방향 결정
                 is_landscape = pix.width > pix.height
+                orientation = "가로" if is_landscape else "세로"
+                print(f"  - 페이지 방향 결정: {orientation}")
 
-                # 3. 최종 방향에 맞는 A4 페이지를 준비한다.
+                # 3. A4 캔버스 준비
                 if is_landscape:
                     a4_rect = pymupdf.paper_rect("a4-l")
                 else:
                     a4_rect = pymupdf.paper_rect("a4")
-                
                 new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+                print(f"  - A4 {orientation} 캔버스 준비 완료.")
 
-                # 4. 새 A4 페이지 중앙에 렌더링된 이미지를 삽입한다.
+                # 4. 이미지 삽입
                 margin = 0.98
                 page_rect = new_page.rect
                 margin_x = page_rect.width * (1 - margin) / 2
                 margin_y = page_rect.height * (1 - margin) / 2
                 target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
-
                 new_page.insert_image(target_rect, pixmap=pix)
+                print(f"  - A4 캔버스에 이미지 삽입 완료.")
+                print(f"--- 페이지 {current_page_num + 1} 변환 성공 ---\n")
 
             # 변환된 문서를 바이트로 저장
+            print("모든 페이지 변환 완료. PDF 바이트 스트림 생성 중...")
             self.pdf_bytes = new_doc.tobytes()
             
+            if not self.pdf_bytes:
+                raise ValueError("PDF 바이트 스트림 생성에 실패하여 데이터가 비어있습니다.")
+            
+            print(f"PDF 바이트 스트림 생성 성공 (크기: {len(self.pdf_bytes)} bytes). 최종 문서 로드 중...")
+
             # 바이트 스트림으로부터 최종 문서 로드
             self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
             self.pdf_path = pdf_path
             self.page_count = len(self.doc)
+            print("최종 문서 로드 성공!")
 
         except Exception as exc:
+            print("\n" + "="*20 + " PDF 처리 중 심각한 오류 발생 " + "="*20)
+            print(f"오류 발생 지점: 페이지 {current_page_num + 1}")
+            print(f"예외 유형: {type(exc).__name__}")
+            print(f"예외 메시지: {exc}")
+            print("\n--- 상세 Traceback 정보 ---")
+            traceback.print_exc() # 전체 오류 스택 출력
+            print("="*65 + "\n")
             raise ValueError(f"PDF 로드 및 A4 변환 실패: {exc}")
         finally:
             if source_doc:
