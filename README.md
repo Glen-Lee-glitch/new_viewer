@@ -1,50 +1,120 @@
-# PDF Viewer 프로젝트 리팩토링 계획: 컴포넌트 단위 파일 분리
+# PDF Viewer
 
-## 1. 목표
-현재 `core/widgets.py` 파일에 모든 UI 관련 클래스가 집중되어 있어 가독성과 유지보수성이 저하되고 있습니다.
-'컴포넌트(위젯) 단위'로 파일을 분리하여 코드 구조를 개선하고, 각 위젯의 독립성을 높여 향후 기능 확장 및 수정이 용이하도록 만듭니다.
+PyQt6 기반의 고성능 PDF 뷰어 애플리케이션입니다. PDF 문서를 A4 규격으로 자동 변환하여 일관된 뷰어 경험을 제공하며, 페이지 회전, 줌, 썸네일 네비게이션 등의 기능을 지원합니다.
 
-## 2. 변경 전후 구조 비교
+## ✨ 주요 기능
 
-### 변경 전 (Before)
+- **PDF 뷰어**: 고화질 PDF 렌더링 및 페이지 네비게이션
+- **A4 자동 변환**: 모든 PDF를 A4 규격으로 통일하여 일관된 뷰어 경험 제공
+- **썸네일 네비게이션**: 좌측 패널에서 페이지 미리보기 및 빠른 이동
+- **페이지 회전**: 개별 페이지 회전 기능
+- **줌 기능**: 확대/축소 및 팬(pan) 기능
+- **PDF 압축 저장**: 다단계 압축을 통한 파일 크기 최적화
+- **일괄 테스트**: 여러 PDF 파일의 열기/저장 테스트 기능
+- **다크 테마**: qt-material을 활용한 현대적인 UI
+
+## 🏗️ 프로젝트 구조
+
 ```
 new_viewer/
-├── core/
-│   ├── widgets.py  # <-- MainWindow, PdfViewWidget 등 모든 위젯 클래스 포함
-│   └── pdf_render.py
-├── ui/
-│   └── ...
-└── main.py
+├── core/                      # 핵심 비즈니스 로직
+│   ├── pdf_render.py         # PDF 렌더링 엔진
+│   ├── pdf_saved.py          # PDF 압축 및 저장
+│   ├── edit_mixin.py         # 편집 기능 믹스인
+│   └── insert_mixin.py       # 삽입 기능 믹스인
+├── widgets/                   # UI 컴포넌트
+│   ├── main_window.py        # 메인 윈도우
+│   ├── pdf_view_widget.py    # PDF 뷰어 위젯
+│   ├── thumbnail_view_widget.py  # 썸네일 뷰어
+│   ├── floating_toolbar.py   # 플로팅 툴바
+│   ├── pdf_load_widget.py    # PDF 로드 위젯
+│   ├── stamp_overlay_widget.py   # 도장 오버레이
+│   ├── info_panel_widget.py  # 정보 패널
+│   └── zoomable_graphics_view.py  # 줌 가능한 그래픽 뷰
+├── ui/                       # Qt Designer UI 파일
+│   ├── floating_toolbar.ui
+│   ├── info_panel.ui
+│   ├── pdf_load_area.ui
+│   ├── pdf_view_widget.ui
+│   ├── stamp_overlay.ui
+│   └── thumbnail_viewer.ui
+├── assets/                   # 리소스 파일
+│   └── 도장1.png
+├── test/                     # 테스트 파일
+│   ├── test.py
+│   ├── 800.pdf
+│   └── download.pdf
+├── main.py                   # 애플리케이션 진입점
+├── requirements.txt          # 의존성 목록
+├── pyproject.toml           # 프로젝트 설정
+└── README.md
 ```
 
-### 변경 후 (After)
-```
-new_viewer/
-├── core/
-│   └── pdf_render.py          # PDF 렌더링 등 핵심 로직
-├── widgets/                   # <-- 신규: UI 컴포넌트(위젯) 패키지
-│   ├── __init__.py
-│   ├── main_window.py         # MainWindow, create_app()
-│   ├── pdf_view_widget.py
-│   ├── thumbnail_view_widget.py
-│   ├── floating_toolbar.py
-│   ├── pdf_load_widget.py
-│   ├── stamp_overlay_widget.py
-│   └── zoomable_graphics_view.py
-├── ui/
-│   └── ...
-└── main.py
+## 🚀 설치 및 실행
+
+### 1. 의존성 설치
+
+```bash
+# uv 사용 (권장)
+uv sync
+
+# 또는 pip 사용
+pip install -r requirements.txt
 ```
 
-## 3. 주요 변경 사항
-1.  **`widgets` 패키지 생성**: UI 컴포넌트를 관리할 `widgets/` 디렉토리를 생성합니다.
-2.  **`core/widgets.py` 파일 분리**:
-    -   `core/widgets.py` 내부의 각 Qt 위젯 클래스(`MainWindow`, `PdfViewWidget` 등)를 `widgets/` 디렉토리 아래의 개별 Python 파일로 분리합니다.
-    -   `create_app` 함수는 `MainWindow`와 함께 `widgets/main_window.py`로 이동합니다.
-3.  **`core/widgets.py` 파일 삭제**: 모든 클래스가 이전된 후, 기존 `core/widgets.py` 파일은 삭제합니다.
-4.  **Import 구문 수정**:
-    -   분리된 파일 간의 의존성(예: `PdfViewWidget`가 `FloatingToolbarWidget`를 사용하는 경우)을 해결하기 위해 `import` 경로를 수정합니다.
-    -   `main.py`에서 `create_app`을 임포트하는 경로를 `from widgets.main_window import create_app`으로 변경합니다.
-5.  **`widgets/__init__.py` 설정**: 각 위젯 클래스를 `widgets` 패키지 레벨에서 쉽게 임포트할 수 있도록 설정하여 사용 편의성을 높입니다.
+### 2. 애플리케이션 실행
 
-이 작업을 통해 각 UI 컴포넌트의 코드가 명확하게 분리되어, 특정 기능을 찾거나 수정할 때 훨씬 수월해질 것으로 기대됩니다.
+```bash
+python main.py
+```
+
+## 📋 주요 의존성
+
+- **PyQt6**: GUI 프레임워크
+- **PyMuPDF**: PDF 처리 및 렌더링
+- **Pillow**: 이미지 처리
+- **qt-material**: 다크 테마 지원
+
+## 🔧 핵심 컴포넌트
+
+### PdfRender (core/pdf_render.py)
+- PDF 문서를 A4 규격으로 자동 변환
+- 고화질 렌더링 (200 DPI)
+- 썸네일 생성
+- 메모리 효율적인 처리
+
+### MainWindow (widgets/main_window.py)
+- 메인 애플리케이션 윈도우
+- 위젯 간 시그널-슬롯 연결
+- 페이지 네비게이션 관리
+- 일괄 테스트 기능
+
+### PdfViewWidget (widgets/pdf_view_widget.py)
+- PDF 페이지 렌더링 및 표시
+- 줌/팬 기능
+- 페이지 회전
+- 백그라운드 렌더링
+
+## 🎯 사용법
+
+1. **PDF 열기**: 파일 드래그 앤 드롭 또는 파일 선택
+2. **페이지 이동**: 썸네일 클릭 또는 네비게이션 버튼 사용
+3. **줌 조절**: 마우스 휠 또는 툴바 버튼
+4. **페이지 회전**: 툴바의 회전 버튼 사용
+5. **PDF 저장**: 툴바의 저장 버튼으로 압축된 PDF 저장
+
+## 🧪 테스트
+
+일괄 테스트 기능을 통해 여러 PDF 파일의 열기/저장을 자동화할 수 있습니다:
+
+1. 테스트 버튼 클릭
+2. 지정된 폴더의 모든 PDF 파일이 자동으로 처리됨
+3. 결과는 별도 폴더에 저장됨
+
+## 🔄 개발 상태
+
+이 프로젝트는 리팩토링을 통해 컴포넌트 단위로 파일이 분리되어 있습니다. 각 위젯은 독립적으로 관리되며, 향후 기능 확장 및 유지보수가 용이한 구조로 설계되었습니다.
+
+## 📝 라이선스
+
+이 프로젝트는 개인/교육 목적으로 개발되었습니다.
