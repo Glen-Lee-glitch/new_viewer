@@ -1,18 +1,103 @@
 import sys
+import time
+import os
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QThreadPool
+from PyQt6.QtCore import Qt, QThreadPool, QRunnable, pyqtSignal, QObject
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
                              QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar,
                              QPushButton, QLabel)
 from qt_material import apply_stylesheet
 
 from core.pdf_render import PdfRender
+from core.pdf_saved import compress_pdf_with_multiple_stages
 from widgets.floating_toolbar import PdfSaveWorker
 from widgets.pdf_load_widget import PdfLoadWidget
 from widgets.pdf_view_widget import PdfViewWidget
 from widgets.thumbnail_view_widget import ThumbnailViewWidget
 from widgets.info_panel_widget import InfoPanelWidget
+
+
+class BatchTestSignals(QObject):
+    """PDF 일괄 테스트 Worker의 시그널 정의"""
+    progress = pyqtSignal(str)
+    error = pyqtSignal(str, str) # file_name, error_message
+    finished = pyqtSignal()
+
+
+class PdfBatchTestWorker(QRunnable):
+    """PDF 일괄 열기/저장 테스트를 수행하는 Worker"""
+    def __init__(self):
+        super().__init__()
+        self.signals = BatchTestSignals()
+        self.input_dir = r'C:\Users\HP\Desktop\files\테스트PDF'
+        self.output_dir = r'C:\Users\HP\Desktop\files\결과'
+
+    def run(self):
+        input_path = Path(self.input_dir)
+        output_path = Path(self.output_dir)
+
+        if not input_path.is_dir():
+            self.signals.error.emit("", f"입력 폴더를 찾을 수 없습니다: {self.input_dir}")
+            return
+
+        if not output_path.exists():
+            try:
+                output_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                self.signals.error.emit("", f"출력 폴더를 생성하는 데 실패했습니다: {e}")
+                return
+
+        pdf_files = list(input_path.glob("*.pdf"))
+        if not pdf_files:
+            self.signals.error.emit("", f"테스트할 PDF 파일이 없습니다: {self.input_dir}")
+            return
+        
+        self.signals.progress.emit(f"총 {len(pdf_files)}개의 PDF 파일 테스트 시작...")
+        time.sleep(1)
+
+        for pdf_file in pdf_files:
+            renderer = None
+            try:
+                # 1. PDF 열기
+                self.signals.progress.emit(f"'{pdf_file.name}' 여는 중...")
+                renderer = PdfRender()
+                renderer.load_pdf(str(pdf_file))
+                self.signals.progress.emit(f"'{pdf_file.name}' 열기 성공. ({renderer.get_page_count()} 페이지)")
+                
+                # 2. 2초 대기
+                time.sleep(2)
+
+                # 3. PDF 저장
+                output_file = output_path / f"{pdf_file.stem}_tested.pdf"
+                self.signals.progress.emit(f"'{pdf_file.name}' 저장 시작 -> '{output_file.name}'")
+                
+                success = compress_pdf_with_multiple_stages(
+                    input_path=str(pdf_file),
+                    output_path=str(output_file),
+                    target_size_mb=3,
+                    rotations={},
+                    force_resize_pages=set()
+                )
+                if not success:
+                    # 압축 실패 시 오류는 아니지만, 별도 처리 가능
+                    self.signals.progress.emit(f"'{output_file.name}' 압축 실패, 원본 저장됨.")
+
+                self.signals.progress.emit(f"'{output_file.name}' 저장 완료.")
+
+                # 4. 3초 대기
+                time.sleep(3)
+
+            except Exception as e:
+                self.signals.error.emit(pdf_file.name, str(e))
+                if renderer:
+                    renderer.close()
+                return # 오류 발생 시 즉시 중단
+            finally:
+                if renderer:
+                    renderer.close()
+        
+        self.signals.finished.emit()
 
 
 class MainWindow(QMainWindow):
@@ -102,8 +187,37 @@ class MainWindow(QMainWindow):
         self.pushButton_prev.clicked.connect(lambda: self.change_page(-1))
         self.pushButton_next.clicked.connect(lambda: self.change_page(1))
         
+        # 테스트 버튼 시그널 연결
+        self.test_button.clicked.connect(self.start_batch_test)
+        
         # PdfViewWidget의 내부 페이지 변경 요청 -> 실제 페이지 변경 로직 실행
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
+
+    def start_batch_test(self):
+        """PDF 일괄 테스트 Worker를 시작한다."""
+        self.statusBar.showMessage("PDF 일괄 테스트를 시작합니다...", 0)
+        worker = PdfBatchTestWorker()
+        worker.signals.progress.connect(self.statusBar.showMessage)
+        worker.signals.error.connect(self._on_batch_test_error)
+        worker.signals.finished.connect(self._on_batch_test_finished)
+        self.thread_pool.start(worker)
+
+    def _on_batch_test_error(self, filename: str, error_msg: str):
+        """일괄 테스트 중 오류 발생 시 호출될 슬롯"""
+        if filename:
+            title = f"'{filename}' 처리 중 오류"
+            message = f"파일 '{filename}'을 처리하는 중 오류가 발생하여 테스트를 중단합니다.\n\n오류: {error_msg}"
+        else:
+            title = "테스트 설정 오류"
+            message = f"테스트를 시작하는 중 오류가 발생했습니다.\n\n오류: {error_msg}"
+        
+        self.statusBar.showMessage(f"오류로 테스트가 중단되었습니다: {error_msg}", 10000)
+        QMessageBox.critical(self, title, message)
+
+    def _on_batch_test_finished(self):
+        """일괄 테스트 완료 시 호출될 슬롯"""
+        self.statusBar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
+        QMessageBox.information(self, "테스트 완료", "지정된 모든 PDF 파일의 열기/저장 테스트를 성공적으로 완료했습니다.")
 
     def adjust_viewer_layout(self, is_landscape: bool):
         """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
