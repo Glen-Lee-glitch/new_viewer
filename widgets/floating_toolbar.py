@@ -17,7 +17,6 @@ class WorkerSignals(QObject):
     finished = pyqtSignal(str, bool)  # 저장 경로, 성공 여부
     error = pyqtSignal(str)
 
-
 class PdfSaveWorker(QRunnable):
     """
     QThreadPool에서 PDF 압축 및 저장을 실행하기 위한 Worker

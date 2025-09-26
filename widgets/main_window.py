@@ -34,6 +34,11 @@ class PdfBatchTestWorker(QRunnable):
         self.signals = BatchTestSignals()
         self.input_dir = r'C:\Users\HP\Desktop\files\테스트PDF'
         self.output_dir = r'C:\Users\HP\Desktop\files\결과'
+        self._is_stopped = False
+
+    def stop(self):
+        """Worker를 중지시킨다."""
+        self._is_stopped = True
 
     def run(self):
         input_path = Path(self.input_dir)
@@ -59,6 +64,8 @@ class PdfBatchTestWorker(QRunnable):
         time.sleep(1)
 
         for pdf_file in pdf_files:
+            if self._is_stopped: return
+
             try:
                 # 1. UI에 PDF 로드 요청
                 self.signals.progress.emit(f"'{pdf_file.name}' 로드 요청...")
@@ -66,6 +73,8 @@ class PdfBatchTestWorker(QRunnable):
                 
                 # 2. 2초 대기 (실제 로드는 메인 스레드에서 일어남)
                 time.sleep(2)
+
+                if self._is_stopped: return
 
                 # 3. UI에 PDF 저장 요청
                 self.signals.progress.emit(f"'{pdf_file.name}' 저장 요청...")
@@ -75,10 +84,12 @@ class PdfBatchTestWorker(QRunnable):
                 time.sleep(3)
 
             except Exception as e:
-                self.signals.error.emit(pdf_file.name, str(e))
+                if not self._is_stopped:
+                    self.signals.error.emit(pdf_file.name, str(e))
                 return # 오류 발생 시 즉시 중단
         
-        self.signals.finished.emit()
+        if not self._is_stopped:
+            self.signals.finished.emit()
 
 
 class MainWindow(QMainWindow):
@@ -216,11 +227,16 @@ class MainWindow(QMainWindow):
             )
         except Exception as e:
             # 테스트 워커에 오류 전파
-            self.test_worker.signals.error.emit(Path(input_path).name, str(e))
+            if not self.test_worker._is_stopped:
+                self.test_worker.signals.error.emit(Path(input_path).name, str(e))
 
 
     def _on_batch_test_error(self, filename: str, error_msg: str):
         """일괄 테스트 중 오류 발생 시 호출될 슬롯"""
+        # 워커를 중지시켜 더 이상 진행되지 않도록 함
+        if self.test_worker:
+            self.test_worker.stop()
+
         if filename:
             title = f"'{filename}' 처리 중 오류"
             message = f"파일 '{filename}'을 처리하는 중 오류가 발생하여 테스트를 중단합니다.\n\n오류: {error_msg}"
