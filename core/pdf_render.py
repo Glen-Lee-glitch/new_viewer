@@ -1,14 +1,14 @@
 import pymupdf  # PyMuPDF
-from PyQt6.QtGui import QPixmap, QImage, QIcon, QTransform, QPainter, QColor
-from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize
+from PyQt6.QtGui import QPixmap, QImage, QIcon, QTransform
+from PyQt6.QtCore import Qt, QBuffer, QIODevice
 
 A4_WIDTH_PT = 595.276
 A4_HEIGHT_PT = 841.890
 
 class PdfRender:
     """PyMuPDF 기반 PDF 렌더러.
-
-    - render_page: 고화질(oversampling)로 페이지를 QPixmap으로 렌더링
+    - load_pdf: PDF를 로드하며 A4 규격으로 사전 변환
+    - render_page: 변환된 페이지를 QPixmap으로 렌더링
     - create_thumbnail: 선명한 썸네일(QIcon) 생성
     """
 
@@ -16,27 +16,59 @@ class PdfRender:
         self.doc = None
         self.page_count = 0
         self.pdf_path: str | None = None
+        self.pdf_bytes: bytes | None = None
 
     def load_pdf(self, pdf_path: str) -> None:
-        """PDF 문서를 로드한다.
-
-        Args:
-            pdf_path: PDF 파일 경로
-        Raises:
-            FileNotFoundError: 파일이 존재하지 않을 때
-            ValueError: 문서 로드 실패 시
-        """
+        """PDF를 로드하고, 모든 페이지를 A4 규격으로 변환하여 메모리에 저장한다."""
+        source_doc = None
+        new_doc = None
         try:
-            self.doc = pymupdf.open(pdf_path)
+            source_doc = pymupdf.open(pdf_path)
+            new_doc = pymupdf.open() # 새 인메모리 문서
+
+            for page in source_doc:
+                is_landscape = page.rect.width > page.rect.height
+
+                # A4 페이지 크기 결정 (세로/가로)
+                if is_landscape:
+                    a4_rect = pymupdf.paper_rect("a4-l")
+                else:
+                    a4_rect = pymupdf.paper_rect("a4")
+                
+                # 새 A4 페이지 추가
+                new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+
+                # 원본 페이지를 A4 페이지 중앙에 98% 크기로 맞춤
+                # PyMuPDF의 show_pdf_page는 자동으로 비율을 유지하며 맞춤
+                margin = 0.98
+                target_rect = new_page.rect * margin
+                target_rect.center = new_page.rect.center
+
+                new_page.show_pdf_page(target_rect, source_doc, page.number)
+
+            # 변환된 문서를 바이트로 저장
+            self.pdf_bytes = new_doc.tobytes()
+            
+            # 바이트 스트림으로부터 최종 문서 로드
+            self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
             self.pdf_path = pdf_path
-        except Exception as exc:  # 파일 경로/형식 문제 포함
-            raise ValueError(f"PDF 로드 실패: {exc}")
+            self.page_count = len(self.doc)
+
+        except Exception as exc:
+            raise ValueError(f"PDF 로드 및 A4 변환 실패: {exc}")
+        finally:
+            if source_doc:
+                source_doc.close()
+            if new_doc:
+                new_doc.close()
 
         if self.doc is None or len(self.doc) == 0:
-            raise ValueError("빈 문서이거나 로드할 수 없습니다.")
+            raise ValueError("빈 문서이거나 변환 후 페이지가 없습니다.")
 
-        self.page_count = len(self.doc)
-
+    def get_pdf_bytes(self) -> bytes | None:
+        """변환된 PDF의 바이트 데이터를 반환한다."""
+        return self.pdf_bytes
+        
     def _ensure_loaded(self) -> None:
         if self.doc is None:
             raise RuntimeError("PDF가 로드되지 않았습니다. load_pdf()를 먼저 호출하세요.")
@@ -128,60 +160,34 @@ class PdfRender:
         return self.page_count
     
     @staticmethod
-    def render_page_thread_safe(pdf_path: str, page_num: int, zoom_factor: float = 2.0, user_rotation: int = 0) -> QPixmap:
+    def render_page_thread_safe(pdf_bytes: bytes, page_num: int, zoom_factor: float = 2.0, user_rotation: int = 0) -> QPixmap:
         """
-        PDF 페이지를 A4 규격(가로/세로 자동 판별)의 흰 배경 위에 렌더링한다.
-        - 페이지의 원본 비율과 회전, 사용자 추가 회전을 모두 존중한다.
-        - 최종 결과물은 항상 A4 비율을 가지는 QPixmap이 된다.
+        A4로 사전 변환된 PDF 바이트 스트림으로부터 페이지를 렌더링한다.
+        - 이제 이 메서드는 항상 A4 비율의 페이지를 다루게 된다.
         """
         doc = None
         try:
-            doc = pymupdf.open(pdf_path)
+            doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
             if page_num < 0 or page_num >= len(doc):
                 raise IndexError(f"잘못된 페이지 번호: {page_num}")
 
             page = doc.load_page(page_num)
 
-            # 1. 원본 페이지를 고화질로 렌더링 (기본 회전값 포함)
+            # 고화질 렌더링 매트릭스 생성
             zoom_matrix = pymupdf.Matrix(zoom_factor, zoom_factor)
             pix = page.get_pixmap(matrix=zoom_matrix, alpha=False, annots=True)
+
             image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
             qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, image_format).copy()
-            source_pixmap = QPixmap.fromImage(qimage)
+            
+            pixmap = QPixmap.fromImage(qimage)
 
-            # 2. 사용자 인터페이스에서 요청한 추가 회전을 적용
+            # 사용자 인터페이스에서 요청한 추가 회전을 적용한다.
             if user_rotation != 0:
                 transform = QTransform().rotate(user_rotation)
-                source_pixmap = source_pixmap.transformed(transform, Qt.TransformationMode.SmoothTransformation)
+                pixmap = pixmap.transformed(transform, Qt.TransformationMode.SmoothTransformation)
             
-            # 3. 최종 방향(가로/세로)을 결정하고 A4 캔버스 크기 설정
-            is_landscape = source_pixmap.width() > source_pixmap.height()
-            
-            if is_landscape:
-                canvas_width = int(A4_HEIGHT_PT * zoom_factor)
-                canvas_height = int(A4_WIDTH_PT * zoom_factor)
-            else:
-                canvas_width = int(A4_WIDTH_PT * zoom_factor)
-                canvas_height = int(A4_HEIGHT_PT * zoom_factor)
-            
-            # 4. 흰색 A4 캔버스 생성
-            a4_canvas = QPixmap(canvas_width, canvas_height)
-            a4_canvas.fill(QColor("white"))
-
-            # 5. 원본 이미지를 A4 캔버스에 맞게 축소 (98% 여백 활용)
-            margin_utilization = 0.98
-            target_size = QSize(int(canvas_width * margin_utilization), int(canvas_height * margin_utilization))
-            
-            scaled_pixmap = source_pixmap.scaled(target_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-
-            # 6. A4 캔버스 중앙에 렌더링된 페이지를 그리기
-            painter = QPainter(a4_canvas)
-            x_pos = (canvas_width - scaled_pixmap.width()) // 2
-            y_pos = (canvas_height - scaled_pixmap.height()) // 2
-            painter.drawPixmap(x_pos, y_pos, scaled_pixmap)
-            painter.end()
-
-            return a4_canvas
+            return pixmap
             
         finally:
             if doc:

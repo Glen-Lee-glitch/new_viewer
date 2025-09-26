@@ -29,9 +29,9 @@ class WorkerSignals(QObject):
 class PdfRenderWorker(QRunnable):
     """단일 PDF 페이지를 렌더링하는 Worker 스레드"""
 
-    def __init__(self, pdf_path: str, page_num: int, zoom_factor: float = 2.0, user_rotation: int = 0):
+    def __init__(self, pdf_bytes: bytes, page_num: int, zoom_factor: float = 2.0, user_rotation: int = 0):
         super().__init__()
-        self.pdf_path = pdf_path
+        self.pdf_bytes = pdf_bytes
         self.page_num = page_num
         self.zoom_factor = zoom_factor
         self.user_rotation = user_rotation
@@ -50,9 +50,9 @@ class PdfRenderWorker(QRunnable):
     def run(self):
         """백그라운드 스레드에서 렌더링 실행. 핵심 로직은 PdfRender 클래스에 위임."""
         try:
-            # PdfRender의 스레드 안전 메서드를 호출 (사용자 회전 각도 포함)
+            # PdfRender의 스레드 안전 메서드를 호출 (A4 변환된 바이트 데이터 사용)
             pixmap = PdfRender.render_page_thread_safe(
-                self.pdf_path, self.page_num, self.zoom_factor, self.user_rotation
+                self.pdf_bytes, self.page_num, self.zoom_factor, self.user_rotation
             )
             self.signals.finished.emit(self.page_num, pixmap)
 
@@ -190,7 +190,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
     def show_page(self, page_num: int):
         """지정된 페이지를 뷰에 표시한다. 캐시를 확인하고, 없으면 백그라운드 렌더링을 시작한다."""
-        if not self.renderer or not self.pdf_path or page_num < 0 or page_num >= self.renderer.get_page_count():
+        if not self.renderer or not self.renderer.get_pdf_bytes() or page_num < 0 or page_num >= self.renderer.get_page_count():
             return
 
         self.current_page = page_num
@@ -220,7 +220,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
     def _start_render_job(self, page_num: int):
         """지정된 페이지의 백그라운드 렌더링 작업을 시작한다."""
-        if (not self.renderer or not self.pdf_path or
+        pdf_bytes = self.renderer.get_pdf_bytes()
+        if (not self.renderer or not pdf_bytes or
                 page_num < 0 or page_num >= self.renderer.get_page_count()):
             return
         if page_num in self.page_cache or page_num in self.rendering_jobs:
@@ -229,7 +230,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.rendering_jobs.add(page_num)
         # 현재 회전 각도를 워커에 전달
         user_rotation = self.page_rotations.get(page_num, 0)
-        worker = PdfRenderWorker(self.pdf_path, page_num, zoom_factor=2.0, user_rotation=user_rotation)
+        worker = PdfRenderWorker(pdf_bytes, page_num, zoom_factor=2.0, user_rotation=user_rotation)
         worker.signals.finished.connect(self._on_page_rendered)
         worker.signals.error.connect(self._on_render_error)
         self.thread_pool.start(worker)
