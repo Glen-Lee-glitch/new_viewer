@@ -282,8 +282,12 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self._start_render_job(page_num + 1)
         self._start_render_job(page_num - 1)
 
+    def rotate_current_page_by_90(self):
+        """(공개 메소드) 현재 페이지를 90도 회전시킨다."""
+        self._rotate_current_page()
+
     def _rotate_current_page(self):
-        """현재 페이지를 90도 회전시킨다."""
+        """(내부 메소드) 현재 페이지를 90도 회전시킨다."""
         if not self.current_page_item:
             return
         
