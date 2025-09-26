@@ -210,8 +210,17 @@ class MainWindow(QMainWindow):
         """테스트 목적으로 첫 페이지를 90도 회전한다."""
         try:
             if self.renderer and self.renderer.get_page_count() > 0:
+                
+                # --- 테스트 디버그 기능 추가 ---
+                # 현재 뷰어의 페이지가 첫 페이지(0)가 아니면 강제로 이동
+                if self.pdf_view_widget.current_page != 0:
+                    print(f"[DEBUG] 현재 페이지가 {self.pdf_view_widget.current_page + 1}이므로 첫 페이지로 이동합니다.")
+                    self.go_to_page(0)
+
                 # PdfViewWidget의 현재 페이지(첫 페이지) 회전 기능을 호출
+                print(f"[DEBUG] 회전 명령: 첫 페이지({self.pdf_view_widget.current_page + 1}p)를 90도 회전합니다.")
                 self.pdf_view_widget.rotate_current_page_by_90()
+                
         except Exception as e:
             if not self.test_worker._is_stopped and self.pdf_view_widget.get_current_pdf_path():
                 filename = Path(self.pdf_view_widget.get_current_pdf_path()).name
