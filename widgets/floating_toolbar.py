@@ -50,7 +50,6 @@ class PdfSaveWorker(QRunnable):
             if os.path.exists(temp_input_path):
                 os.remove(temp_input_path)
 
-
 class FloatingToolbarWidget(QWidget):
     """pdf_view_widget 위에 떠다니는 이동 가능한 툴바."""
     stamp_menu_requested = pyqtSignal()

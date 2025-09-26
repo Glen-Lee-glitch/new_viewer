@@ -173,6 +173,9 @@ class MainWindow(QMainWindow):
         self.statusBar.showMessage(message, 8000)
         QMessageBox.information(self, "저장 완료", message)
 
+        # 저장 완료 후 초기 로드 화면으로 전환
+        self.show_load_view()
+
     def _on_save_error(self, error_msg: str):
         """저장 중 오류 발생 시 호출될 슬롯"""
         self.statusBar.showMessage(f"오류 발생: {error_msg}", 8000)
@@ -205,18 +208,25 @@ class MainWindow(QMainWindow):
         self.thumbnail_viewer.show()
         self.info_panel.show()
         
-    def _on_pdf_closed(self):
-        """PDF 파일이 닫혔을 때의 UI 상태를 처리한다."""
+    def show_load_view(self):
+        """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
         self.setWindowTitle("PDF Viewer")
+        if self.renderer:
+            self.renderer.close()
+        
         self.renderer = None
         self.current_page = -1
 
         self.pdf_load_widget.show()
-        self.thumbnail_viewer.clear()
+        
+        # 뷰어 관련 위젯들 숨기기 및 초기화
         self.pdf_view_widget.hide()
-        self.info_panel.clear_info()
+        self.pdf_view_widget.set_renderer(None) # 뷰어 내부 상태 초기화
         self.thumbnail_viewer.hide()
+        self.thumbnail_viewer.clear_thumbnails()
         self.info_panel.hide()
+        self.info_panel.clear_info()
+
         self._update_page_navigation(0, 0)
 
     def go_to_page(self, page_num: int):
