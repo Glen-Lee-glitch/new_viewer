@@ -23,6 +23,8 @@ class BatchTestSignals(QObject):
     progress = pyqtSignal(str)
     error = pyqtSignal(str, str) # file_name, error_message
     finished = pyqtSignal()
+    load_pdf = pyqtSignal(str) # UI에 PDF 로드를 요청하는 시그널
+    save_pdf = pyqtSignal()   # UI에 PDF 저장을 요청하는 시그널
 
 
 class PdfBatchTestWorker(QRunnable):
@@ -57,45 +59,24 @@ class PdfBatchTestWorker(QRunnable):
         time.sleep(1)
 
         for pdf_file in pdf_files:
-            renderer = None
             try:
-                # 1. PDF 열기
-                self.signals.progress.emit(f"'{pdf_file.name}' 여는 중...")
-                renderer = PdfRender()
-                renderer.load_pdf(str(pdf_file))
-                self.signals.progress.emit(f"'{pdf_file.name}' 열기 성공. ({renderer.get_page_count()} 페이지)")
+                # 1. UI에 PDF 로드 요청
+                self.signals.progress.emit(f"'{pdf_file.name}' 로드 요청...")
+                self.signals.load_pdf.emit(str(pdf_file))
                 
-                # 2. 2초 대기
+                # 2. 2초 대기 (실제 로드는 메인 스레드에서 일어남)
                 time.sleep(2)
 
-                # 3. PDF 저장
-                output_file = output_path / f"{pdf_file.stem}_tested.pdf"
-                self.signals.progress.emit(f"'{pdf_file.name}' 저장 시작 -> '{output_file.name}'")
+                # 3. UI에 PDF 저장 요청
+                self.signals.progress.emit(f"'{pdf_file.name}' 저장 요청...")
+                self.signals.save_pdf.emit()
                 
-                success = compress_pdf_with_multiple_stages(
-                    input_path=str(pdf_file),
-                    output_path=str(output_file),
-                    target_size_mb=3,
-                    rotations={},
-                    force_resize_pages=set()
-                )
-                if not success:
-                    # 압축 실패 시 오류는 아니지만, 별도 처리 가능
-                    self.signals.progress.emit(f"'{output_file.name}' 압축 실패, 원본 저장됨.")
-
-                self.signals.progress.emit(f"'{output_file.name}' 저장 완료.")
-
-                # 4. 3초 대기
+                # 4. 3초 대기 (실제 저장은 메인 스레드에서 일어남)
                 time.sleep(3)
 
             except Exception as e:
                 self.signals.error.emit(pdf_file.name, str(e))
-                if renderer:
-                    renderer.close()
                 return # 오류 발생 시 즉시 중단
-            finally:
-                if renderer:
-                    renderer.close()
         
         self.signals.finished.emit()
 
@@ -196,11 +177,47 @@ class MainWindow(QMainWindow):
     def start_batch_test(self):
         """PDF 일괄 테스트 Worker를 시작한다."""
         self.statusBar.showMessage("PDF 일괄 테스트를 시작합니다...", 0)
-        worker = PdfBatchTestWorker()
-        worker.signals.progress.connect(self.statusBar.showMessage)
-        worker.signals.error.connect(self._on_batch_test_error)
-        worker.signals.finished.connect(self._on_batch_test_finished)
-        self.thread_pool.start(worker)
+        self.test_worker = PdfBatchTestWorker()
+        self.test_worker.signals.progress.connect(self.statusBar.showMessage)
+        self.test_worker.signals.error.connect(self._on_batch_test_error)
+        self.test_worker.signals.finished.connect(self._on_batch_test_finished)
+        self.test_worker.signals.load_pdf.connect(self.load_document_for_test)
+        self.test_worker.signals.save_pdf.connect(self._save_document_for_test)
+        
+        self.thread_pool.start(self.test_worker)
+
+    def load_document_for_test(self, pdf_path: str):
+        """테스트 목적으로 문서를 UI에 로드한다."""
+        self.load_document(pdf_path)
+
+    def _save_document_for_test(self):
+        """테스트 목적으로 현재 문서를 저장한다."""
+        if not self.pdf_view_widget.get_current_pdf_path():
+            # 이 경우는 거의 없지만, 방어 코드
+            return
+
+        input_path = self.pdf_view_widget.get_current_pdf_path()
+        output_dir = Path(r'C:\Users\HP\Desktop\files\결과')
+        output_file = output_dir / f"{Path(input_path).stem}_tested.pdf"
+
+        # 기존 저장 로직과 유사하게 실행
+        rotations = self.pdf_view_widget.get_page_rotations()
+        force_resize_pages = self.pdf_view_widget.get_force_resize_pages()
+
+        # 저장은 백그라운드에서 실행되지만, 여기서는 테스트의 일부로 직접 호출
+        # 실제 저장 워커를 또 만들면 복잡해지므로, compress 함수를 직접 호출
+        try:
+            compress_pdf_with_multiple_stages(
+                input_path=input_path,
+                output_path=str(output_file),
+                target_size_mb=3,
+                rotations=rotations,
+                force_resize_pages=force_resize_pages
+            )
+        except Exception as e:
+            # 테스트 워커에 오류 전파
+            self.test_worker.signals.error.emit(Path(input_path).name, str(e))
+
 
     def _on_batch_test_error(self, filename: str, error_msg: str):
         """일괄 테스트 중 오류 발생 시 호출될 슬롯"""
