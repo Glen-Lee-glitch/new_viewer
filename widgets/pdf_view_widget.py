@@ -762,7 +762,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         
         # --- 기본 확대 레벨 설정 ---
         # 사용자가 요청한 대로, 기본적으로 두 단계 확대된 상태로 보이도록 스케일 팩터를 1.4배 증가
-        default_zoom_level = 1.4
+        default_zoom_level = 1
         scale_factor *= default_zoom_level
 
         # 너무 작아지지 않도록 최소 스케일 제한
