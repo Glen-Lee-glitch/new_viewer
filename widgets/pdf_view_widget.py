@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QApplication, QGraphicsPixmapItem, QGraphicsScene,
 import pymupdf
 from core.edit_mixin import ViewModeMixin
 from core.pdf_render import PdfRender
+from core.insert_utils import add_stamp_item
 
 from .floating_toolbar import FloatingToolbarWidget
 from .stamp_overlay_widget import StampOverlayWidget
@@ -295,36 +296,12 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         if not self._stamp_pixmap or not self.current_page_item:
             return
 
-        # 페이지 아이템의 좌표계를 기준으로 스탬프 QGraphicsPixmapItem 생성
-        stamp_item = QGraphicsPixmapItem(self._stamp_pixmap, self.current_page_item)
-        
-        # 1. 마우스가 찍히는 지점이 '도장'의 중앙이 위치되도록 삽입.
-        stamp_center_x = self._stamp_pixmap.width() / 2
-        stamp_center_y = self._stamp_pixmap.height() / 2
-        stamp_item.setPos(position.x() - stamp_center_x, position.y() - stamp_center_y)
-
-        # 2. 현재 로드된 페이지에서 벗어나는 부분이 있을 경우에만 그 안쪽에 전부 보이도록 자동 배치
-        page_rect = self.current_page_item.boundingRect()
-        stamp_rect = stamp_item.sceneBoundingRect()
-        
-        # 씬 좌표를 페이지 아이템 좌표로 변환하여 경계 검사
-        stamp_rect_in_item = self.current_page_item.mapRectFromScene(stamp_rect)
-
-        dx = 0
-        dy = 0
-
-        if stamp_rect_in_item.left() < page_rect.left():
-            dx = page_rect.left() - stamp_rect_in_item.left()
-        elif stamp_rect_in_item.right() > page_rect.right():
-            dx = page_rect.right() - stamp_rect_in_item.right()
-
-        if stamp_rect_in_item.top() < page_rect.top():
-            dy = page_rect.top() - stamp_rect_in_item.top()
-        elif stamp_rect_in_item.bottom() > page_rect.bottom():
-            dy = page_rect.bottom() - stamp_rect_in_item.bottom()
-        
-        if dx != 0 or dy != 0:
-            stamp_item.moveBy(dx, dy)
+        # insert_utils를 사용하여 스탬프 아이템 생성 및 추가
+        stamp_item = add_stamp_item(
+            stamp_pixmap=self._stamp_pixmap,
+            page_item=self.current_page_item,
+            position=position
+        )
 
         print(f"페이지 {self.current_page + 1}에 스탬프 추가: {stamp_item.pos()}")
 
