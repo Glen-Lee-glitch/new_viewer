@@ -15,7 +15,7 @@
   </property>
   <property name="styleSheet">
    <string notr="true">QWidget#ToDoWidget {
-        background-color: rgba(30, 30, 30, 220); /* 검은색 배경에 220/255의 투명도 적용 */
+        background-color: rgba(245, 245, 245, 230); /* 밝은 회색 배경에 230/255의 투명도 */
         border-radius: 10px;
     }</string>
   </property>
@@ -24,10 +24,10 @@
     <widget class="QLabel" name="titleLabel">
      <property name="styleSheet">
       <string notr="true">QLabel#titleLabel {
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-        }</string>
+        color: black;
+        font-size: 24px;
+        font-weight: bold;
+    }</string>
      </property>
      <property name="text">
       <string>할 일 목록</string>
@@ -40,26 +40,25 @@
    <item>
     <widget class="QListWidget" name="todoListWidget">
      <property name="styleSheet">
-      <string notr="true">QListWidget#todoListWidget {
-            background-color: transparent; /* 부모 위젯의 배경을 따름 */
-            color: #E0E0E0; /* 밝은 회색 텍스트 */
-            border: none; /* 테두리 없음 */
-            font-size: 16px;
-            padding-left: 10px;
-            padding-right: 10px;
-        }
+      <string notr="true">    /* 수정 후 전체 스타일시트 */
+    QListWidget#todoListWidget {
+        background-color: transparent;
+        color: black; /* 글자색 변경 */
+        border: none;
+        font-size: 16px;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
 
-        /* 각 항목에 대한 스타일 */
-        QListWidget::item {
-            padding: 12px;
-            border-bottom: 1px solid #444; /* 항목 구분선 */
-        }
+    QListWidget::item {
+        padding: 12px;
+        border-bottom: 1px solid #cccccc; /* 구분선 색상 변경 */
+    }
 
-        /* 항목 선택 시 스타일 */
-        QListWidget::item:selected {
-            background-color: rgba(0, 120, 215, 150); /* 반투명 파란색 */
-            color: white;
-        }</string>
+    QListWidget::item:selected {
+        background-color: rgba(0, 120, 215, 150);
+        color: white;
+    }</string>
      </property>
     </widget>
    </item>

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QListWidgetItem
 
 
@@ -41,6 +42,7 @@ class ToDoWidget(QWidget):
 
         for item_text in todos:
             item = QListWidgetItem(item_text)
+            item.setForeground(QColor("black"))  # 글자색을 검은색으로 강제 설정
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
             self.todoListWidget.addItem(item)
