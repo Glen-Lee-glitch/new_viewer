@@ -1,12 +1,14 @@
 from pathlib import Path
 
 from PyQt6 import uic
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QWidget
 
 
 class StampOverlayWidget(QWidget):
     """메인 윈도우 위에 나타나는 반투명 오버레이 위젯."""
+    stamp_selected = pyqtSignal(str)  # 도장 선택 신호 (이미지 경로 전달)
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         ui_path = Path(__file__).parent.parent / "ui" / "stamp_overlay.ui"
@@ -22,7 +24,7 @@ class StampOverlayWidget(QWidget):
 
     def _connect_signals(self):
         if hasattr(self, 'stamp_button_1'):
-            self.stamp_button_1.clicked.connect(self._on_stamp_selected)
+            self.stamp_button_1.clicked.connect(lambda: self._on_stamp_button_clicked("assets/도장1.png"))
         if hasattr(self, 'stamp_button_2'):
             self.stamp_button_2.clicked.connect(self._on_stamp_selected)
         if hasattr(self, 'stamp_button_3'):
@@ -31,6 +33,14 @@ class StampOverlayWidget(QWidget):
             self.stamp_button_4.clicked.connect(self._on_stamp_selected)
         if hasattr(self, 'stamp_button_5'):
             self.stamp_button_5.clicked.connect(self._on_stamp_selected)
+
+    def _on_stamp_button_clicked(self, image_path: str):
+        """도장 버튼 클릭 시, 선택된 도장 이미지 경로를 포함한 시그널을 발생시킨다."""
+        self.stamp_selected.emit(image_path)
+        try:
+            self.releaseKeyboard()
+        finally:
+            self.hide()
 
     def _on_stamp_selected(self):
         print("성공")

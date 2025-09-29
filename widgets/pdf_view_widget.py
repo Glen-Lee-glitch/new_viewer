@@ -79,6 +79,10 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         # --- 오버레이 위젯 ---
         self.stamp_overlay = None
 
+        # --- 스탬프 모드 ---
+        self._is_stamp_mode = False
+        self._stamp_pixmap: QPixmap | None = None
+
         # --- 비동기 처리 및 캐싱 설정 ---
         self.thread_pool = QThreadPool.globalInstance()
         self.page_cache = {}  # 페이지 캐시: {page_num: QPixmap}
@@ -104,7 +108,36 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.toolbar.rotate_90_requested.connect(self._rotate_current_page)
         self.toolbar.crop_requested.connect(self._open_crop_dialog) # 자르기 신호 연결
 
+        # --- 스탬프 오버레이 시그널 연결 ---
+        self.stamp_overlay.stamp_selected.connect(self._activate_stamp_mode)
+
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def _activate_stamp_mode(self, image_path: str):
+        """스탬프 오버레이에서 도장이 선택되면 호출된다."""
+        try:
+            pixmap = QPixmap(image_path)
+            if pixmap.isNull():
+                raise FileNotFoundError(f"이미지 파일을 로드할 수 없습니다: {image_path}")
+            
+            self._stamp_pixmap = pixmap
+            self._is_stamp_mode = True
+            self.setCursor(Qt.CursorShape.CrossCursor)
+            print(f"스탬프 모드 활성화: {image_path}")
+
+        except FileNotFoundError as e:
+            QMessageBox.warning(self, "오류", str(e))
+            self._deactivate_stamp_mode()
+        except Exception as e:
+            QMessageBox.warning(self, "오류", f"도장 이미지를 처리하는 중 오류가 발생했습니다: {e}")
+            self._deactivate_stamp_mode()
+
+    def _deactivate_stamp_mode(self):
+        """스탬프 모드를 비활성화한다."""
+        self._is_stamp_mode = False
+        self._stamp_pixmap = None
+        self.unsetCursor()
+        print("스탬프 모드 비활성화")
 
     def _open_crop_dialog(self):
         """자르기 다이얼로그를 연다."""
@@ -241,6 +274,61 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         )
         view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
     
+    def mousePressEvent(self, event):
+        """마우스 클릭 이벤트를 처리한다 (스탬프 모드)."""
+        if self._is_stamp_mode and event.button() == Qt.MouseButton.LeftButton:
+            if self.current_page_item:
+                # 뷰의 좌표를 씬 좌표로 변환
+                scene_pos = self.pdf_graphics_view.mapToScene(event.pos())
+                # 씬 좌표를 현재 페이지 아이템의 내부 좌표로 변환
+                item_pos = self.current_page_item.mapFromScene(scene_pos)
+                self._add_stamp_to_page(item_pos)
+            
+            # 스탬프를 한 번 찍으면 모드 해제
+            self._deactivate_stamp_mode()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def _add_stamp_to_page(self, position):
+        """페이지에 스탬프를 추가한다."""
+        if not self._stamp_pixmap or not self.current_page_item:
+            return
+
+        # 페이지 아이템의 좌표계를 기준으로 스탬프 QGraphicsPixmapItem 생성
+        stamp_item = QGraphicsPixmapItem(self._stamp_pixmap, self.current_page_item)
+        
+        # 1. 마우스가 찍히는 지점이 '도장'의 중앙이 위치되도록 삽입.
+        stamp_center_x = self._stamp_pixmap.width() / 2
+        stamp_center_y = self._stamp_pixmap.height() / 2
+        stamp_item.setPos(position.x() - stamp_center_x, position.y() - stamp_center_y)
+
+        # 2. 현재 로드된 페이지에서 벗어나는 부분이 있을 경우에만 그 안쪽에 전부 보이도록 자동 배치
+        page_rect = self.current_page_item.boundingRect()
+        stamp_rect = stamp_item.sceneBoundingRect()
+        
+        # 씬 좌표를 페이지 아이템 좌표로 변환하여 경계 검사
+        stamp_rect_in_item = self.current_page_item.mapRectFromScene(stamp_rect)
+
+        dx = 0
+        dy = 0
+
+        if stamp_rect_in_item.left() < page_rect.left():
+            dx = page_rect.left() - stamp_rect_in_item.left()
+        elif stamp_rect_in_item.right() > page_rect.right():
+            dx = page_rect.right() - stamp_rect_in_item.right()
+
+        if stamp_rect_in_item.top() < page_rect.top():
+            dy = page_rect.top() - stamp_rect_in_item.top()
+        elif stamp_rect_in_item.bottom() > page_rect.bottom():
+            dy = page_rect.bottom() - stamp_rect_in_item.bottom()
+        
+        if dx != 0 or dy != 0:
+            stamp_item.moveBy(dx, dy)
+
+        print(f"페이지 {self.current_page + 1}에 스탬프 추가: {stamp_item.pos()}")
+
+
     def resizeEvent(self, event):
         """뷰어 크기가 변경될 때 툴바 위치를 재조정한다."""
         super().resizeEvent(event)

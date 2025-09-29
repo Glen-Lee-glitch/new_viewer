@@ -124,7 +124,6 @@ class ResizableCropRectItem(QGraphicsRectItem):
         
         painter.drawEllipse(self.handle_rect())
 
-
 class CropDialog(QDialog):
     """PDF 페이지 자르기 다이얼로그"""
     def __init__(self, parent=None):
