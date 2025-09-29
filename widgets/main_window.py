@@ -15,6 +15,7 @@ from widgets.pdf_load_widget import PdfLoadWidget
 from widgets.pdf_view_widget import PdfViewWidget
 from widgets.thumbnail_view_widget import ThumbnailViewWidget
 from widgets.info_panel_widget import InfoPanelWidget
+from widgets.todo_widget import ToDoWidget
 
 
 class BatchTestSignals(QObject):
@@ -125,6 +126,7 @@ class MainWindow(QMainWindow):
         self.pdf_view_widget = PdfViewWidget()
         self.pdf_load_widget = PdfLoadWidget()
         self.info_panel = InfoPanelWidget()
+        self.todo_widget = ToDoWidget(self)
 
         # --- 메인 레이아웃 설정 ---
         central_widget = QWidget()
@@ -145,6 +147,7 @@ class MainWindow(QMainWindow):
         self.pdf_view_widget.hide()
         self.thumbnail_viewer.hide()
         self.info_panel.hide()
+        self.todo_widget.hide()
 
         # --- 메뉴바 및 액션 설정 ---
         self._setup_menus()
@@ -195,6 +198,14 @@ class MainWindow(QMainWindow):
         
         # 테스트 버튼 시그널 연결
         self.test_button.clicked.connect(self.start_batch_test)
+        
+    def keyPressEvent(self, event):
+        """키보드 입력을 처리한다."""
+        # Qt.Key.Key_QuoteLeft는 보통 ~ 키에 해당합니다.
+        if event.key() == Qt.Key.Key_QuoteLeft:
+            self.todo_widget.toggle_overlay()
+        else:
+            super().keyPressEvent(event)
         
     def start_batch_test(self):
         """PDF 일괄 테스트 Worker를 시작한다."""
