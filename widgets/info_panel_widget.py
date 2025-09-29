@@ -5,7 +5,7 @@ from PyQt6.QtCore import pyqtSignal
 
 class InfoPanelWidget(QWidget):
     """PDF 파일 및 페이지 정보를 표시하는 위젯"""
-    text_stamp_requested = pyqtSignal(str)
+    text_stamp_requested = pyqtSignal(str, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,10 +37,11 @@ class InfoPanelWidget(QWidget):
         self.label_page_rotation.setText(f"{rotation}°")
 
     def _on_insert_text_clicked(self):
-        if hasattr(self, 'text_edit'):
+        if hasattr(self, 'text_edit') and hasattr(self, 'font_spinBox'):
             text = self.text_edit.text()
+            font_size = self.font_spinBox.value() # 스핀박스에서 폰트 크기 가져오기
             if text:
-                self.text_stamp_requested.emit(text) # 입력된 텍스트를 신호로 보냄
+                self.text_stamp_requested.emit(text, font_size) # 텍스트와 폰트 크기 함께 전달
                 self.text_edit.clear() # 입력창 비우기
             else:
                 # (선택사항) 사용자에게 텍스트를 입력하라는 메시지를 보여줄 수 있습니다.

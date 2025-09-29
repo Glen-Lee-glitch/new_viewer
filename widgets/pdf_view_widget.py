@@ -193,12 +193,12 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.unsetCursor()
         print("스탬프 모드 비활성화")
 
-    def activate_text_stamp_mode(self, text: str):
-        """info_panel로부터 텍스트를 받아 스탬프 모드를 활성화한다."""
+    def activate_text_stamp_mode(self, text: str, font_size: int):
+        """info_panel로부터 텍스트와 폰트 크기를 받아 스탬프 모드를 활성화한다."""
         if not text:
             return
             
-        pixmap = self._create_pixmap_from_text(text)
+        pixmap = self._create_pixmap_from_text(text, font_size)
         
         stamp_info = {
             'path': f'text_{text[:10]}',
@@ -207,9 +207,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         }
         self._activate_stamp_mode(stamp_info)
 
-    def _create_pixmap_from_text(self, text: str) -> QPixmap:
+    def _create_pixmap_from_text(self, text: str, font_size: int) -> QPixmap:
         """주어진 텍스트로부터 QPixmap 이미지를 생성한다."""
-        font = QFont("Malgun Gothic", 32, QFont.Weight.Bold)
+        font = QFont("Malgun Gothic", font_size, QFont.Weight.Bold)
         
         # 텍스트 크기를 계산하기 위한 FontMetrics
         fm = QFontMetrics(font)
