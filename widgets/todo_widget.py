@@ -32,6 +32,27 @@ class ToDoWidget(QWidget):
             QListWidget::item:selected {
                 color: white; /* 선택 시에는 흰색 유지 */
             }
+
+            /* 테마에 의해 숨겨진 체크박스를 다시 보이도록 스타일을 강제 적용합니다. */
+            QListWidget::indicator {
+                width: 15px;
+                height: 15px;
+                border-radius: 3px;
+                border: 1px solid #999;
+                background-color: white;
+                margin-right: 5px; /* 텍스트와 간격을 줍니다 */
+            }
+
+            /* 체크되었을 때의 스타일 */
+            QListWidget::indicator:checked {
+                background-color: #0078d7;
+                border-color: #005a9e;
+            }
+            
+            /* 마우스를 올렸을 때의 스타일 */
+            QListWidget::indicator:hover {
+                border: 1px solid #0078d7;
+            }
         """)
 
         # --- 초기 할 일 목록 설정 ---
