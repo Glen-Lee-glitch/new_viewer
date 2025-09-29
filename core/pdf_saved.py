@@ -4,15 +4,19 @@ from PIL import Image
 import io
 import gc
 import os
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
+
 
 def compress_pdf_file(
         input_bytes: bytes,
         output_path: str,
         jpeg_quality: int = 65,
         dpi: int = 120,
-        size_threshold_kb: int = 300,  # 페이지 당 300 KB 이상만 재압축
-        user_rotations: dict = None,  # 사용자가 적용한 페이지별 회전 정보
-        force_resize_pages: set = None # 강제 크기 조정을 적용할 페이지 번호
+        size_threshold_kb: int = 300,
+        user_rotations: dict = None,
+        force_resize_pages: set = None,
+        stamp_data: dict[int, list[dict]] = None,
 ):
     """
     이미지·스캔으로 추정되거나 강제 조정이 요청된 페이지만 재렌더링-압축하고,
@@ -23,15 +27,18 @@ def compress_pdf_file(
         return None
 
     src = pymupdf.open(stream=input_bytes, filetype="pdf")
-    dst = pymupdf.open()                     # 결과 PDF
+    dst = pymupdf.open()
     user_rotations = user_rotations or {}
     force_resize_pages = force_resize_pages or set()
+    stamp_data = stamp_data or {}
     try:
         for i, page in enumerate(src):
             user_rotation = user_rotations.get(i, 0)
             # 강제 크기 조정이 요청된 페이지인지 확인
             is_forced = i in force_resize_pages
-            
+            # 스탬프가 있는 페이지인지 확인
+            has_stamps = i in stamp_data
+
             image_list = []
             image_size = 0
             # --- 개선된 용량 추정 --------------------------
@@ -63,7 +70,8 @@ def compress_pdf_file(
 
             # 조건: (이미지가 없거나 이미지 크기가 임계값 미만) 이고 (강제 조정이 아닐 때) -> 복사
             # 회전이 적용된 페이지는 이 조건을 건너뛰고 재렌더링되도록 user_rotation == 0 조건을 제거
-            if (not image_list or image_size / 1024 < size_threshold_kb) and not is_forced:
+            # 스탬프가 있는 페이지는 항상 재렌더링
+            if (not image_list or image_size / 1024 < size_threshold_kb) and not is_forced and not has_stamps:
                 # 하지만, 회전이 없는 페이지만 복사하도록 내부에서 한 번 더 체크
                 if user_rotation == 0:
                     dst.insert_pdf(src, from_page=i, to_page=i)
@@ -163,6 +171,33 @@ def compress_pdf_file(
                 # 이미지 삽입 영역 정의
                 insert_rect = pymupdf.Rect(x_offset, y_offset, x_offset + img_width, y_offset + img_height)
                 new_p.insert_image(insert_rect, stream=img_buf.read())
+
+                # 9. 스탬프 데이터가 있으면 페이지에 삽입
+                if has_stamps:
+                    for stamp in stamp_data[i]:
+                        try:
+                            stamp_pix: QPixmap = stamp['pixmap']
+                            
+                            # QPixmap을 PNG 바이트로 변환 (io.BytesIO -> QBuffer)
+                            byte_array = QByteArray()
+                            buffer = QBuffer(byte_array)
+                            buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+                            stamp_pix.save(buffer, "PNG")
+                            stamp_bytes = bytes(buffer.data())
+                            
+                            base_rect = insert_rect
+                            
+                            stamp_w = base_rect.width * stamp['w_ratio']
+                            stamp_h = base_rect.height * stamp['h_ratio']
+                            stamp_x = base_rect.x0 + base_rect.width * stamp['x_ratio']
+                            stamp_y = base_rect.y0 + base_rect.height * stamp['y_ratio']
+                            
+                            stamp_rect = pymupdf.Rect(stamp_x, stamp_y, stamp_x + stamp_w, stamp_y + stamp_h)
+                            
+                            new_p.insert_image(stamp_rect, stream=stamp_bytes, overlay=True)
+
+                        except Exception as e_stamp:
+                            print(f"[compress] page {i+1} stamp insertion error: {e_stamp}")
                 
             except Exception as e:
                 # 실패하면 그대로 복사(품질 보존 우선)
@@ -183,7 +218,7 @@ def compress_pdf_file(
         src.close()
         dst.close()
 
-def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_size_mb=3, rotations=None, force_resize_pages=None):
+def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_size_mb=3, rotations=None, force_resize_pages=None, stamp_data=None):
     """
     여러 단계의 압축을 시도하여 PDF를 목표 크기로 압축하는 함수
     
@@ -193,6 +228,7 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
         target_size_mb (int): 목표 파일 크기 (MB)
         rotations (dict, optional): {page_num: rotation_angle} 형태의 딕셔너리. Defaults to None.
         force_resize_pages (set, optional): 강제 크기 조정을 적용할 페이지 번호. Defaults to None.
+        stamp_data (dict, optional): 페이지별 스탬프 데이터. Defaults to None.
     
     Returns:
         bool: 압축 성공 여부
@@ -201,10 +237,11 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
     
     rotations = rotations if rotations is not None else {}
     force_resize_pages = force_resize_pages if force_resize_pages is not None else set()
+    stamp_data = stamp_data if stamp_data is not None else {}
 
-    # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전 정보나 강제 조정이 있으면 압축 시도)
+    # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전, 강제 조정, 스탬프 정보가 있으면 압축 시도)
     orig_mb = len(input_bytes) / (1024 * 1024)
-    if orig_mb <= target_size_mb and not rotations and not force_resize_pages:
+    if orig_mb <= target_size_mb and not rotations and not force_resize_pages and not stamp_data:
         with open(output_path, "wb") as f:
             f.write(input_bytes)
         return True
@@ -213,11 +250,12 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
     compressed_mb = compress_pdf_file(
         input_bytes=input_bytes,
         output_path=output_path,
-        jpeg_quality=83,   # 중간 품질
-        dpi=146,           # 중간 해상도
+        jpeg_quality=83,
+        dpi=146,
         size_threshold_kb=300,
         user_rotations=rotations,
-        force_resize_pages=force_resize_pages
+        force_resize_pages=force_resize_pages,
+        stamp_data=stamp_data
     )
     print(f"1단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
@@ -227,11 +265,12 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
     compressed_mb = compress_pdf_file(
         input_bytes=input_bytes,
         output_path=output_path,
-        jpeg_quality=75,   # 낮은 품질
-        dpi=125,           # 낮은 해상도
-        size_threshold_kb=0,  # 모든 페이지 강제 이미지화
+        jpeg_quality=75,
+        dpi=125,
+        size_threshold_kb=0,
         user_rotations=rotations,
-        force_resize_pages=force_resize_pages
+        force_resize_pages=force_resize_pages,
+        stamp_data=stamp_data
     )
     print(f"2단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
@@ -241,11 +280,12 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
     compressed_mb = compress_pdf_file(
         input_bytes=input_bytes,
         output_path=output_path,
-        jpeg_quality=68,   # 최저 품질
-        dpi=100,            # 최저 해상도
-        size_threshold_kb=0,  # 모든 페이지 강제 이미지화
+        jpeg_quality=68,
+        dpi=100,
+        size_threshold_kb=0,
         user_rotations=rotations,
-        force_resize_pages=force_resize_pages
+        force_resize_pages=force_resize_pages,
+        stamp_data=stamp_data
     )
     print(f"3단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:

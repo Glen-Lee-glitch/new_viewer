@@ -3,29 +3,35 @@ from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal)
 from PyQt6.QtGui import QImage, QPainter, QPixmap
-from PyQt6.QtWidgets import (QApplication, QGraphicsPixmapItem, QGraphicsScene,
-                                 QGraphicsView, QMessageBox, QWidget)
+from PyQt6.QtWidgets import (QApplication, QFileDialog, QGraphicsPixmapItem,
+                                 QGraphicsScene, QGraphicsView, QMessageBox,
+                                 QWidget)
 
 import pymupdf
 from core.edit_mixin import ViewModeMixin
-from core.pdf_render import PdfRender
 from core.insert_utils import add_stamp_item
-
+from core.pdf_render import PdfRender
+from core.pdf_saved import compress_pdf_with_multiple_stages
+from .crop_dialog import CropDialog
 from .floating_toolbar import FloatingToolbarWidget
 from .stamp_overlay_widget import StampOverlayWidget
 from .zoomable_graphics_view import ZoomableGraphicsView
-from .crop_dialog import CropDialog # CropDialog 임포트
 
 
-# --- 백그라운드 렌더링을 위한 Worker ---
+# --- 백그라운드 Worker 정의 ---
+
 class WorkerSignals(QObject):
     """
     Worker 스레드에서 발생할 수 있는 시그널 정의
-    - finished: 작업 완료 시 (페이지 번호, 렌더링된 QPixmap)
-    - error: 오류 발생 시 (페이지 번호, 에러 메시지)
+    - finished: 렌더링 완료 시 (페이지 번호, 렌더링된 QPixmap)
+    - error: 렌더링 오류 시 (페이지 번호, 에러 메시지)
+    - save_finished: 저장 완료 시 (경로, 성공 여부)
+    - save_error: 저장 오류 시 (에러 메시지)
     """
     finished = pyqtSignal(int, QPixmap)
     error = pyqtSignal(int, str)
+    save_finished = pyqtSignal(str, bool)
+    save_error = pyqtSignal(str)
 
 
 class PdfRenderWorker(QRunnable):
@@ -43,7 +49,7 @@ class PdfRenderWorker(QRunnable):
     def _is_a4_size(width_cm: float, height_cm: float, tolerance: float = 2.0) -> bool:
         """페이지가 A4 크기 범위 내인지 확인한다."""
         a4_width, a4_height = 21.0, 29.7
-        vertical_match = (abs(width_cm - a4_width) <= tolerance and 
+        vertical_match = (abs(width_cm - a4_width) <= tolerance and
                          abs(height_cm - a4_height) <= tolerance)
         horizontal_match = (abs(width_cm - a4_height) <= tolerance and
                            abs(height_cm - a4_width) <= tolerance)
@@ -61,11 +67,44 @@ class PdfRenderWorker(QRunnable):
         except Exception as e:
             self.signals.error.emit(self.page_num, str(e))
 
+
+class PdfSaveWorker(QRunnable):
+    """QThreadPool에서 PDF 압축 및 저장을 실행하기 위한 Worker"""
+
+    def __init__(self, input_bytes: bytes, output_path: str,
+                 rotations: dict | None = None,
+                 force_resize_pages: set | None = None,
+                 stamp_data: dict[int, list[dict]] | None = None):
+        super().__init__()
+        self.signals = WorkerSignals()
+        self.input_bytes = input_bytes
+        self.output_path = output_path
+        self.rotations = rotations if rotations is not None else {}
+        self.force_resize_pages = force_resize_pages if force_resize_pages is not None else set()
+        self.stamp_data = stamp_data if stamp_data is not None else {}
+
+    def run(self):
+        """백그라운드 스레드에서 PDF 저장 및 압축 실행."""
+        try:
+            success = compress_pdf_with_multiple_stages(
+                input_bytes=self.input_bytes,
+                output_path=self.output_path,
+                target_size_mb=3,
+                rotations=self.rotations,
+                force_resize_pages=self.force_resize_pages,
+                stamp_data=self.stamp_data
+            )
+            self.signals.save_finished.emit(self.output_path, success)
+        except Exception as e:
+            self.signals.save_error.emit(str(e))
+
+
 class PdfViewWidget(QWidget, ViewModeMixin):
     """PDF 뷰어 위젯"""
     page_change_requested = pyqtSignal(int)
     page_aspect_ratio_changed = pyqtSignal(bool)  # is_landscape: 가로가 긴 페이지 여부
-    
+    save_completed = pyqtSignal()  # 저장 완료 후 화면 전환을 위한 신호
+
     # --- 정보 패널 연동을 위한 신호 ---
     pdf_loaded = pyqtSignal(str, float, int)  # file_path, file_size_mb, total_pages
     page_info_updated = pyqtSignal(int, float, float, int)  # page_num, width, height, rotation
@@ -76,6 +115,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.pdf_path: str | None = None
         self.scene = QGraphicsScene(self)
         self.current_page_item: QGraphicsPixmapItem | None = None
+
+        # --- 페이지 별 오버레이 아이템 관리 ---
+        self._overlay_items: dict[int, list[QGraphicsPixmapItem]] = {}
         
         # --- 오버레이 위젯 ---
         self.stamp_overlay = None
@@ -108,6 +150,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
         self.toolbar.rotate_90_requested.connect(self._rotate_current_page)
         self.toolbar.crop_requested.connect(self._open_crop_dialog) # 자르기 신호 연결
+        self.toolbar.save_pdf_requested.connect(self.save_pdf) # 저장 신호 연결
 
         # --- 스탬프 오버레이 시그널 연결 ---
         self.stamp_overlay.stamp_selected.connect(self._activate_stamp_mode)
@@ -303,8 +346,12 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             position=position
         )
 
-        print(f"페이지 {self.current_page + 1}에 스탬프 추가: {stamp_item.pos()}")
+        # 페이지별로 스탬프 아이템 관리
+        if self.current_page not in self._overlay_items:
+            self._overlay_items[self.current_page] = []
+        self._overlay_items[self.current_page].append(stamp_item)
 
+        print(f"페이지 {self.current_page + 1}에 스탬프 추가: {stamp_item.pos()}")
 
     def resizeEvent(self, event):
         """뷰어 크기가 변경될 때 툴바 위치를 재조정한다."""
@@ -325,6 +372,92 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         else:
             super().keyPressEvent(event)
 
+    def save_pdf(self):
+        """PDF 저장 프로세스를 시작한다."""
+        if not self.renderer or not self.renderer.get_pdf_bytes():
+            QMessageBox.warning(self, "저장 오류", "저장할 PDF 파일이 없습니다.")
+            return
+
+        default_path = self.get_current_pdf_path() or "untitled.pdf"
+        output_path, _ = QFileDialog.getSaveFileName(
+            self, "PDF로 저장", default_path, "PDF Files (*.pdf)"
+        )
+
+        if not output_path:
+            return
+
+        input_bytes = self.renderer.get_pdf_bytes()
+        rotations = self.get_page_rotations()
+        force_resize_pages = self.get_force_resize_pages()
+        stamp_data = self.get_stamp_items_data()
+
+        worker = PdfSaveWorker(
+            input_bytes=input_bytes, output_path=output_path,
+            rotations=rotations, force_resize_pages=force_resize_pages,
+            stamp_data=stamp_data
+        )
+
+        worker.signals.save_finished.connect(self._on_save_finished)
+        worker.signals.save_error.connect(self._on_save_error)
+
+        print(f"'{output_path}' 경로로 PDF 저장을 시작합니다...")
+        self.thread_pool.start(worker)
+
+    def _on_save_finished(self, output_path: str, success: bool):
+        """PDF 저장이 완료되었을 때 호출된다."""
+        if success:
+            QMessageBox.information(self, "저장 완료", f"'{output_path}'\n\n파일이 성공적으로 저장되었습니다.")
+        else:
+            QMessageBox.warning(
+                self, "압축 실패",
+                f"파일을 목표 크기로 압축하지 못했습니다.\n\n"
+                f"'{output_path}' 경로에 원본 품질로 저장되었습니다."
+            )
+        
+        self.save_completed.emit()
+
+    def _on_save_error(self, error_msg: str):
+        """PDF 저장 중 오류가 발생했을 때 호출된다."""
+        QMessageBox.critical(self, "저장 오류", f"PDF를 저장하는 중 오류가 발생했습니다:\n\n{error_msg}")
+
+    def get_stamp_items_data(self) -> dict[int, list[dict]]:
+        """
+        모든 페이지에 추가된 스탬프 아이템들의 정보를 딕셔너리 형태로 반환한다.
+        {페이지 번호: [{'pixmap': QPixmap, 'x_ratio': float, 'y_ratio': float, 'w_ratio': float, 'h_ratio': float}]}
+        """
+        data = {}
+        for page_num, items in self._overlay_items.items():
+            if not items:
+                continue
+
+            page_pixmap = self.page_cache.get(page_num)
+            if not page_pixmap:
+                continue
+
+            page_width = page_pixmap.width()
+            page_height = page_pixmap.height()
+
+            data[page_num] = []
+            for item in items:
+                item_rect = item.boundingRect()
+                item_pos = item.pos()
+
+                x_ratio = item_pos.x() / page_width
+                y_ratio = item_pos.y() / page_height
+                w_ratio = item_rect.width() / page_width
+                h_ratio = item_rect.height() / page_height
+                
+                stamp_data = {
+                    'pixmap': item.pixmap(),
+                    'x_ratio': x_ratio,
+                    'y_ratio': y_ratio,
+                    'w_ratio': w_ratio,
+                    'h_ratio': h_ratio,
+                }
+                data[page_num].append(stamp_data)
+        
+        return data
+
     def set_renderer(self, renderer: PdfRender | None):
         """PDF 렌더러를 설정하고 캐시를 초기화한다."""
         self.renderer = renderer # PdfRender 인스턴스
@@ -338,6 +471,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.current_page = -1 # 지금 보고 있는 페이지 없음 (존재하지 않는 페이지 번호로 -1로 설정)
         self.page_rotations = {} # 새 파일 로드 시 회전 정보 초기화
         self.force_resize_pages.clear() # 새 파일 로드 시 크기 조정 정보 초기화
+        self._overlay_items.clear() # 새 파일 로드 시 오버레이 아이템 초기화
 
         # --- 파일 정보 시그널 발생 ---
         if self.renderer:

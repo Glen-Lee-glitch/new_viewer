@@ -11,7 +11,6 @@ from qt_material import apply_stylesheet
 
 from core.pdf_render import PdfRender
 from core.pdf_saved import compress_pdf_with_multiple_stages
-from widgets.floating_toolbar import PdfSaveWorker
 from widgets.pdf_load_widget import PdfLoadWidget
 from widgets.pdf_view_widget import PdfViewWidget
 from widgets.thumbnail_view_widget import ThumbnailViewWidget
@@ -178,9 +177,7 @@ class MainWindow(QMainWindow):
         self.thumbnail_viewer.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
-        
-        # 툴바의 저장 요청 시그널 연결
-        self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._request_save_pdf)
+        self.pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
         
         # 정보 패널 업데이트 연결
         self.pdf_view_widget.pdf_loaded.connect(self.info_panel.update_file_info)
@@ -300,67 +297,6 @@ class MainWindow(QMainWindow):
 
         self.pushButton_prev.setEnabled(total_pages > 0 and current_page > 0)
         self.pushButton_next.setEnabled(total_pages > 0 and current_page < total_pages - 1)
-
-    def _request_save_pdf(self):
-        """PDF 저장 요청을 처리하고 파일 대화상자를 연다."""
-        if not self.renderer or not self.renderer.get_pdf_bytes():
-            self.statusBar.showMessage("저장할 PDF 파일이 열려있지 않습니다.", 5000)
-            return
-        
-        # 원본 파일 경로 대신, 현재 편집된 PDF 바이트 데이터를 직접 전달
-        pdf_bytes = self.renderer.get_pdf_bytes()
-        self._start_save_process(pdf_bytes)
-
-    def _start_save_process(self, input_bytes: bytes):
-        """실제 PDF 저장 프로세스를 시작한다."""
-        # 파일 저장 경로 얻기
-        # 원본 경로가 없을 수 있으므로 기본 파일명을 사용
-        default_filename = "untitled_edited.pdf"
-        if self.renderer and self.renderer.pdf_path:
-            default_filename = Path(self.renderer.pdf_path).stem + "_edited.pdf"
-            
-        save_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "PDF 저장",
-            default_filename,
-            "PDF Files (*.pdf)"
-        )
-
-        if not save_path:
-            self.statusBar.showMessage("저장이 취소되었습니다.", 3000)
-            return
-
-        self.statusBar.showMessage(f"'{Path(save_path).name}' 파일 저장 중...", 0)
-        
-        # 페이지별 회전 정보 가져오기
-        rotations = self.pdf_view_widget.get_page_rotations()
-        # 페이지별 강제 크기 조정 정보 가져오기
-        force_resize_pages = self.pdf_view_widget.get_force_resize_pages()
-
-        # 백그라운드에서 압축 및 저장 실행
-        worker = PdfSaveWorker(input_bytes, save_path, rotations, force_resize_pages)
-        worker.signals.finished.connect(self._on_save_finished)
-        worker.signals.error.connect(lambda msg: self.statusBar.showMessage(f"저장 오류: {msg}", 5000))
-        self.thread_pool.start(worker)
-
-    def _on_save_finished(self, path, success):
-        self.statusBar.clearMessage()
-        """저장 완료 시 호출될 슬롯"""
-        if success:
-            message = f"성공적으로 '{Path(path).name}'에 압축 저장되었습니다."
-        else:
-            message = f"'{Path(path).name}'에 원본 파일을 저장했습니다 (압축 실패)."
-        
-        self.statusBar.showMessage(message, 8000)
-        QMessageBox.information(self, "저장 완료", message)
-
-        # 저장 완료 후 초기 로드 화면으로 전환
-        self.show_load_view()
-
-    def _on_save_error(self, error_msg: str):
-        """저장 중 오류 발생 시 호출될 슬롯"""
-        self.statusBar.showMessage(f"오류 발생: {error_msg}", 8000)
-        QMessageBox.critical(self, "저장 오류", f"PDF 저장 중 오류가 발생했습니다:\n{error_msg}")
 
     def load_document(self, pdf_paths: list):
         """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
