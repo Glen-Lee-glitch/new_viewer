@@ -121,6 +121,7 @@ class MainWindow(QMainWindow):
         self.renderer: PdfRender | None = None
         self.current_page = -1
         self.thread_pool = QThreadPool()
+        self._initial_resize_done = False  # 초기 크기 조정 완료 플래그
         
         # --- 위젯 인스턴스 생성 ---
         self.thumbnail_viewer = ThumbnailViewWidget()
@@ -205,6 +206,39 @@ class MainWindow(QMainWindow):
         toggle_todo_action.setShortcut(Qt.Key.Key_QuoteLeft) # '~' 키
         toggle_todo_action.triggered.connect(self.todo_widget.toggle_overlay)
         self.addAction(toggle_todo_action)
+
+    def showEvent(self, event):
+        """창이 처음 표시될 때 제목 표시줄을 포함한 전체 높이를 화면에 맞게 조정한다."""
+        super().showEvent(event)
+        if not self._initial_resize_done:
+            # 최대화 상태로 전환하여 최대 크기 정보 획득
+            self.showMaximized()
+            max_geometry = self.geometry()
+            
+            # 즉시 일반 상태로 복원
+            self.showNormal()
+            
+            # 너비는 1200으로 고정, 높이는 최대화 상태의 높이 사용
+            target_width = 1200
+            target_height = max_geometry.height()
+            
+            # 화면 중앙에 배치 (전체 창 높이가 화면 높이와 일치하도록)
+            screen = self.screen()
+            if screen:
+                available_geometry = screen.availableGeometry()
+                x = (available_geometry.width() - target_width) // 2
+                # 제목 표시줄 높이 계산
+                title_bar_height = self.frameGeometry().height() - self.geometry().height()
+                
+                # 제목 표시줄이 화면 맨 위에 오도록 클라이언트 영역을 제목 표시줄 높이만큼 아래로 배치
+                y = title_bar_height
+                
+                # 클라이언트 영역 높이 = 화면 높이 - 제목 표시줄 높이
+                client_height = available_geometry.height() - title_bar_height
+                
+                self.setGeometry(x, y, target_width, client_height)
+            
+            self._initial_resize_done = True
         
     def start_batch_test(self):
         """PDF 일괄 테스트 Worker를 시작한다."""
