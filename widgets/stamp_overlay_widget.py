@@ -70,18 +70,22 @@ class StampOverlayWidget(QWidget):
         super().mousePressEvent(event)
 
     def keyPressEvent(self, event):
-        # 숫자/숫자패드 1~5 모두 처리 (Keypad 여부는 modifiers로만 구분되므로 동일 키코드 수신)
-        if event.key() in (
-            Qt.Key.Key_1,
+        # 숫자/숫자패드 1~5 모두 처리
+        key = event.key()
+
+        if key == Qt.Key.Key_1:
+            # 1번 도장 선택
+            self._on_stamp_button_clicked("assets/도장1.png")
+            return
+
+        if key in (
             Qt.Key.Key_2,
             Qt.Key.Key_3,
             Qt.Key.Key_4,
             Qt.Key.Key_5,
         ):
-            print("성공")
-            try:
-                self.releaseKeyboard()
-            finally:
-                self.hide()
+            # 2-5번 도장은 현재 기능이 없으므로 기존 동작 유지
+            self._on_stamp_selected()
             return
+
         super().keyPressEvent(event)
