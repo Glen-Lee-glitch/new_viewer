@@ -333,13 +333,39 @@ class MainWindow(QMainWindow):
                 max_y = max(0.0, 1.0 - h_ratio - 0.02)
                 x_ratio = random.uniform(0.02, max_x if max_x > 0.02 else 0.02)
                 y_ratio = random.uniform(0.02, max_y if max_y > 0.02 else 0.02)
-                stamp_data[target_page] = [{
+                entries = [{
                     'pixmap': pix,
                     'x_ratio': x_ratio,
                     'y_ratio': y_ratio,
                     'w_ratio': w_ratio,
                     'h_ratio': h_ratio,
                 }]
+
+                # 추가: '원본대조필' 도장도 동일 페이지에 랜덤 위치로 삽입 (고정 폭 320px)
+                obc_path = Path(__file__).resolve().parent.parent / "assets" / "원본대조필.png"
+                obc_pix = QPixmap(str(obc_path))
+                if not obc_pix.isNull():
+                    desired_width_px2 = 320
+                    aspect2 = obc_pix.height() / max(1, obc_pix.width())
+                    desired_height_px2 = int(desired_width_px2 * aspect2)
+
+                    w_ratio2 = desired_width_px2 / page_width
+                    h_ratio2 = desired_height_px2 / page_height
+
+                    max_x2 = max(0.0, 1.0 - w_ratio2 - 0.02)
+                    max_y2 = max(0.0, 1.0 - h_ratio2 - 0.02)
+                    x_ratio2 = random.uniform(0.02, max_x2 if max_x2 > 0.02 else 0.02)
+                    y_ratio2 = random.uniform(0.02, max_y2 if max_y2 > 0.02 else 0.02)
+
+                    entries.append({
+                        'pixmap': obc_pix,
+                        'x_ratio': x_ratio2,
+                        'y_ratio': y_ratio2,
+                        'w_ratio': w_ratio2,
+                        'h_ratio': h_ratio2,
+                    })
+
+                stamp_data[target_page] = entries
         except Exception:
             pass
 

@@ -66,7 +66,7 @@ class ThumbnailViewWidget(QWidget):
         for i in range(self.renderer.get_page_count()):
             try:
                 icon = self.renderer.create_thumbnail(i, max_width=120)
-                item = QListWidgetItem(icon, f"페이지 {i + 1}")
+                item = QListWidgetItem(icon, f"{i + 1}")
                 item.setData(Qt.ItemDataRole.UserRole, i)
                 self.thumbnail_list_widget.addItem(item)
             except (IndexError, RuntimeError) as e:
