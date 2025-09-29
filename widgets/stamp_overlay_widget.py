@@ -25,7 +25,7 @@ class StampOverlayWidget(QWidget):
     def _connect_signals(self):
         if hasattr(self, 'stamp_button_1'):
             self.stamp_button_1.clicked.connect(lambda: self._on_stamp_button_clicked(
-                {'path': 'assets/도장1.png', 'width': 110}
+                {'path': 'assets/도장1.png', 'width': 90}
             ))
         if hasattr(self, 'stamp_button_2'):
             self.stamp_button_2.clicked.connect(lambda: self._on_stamp_button_clicked(
@@ -78,7 +78,7 @@ class StampOverlayWidget(QWidget):
         key = event.key()
 
         if key == Qt.Key.Key_1:
-            self._on_stamp_button_clicked({'path': 'assets/도장1.png', 'width': 110})
+            self._on_stamp_button_clicked({'path': 'assets/도장1.png', 'width': 90})
             return
 
         if key == Qt.Key.Key_2:
