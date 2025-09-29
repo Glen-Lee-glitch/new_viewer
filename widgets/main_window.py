@@ -193,6 +193,7 @@ class MainWindow(QMainWindow):
         # 정보 패널 업데이트 연결
         self.pdf_view_widget.pdf_loaded.connect(self.info_panel.update_file_info)
         self.pdf_view_widget.page_info_updated.connect(self.info_panel.update_page_info)
+        self.info_panel.text_stamp_requested.connect(self.pdf_view_widget.activate_text_stamp_mode)
 
         # 페이지 네비게이션 버튼 클릭 시그널 연결
         self.pushButton_prev.clicked.connect(lambda: self.change_page(-1))

@@ -21,10 +21,15 @@ def add_stamp_item(
     Returns:
         QGraphicsPixmapItem: 생성되고 위치가 조정된 스탬프 아이템.
     """
-    # 원본 QPixmap을 원하는 너비로 스케일 조정
-    scaled_pixmap = stamp_pixmap.scaledToWidth(
-        desired_width, Qt.TransformationMode.SmoothTransformation
-    )
+    # 1. desired_width 값에 따라 pixmap 크기 결정
+    if desired_width > 0:
+        # 양수 값이면 해당 너비로 pixmap 크기 조정
+        scaled_pixmap = stamp_pixmap.scaledToWidth(
+            desired_width, Qt.TransformationMode.SmoothTransformation
+        )
+    else:
+        # 0 또는 음수 값이면 원본 pixmap 사용 (텍스트 스탬프 등)
+        scaled_pixmap = stamp_pixmap
 
     # 페이지 아이템의 좌표계를 기준으로 스탬프 QGraphicsPixmapItem 생성
     stamp_item = QGraphicsPixmapItem(scaled_pixmap, page_item)

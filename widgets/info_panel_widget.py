@@ -1,14 +1,19 @@
 from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import pyqtSignal
 
 class InfoPanelWidget(QWidget):
     """PDF 파일 및 페이지 정보를 표시하는 위젯"""
+    text_stamp_requested = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         ui_path = Path(__file__).parent.parent / "ui" / "info_panel.ui"
         uic.loadUi(str(ui_path), self)
+
+        if hasattr(self, 'pushButton_insert_text'):
+            self.pushButton_insert_text.clicked.connect(self._on_insert_text_clicked)
 
     def clear_info(self):
         """모든 정보 라벨을 'N/A'로 초기화한다."""
@@ -30,3 +35,13 @@ class InfoPanelWidget(QWidget):
         self.label_current_page.setText(str(page_num + 1))  # 0-based to 1-based
         self.label_page_dims.setText(f"{width:.2f} x {height:.2f} (pt)")
         self.label_page_rotation.setText(f"{rotation}°")
+
+    def _on_insert_text_clicked(self):
+        if hasattr(self, 'text_edit'):
+            text = self.text_edit.text()
+            if text:
+                self.text_stamp_requested.emit(text) # 입력된 텍스트를 신호로 보냄
+                self.text_edit.clear() # 입력창 비우기
+            else:
+                # (선택사항) 사용자에게 텍스트를 입력하라는 메시지를 보여줄 수 있습니다.
+                print("입력된 텍스트가 없습니다.")

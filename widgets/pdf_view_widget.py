@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal)
-from PyQt6.QtGui import QImage, QPainter, QPixmap
+from PyQt6.QtGui import QImage, QPainter, QPixmap, QFont, QFontMetrics
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QGraphicsPixmapItem,
                                  QGraphicsScene, QGraphicsView, QMessageBox,
                                  QWidget)
@@ -161,24 +161,29 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     def _activate_stamp_mode(self, stamp_info: dict): # 변경: image_path: str -> stamp_info: dict
         """스탬프 오버레이에서 도장이 선택되면 호출된다."""
         try:
-            image_path = stamp_info['path']
-            desired_width = stamp_info['width']
+            desired_width = stamp_info['width'] # 먼저 desired_width를 가져옴
 
-            pixmap = QPixmap(image_path)
-            if pixmap.isNull():
-                raise FileNotFoundError(f"이미지 파일을 로드할 수 없습니다: {image_path}")
+            # stamp_info에 미리 생성된 pixmap이 있는지 확인
+            if 'pixmap' in stamp_info:
+                pixmap = stamp_info['pixmap']
+            else:
+                # pixmap이 없으면 path에서 로드
+                image_path = stamp_info['path']
+                pixmap = QPixmap(image_path)
+                if pixmap.isNull():
+                    raise FileNotFoundError(f"이미지 파일을 로드할 수 없습니다: {image_path}")
 
             self._stamp_pixmap = pixmap
-            self._stamp_desired_width = desired_width # 전달받은 너비 저장
+            self._stamp_desired_width = desired_width
             self._is_stamp_mode = True
             self.setCursor(Qt.CursorShape.CrossCursor)
-            print(f"스탬프 모드 활성화: {image_path}, 너비: {desired_width}px")
+            print(f"스탬프 모드 활성화: {stamp_info.get('path', '사용자 지정 텍스트')}, 너비: {desired_width}px")
 
         except FileNotFoundError as e:
             QMessageBox.warning(self, "오류", str(e))
             self._deactivate_stamp_mode()
         except Exception as e:
-            QMessageBox.warning(self, "오류", f"도장 이미지를 처리하는 중 오류가 발생했습니다: {e}")
+            QMessageBox.warning(self, "오류", f"스탬프 이미지를 처리하는 중 오류가 발생했습니다: {e}")
             self._deactivate_stamp_mode()
 
     def _deactivate_stamp_mode(self):
@@ -187,6 +192,45 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self._stamp_pixmap = None
         self.unsetCursor()
         print("스탬프 모드 비활성화")
+
+    def activate_text_stamp_mode(self, text: str):
+        """info_panel로부터 텍스트를 받아 스탬프 모드를 활성화한다."""
+        if not text:
+            return
+            
+        pixmap = self._create_pixmap_from_text(text)
+        
+        stamp_info = {
+            'path': f'text_{text[:10]}',
+            'width': -1, # 크기 조절 안 함
+            'pixmap': pixmap
+        }
+        self._activate_stamp_mode(stamp_info)
+
+    def _create_pixmap_from_text(self, text: str) -> QPixmap:
+        """주어진 텍스트로부터 QPixmap 이미지를 생성한다."""
+        font = QFont("Malgun Gothic", 32, QFont.Weight.Bold)
+        
+        # 텍스트 크기를 계산하기 위한 FontMetrics
+        fm = QFontMetrics(font)
+        text_width = fm.horizontalAdvance(text)
+        text_height = fm.height()
+
+        # 텍스트 크기에 약간의 여백을 더해 QPixmap 생성
+        pixmap = QPixmap(text_width + 20, text_height + 10)
+        pixmap.fill(Qt.GlobalColor.transparent) # 투명 배경
+
+        # QPainter를 사용하여 Pixmap에 텍스트 그리기
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setFont(font)
+        painter.setPen(Qt.GlobalColor.black) # 텍스트 색상
+        
+        # 텍스트를 중앙에 그리기
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
+        painter.end()
+        
+        return pixmap
 
     def _open_crop_dialog(self):
         """자르기 다이얼로그를 연다."""
