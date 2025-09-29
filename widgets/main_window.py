@@ -260,11 +260,30 @@ class MainWindow(QMainWindow):
             stamp_path = Path(__file__).resolve().parent.parent / "assets" / "도장1.png"
             pix = QPixmap(str(stamp_path))
             if not pix.isNull():
-                w_ratio = 0.18
-                aspect = pix.height() / max(1, pix.width())
-                h_ratio = w_ratio * aspect
                 # 대상 페이지: 현재 페이지 기준 (1페이지 또는 2페이지)
                 target_page = self.pdf_view_widget.current_page if self.pdf_view_widget.current_page >= 0 else 0
+                # 페이지 픽셀 크기 확보 (뷰 캐시 또는 동기 렌더링)
+                page_pixmap = self.pdf_view_widget.page_cache.get(target_page)
+                if page_pixmap is None and self.renderer and input_bytes:
+                    user_rotation = rotations.get(target_page, 0)
+                    page_pixmap = PdfRender.render_page_thread_safe(
+                        input_bytes, target_page, zoom_factor=2.0, user_rotation=user_rotation
+                    )
+                if page_pixmap is None:
+                    raise RuntimeError("페이지 미리보기 픽스맵을 얻지 못했습니다.")
+
+                page_width = max(1, page_pixmap.width())
+                page_height = max(1, page_pixmap.height())
+
+                # 고정 픽셀 기준 크기(뷰 기본)와 동일하게: desired_width=110px
+                desired_width_px = 110
+                aspect = pix.height() / max(1, pix.width())
+                desired_height_px = int(desired_width_px * aspect)
+
+                # 비율로 변환 (저장 파이프라인은 비율을 사용)
+                w_ratio = desired_width_px / page_width
+                h_ratio = desired_height_px / page_height
+
                 # 안전한 범위에서 무작위 위치
                 max_x = max(0.0, 1.0 - w_ratio - 0.02)
                 max_y = max(0.0, 1.0 - h_ratio - 0.02)
