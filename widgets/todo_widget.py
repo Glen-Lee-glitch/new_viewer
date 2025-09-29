@@ -2,7 +2,6 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QListWidgetItem
 
 
@@ -24,6 +23,17 @@ class ToDoWidget(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground) # 배경 투명
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating) # 활성화 없이 표시
 
+        # --- 스타일시트 강제 적용 ---
+        # qt_material 테마의 스타일을 덮어쓰기 위해 코드에서 직접 스타일을 설정합니다.
+        self.todoListWidget.setStyleSheet("""
+            QListWidget::item {
+                color: black;
+            }
+            QListWidget::item:selected {
+                color: white; /* 선택 시에는 흰색 유지 */
+            }
+        """)
+
         # --- 초기 할 일 목록 설정 ---
         self._setup_todo_items()
 
@@ -42,7 +52,6 @@ class ToDoWidget(QWidget):
 
         for item_text in todos:
             item = QListWidgetItem(item_text)
-            item.setForeground(QColor("black"))  # 글자색을 검은색으로 강제 설정
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
             self.todoListWidget.addItem(item)
