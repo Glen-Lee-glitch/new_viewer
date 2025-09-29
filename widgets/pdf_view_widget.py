@@ -194,6 +194,26 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             QMessageBox.warning(self, "알림", "자르기할 페이지가 선택되지 않았습니다.")
             return
 
+        # 1. 현재 페이지에 스탬프가 있는지 확인
+        if self.current_page in self._overlay_items and self._overlay_items[self.current_page]:
+            reply = QMessageBox.question(self, '경고',
+                                           '이 페이지의 모든 스탬프(이미지)를 삭제하고 자르기를 진행하시겠습니까?',
+                                           QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                           QMessageBox.StandardButton.No)
+
+            if reply == QMessageBox.StandardButton.No:
+                return  # 사용자가 '아니오'를 선택하면 자르기 취소
+
+            # 2. 사용자가 '예'를 선택하면 현재 페이지의 스탬프 삭제
+            del self._overlay_items[self.current_page]
+            
+            # 3. 화면을 다시 그려서 스탬프가 삭제된 것을 반영
+            # 현재 캐시된 페이지를 다시 로드하여 화면을 갱신
+            if self.current_page in self.page_cache:
+                self._display_pixmap(self.page_cache[self.current_page])
+                QApplication.processEvents() # 화면 업데이트를 즉시 반영
+
+
         # 다이얼로그에 표시할 선명한 미리보기용 이미지를 새로 렌더링한다.
         pdf_bytes = self.renderer.get_pdf_bytes()
         page_num = self.current_page
