@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QThreadPool, QRunnable, pyqtSignal, QObject
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
                              QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar,
                              QPushButton, QLabel)
@@ -199,13 +200,11 @@ class MainWindow(QMainWindow):
         # 테스트 버튼 시그널 연결
         self.test_button.clicked.connect(self.start_batch_test)
         
-    def keyPressEvent(self, event):
-        """키보드 입력을 처리한다."""
-        # Qt.Key.Key_QuoteLeft는 보통 ~ 키에 해당합니다.
-        if event.key() == Qt.Key.Key_QuoteLeft:
-            self.todo_widget.toggle_overlay()
-        else:
-            super().keyPressEvent(event)
+        # --- 전역 단축키 설정 ---
+        toggle_todo_action = QAction(self)
+        toggle_todo_action.setShortcut(Qt.Key.Key_QuoteLeft) # '~' 키
+        toggle_todo_action.triggered.connect(self.todo_widget.toggle_overlay)
+        self.addAction(toggle_todo_action)
         
     def start_batch_test(self):
         """PDF 일괄 테스트 Worker를 시작한다."""
