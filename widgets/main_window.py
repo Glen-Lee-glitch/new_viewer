@@ -190,9 +190,6 @@ class MainWindow(QMainWindow):
         # 테스트 버튼 시그널 연결
         self.test_button.clicked.connect(self.start_batch_test)
         
-        # PdfViewWidget의 내부 페이지 변경 요청 -> 실제 페이지 변경 로직 실행
-        self.pdf_view_widget.page_change_requested.connect(self.change_page)
-
     def start_batch_test(self):
         """PDF 일괄 테스트 Worker를 시작한다."""
         self.statusBar.showMessage("PDF 일괄 테스트를 시작합니다...", 0)
