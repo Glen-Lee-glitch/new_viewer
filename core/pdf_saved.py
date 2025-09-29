@@ -104,9 +104,10 @@ def compress_pdf_file(
                 display_height = temp_pix.height * 72 / 72
                 
                 # 3. A4 크기에 맞추되 비율을 유지하며 여백 최소화 스케일 계산
-                # 회전 각도에 따라 목표 페이지 크기 결정
-                is_landscape = (user_rotation % 180 == 90)  # 90도나 270도면 가로 방향
-                if is_landscape:
+                # 최종적으로 표시되는 이미지의 가로/세로 비율을 기준으로 목표 페이지 방향을 결정
+                is_visual_landscape = display_width > display_height
+                
+                if is_visual_landscape:
                     # A4 가로 방향 사용
                     target_width, target_height = a4_height, a4_width
                 else:
@@ -143,8 +144,8 @@ def compress_pdf_file(
                 img.save(img_buf, format="JPEG", quality=jpeg_quality, optimize=True, progressive=True)
                 img_buf.seek(0)
 
-                # 7. 회전 각도에 따라 A4 페이지 방향 결정 (90도/270도는 가로, 0도/180도는 세로)
-                if is_landscape:
+                # 7. 최종 표시 방향에 따라 A4 페이지 방향 결정
+                if is_visual_landscape:
                     # A4 가로 방향으로 페이지 생성 (너비와 높이 교체)
                     new_p = dst.new_page(width=a4_height, height=a4_width)
                 else:
@@ -159,7 +160,7 @@ def compress_pdf_file(
                 img_height = pix.height / quality_zoom
 
                 # 중앙 배치를 위한 오프셋 계산 (가로/세로 방향에 따라 다름)
-                if is_landscape:
+                if is_visual_landscape:
                     # A4 가로 방향일 때
                     x_offset = (a4_height - img_width) / 2
                     y_offset = (a4_width - img_height) / 2
