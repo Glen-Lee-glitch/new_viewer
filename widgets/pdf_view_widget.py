@@ -116,8 +116,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.scene = QGraphicsScene(self)
         self.current_page_item: QGraphicsPixmapItem | None = None
 
-        # --- 페이지 별 오버레이 아이템 관리 ---
-        self._overlay_items: dict[int, list[QGraphicsPixmapItem]] = {}
+        # --- 페이지 별 오버레이 아이템 "데이터" 관리 ---
+        self._overlay_items: dict[int, list[dict]] = {}
         
         # --- 오버레이 위젯 ---
         self.stamp_overlay = None
@@ -346,10 +346,23 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             position=position
         )
 
-        # 페이지별로 스탬프 아이템 관리
-        if self.current_page not in self._overlay_items:
-            self._overlay_items[self.current_page] = []
-        self._overlay_items[self.current_page].append(stamp_item)
+        # 페이지별로 스탬프 "데이터"를 관리 (QGraphicsPixmapItem 객체 대신)
+        page_pixmap = self.page_cache.get(self.current_page)
+        if page_pixmap:
+            page_width = page_pixmap.width()
+            page_height = page_pixmap.height()
+
+            stamp_data = {
+                'pixmap': stamp_item.pixmap(),
+                'x_ratio': stamp_item.pos().x() / page_width,
+                'y_ratio': stamp_item.pos().y() / page_height,
+                'w_ratio': stamp_item.boundingRect().width() / page_width,
+                'h_ratio': stamp_item.boundingRect().height() / page_height,
+            }
+
+            if self.current_page not in self._overlay_items:
+                self._overlay_items[self.current_page] = []
+            self._overlay_items[self.current_page].append(stamp_data)
 
         print(f"페이지 {self.current_page + 1}에 스탬프 추가: {stamp_item.pos()}")
 
@@ -422,41 +435,10 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
     def get_stamp_items_data(self) -> dict[int, list[dict]]:
         """
-        모든 페이지에 추가된 스탬프 아이템들의 정보를 딕셔너리 형태로 반환한다.
-        {페이지 번호: [{'pixmap': QPixmap, 'x_ratio': float, 'y_ratio': float, 'w_ratio': float, 'h_ratio': float}]}
+        모든 페이지에 추가된 스탬프 아이템들의 "데이터"를 반환한다.
+        이제 이 메서드는 QGraphicsPixmapItem 객체에 접근하지 않으므로 안전하다.
         """
-        data = {}
-        for page_num, items in self._overlay_items.items():
-            if not items:
-                continue
-
-            page_pixmap = self.page_cache.get(page_num)
-            if not page_pixmap:
-                continue
-
-            page_width = page_pixmap.width()
-            page_height = page_pixmap.height()
-
-            data[page_num] = []
-            for item in items:
-                item_rect = item.boundingRect()
-                item_pos = item.pos()
-
-                x_ratio = item_pos.x() / page_width
-                y_ratio = item_pos.y() / page_height
-                w_ratio = item_rect.width() / page_width
-                h_ratio = item_rect.height() / page_height
-                
-                stamp_data = {
-                    'pixmap': item.pixmap(),
-                    'x_ratio': x_ratio,
-                    'y_ratio': y_ratio,
-                    'w_ratio': w_ratio,
-                    'h_ratio': h_ratio,
-                }
-                data[page_num].append(stamp_data)
-        
-        return data
+        return self._overlay_items
 
     def set_renderer(self, renderer: PdfRender | None):
         """PDF 렌더러를 설정하고 캐시를 초기화한다."""
@@ -565,6 +547,22 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
         # A4 세로 기준 통일된 뷰 적용
         self._fit_current_page_to_view()
+
+        # --- 이 페이지에 해당하는 오버레이 아이템(스탬프 등)이 있다면 다시 그리기 ---
+        if self.current_page in self._overlay_items:
+            page_width = pixmap.width()
+            page_height = pixmap.height()
+            
+            for stamp_data in self._overlay_items[self.current_page]:
+                stamp_pixmap = stamp_data['pixmap']
+                
+                # QGraphicsPixmapItem 재생성 및 부모 설정
+                stamp_item = QGraphicsPixmapItem(stamp_pixmap, self.current_page_item)
+                
+                # 저장된 비율을 기반으로 위치 설정
+                pos_x = stamp_data['x_ratio'] * page_width
+                pos_y = stamp_data['y_ratio'] * page_height
+                stamp_item.setPos(pos_x, pos_y)
 
     def _show_loading_message(self):
         """로딩 중 메시지를 표시한다."""
