@@ -16,7 +16,7 @@ def add_stamp_item(
         stamp_pixmap (QPixmap): 삽입할 스탬프의 QPixmap 객체.
         page_item (QGraphicsPixmapItem): 스탬프를 추가할 부모 페이지 아이템.
         position (QPointF): 스탬프를 추가할 위치 (페이지 아이템 내부 좌표).
-        desired_width (int): 스탬프의 목표 너비 (px). 기본값 150.
+        desired_width (int): 스탬프의 목표 너비 (px).
 
     Returns:
         QGraphicsPixmapItem: 생성되고 위치가 조정된 스탬프 아이템.

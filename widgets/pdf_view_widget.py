@@ -125,6 +125,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         # --- 스탬프 모드 ---
         self._is_stamp_mode = False
         self._stamp_pixmap: QPixmap | None = None
+        self._stamp_desired_width: int = 110
 
         # --- 비동기 처리 및 캐싱 설정 ---
         self.thread_pool = QThreadPool.globalInstance()
@@ -157,17 +158,21 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-    def _activate_stamp_mode(self, image_path: str):
+    def _activate_stamp_mode(self, stamp_info: dict): # 변경: image_path: str -> stamp_info: dict
         """스탬프 오버레이에서 도장이 선택되면 호출된다."""
         try:
+            image_path = stamp_info['path']
+            desired_width = stamp_info['width']
+
             pixmap = QPixmap(image_path)
             if pixmap.isNull():
                 raise FileNotFoundError(f"이미지 파일을 로드할 수 없습니다: {image_path}")
-            
+
             self._stamp_pixmap = pixmap
+            self._stamp_desired_width = desired_width # 전달받은 너비 저장
             self._is_stamp_mode = True
             self.setCursor(Qt.CursorShape.CrossCursor)
-            print(f"스탬프 모드 활성화: {image_path}")
+            print(f"스탬프 모드 활성화: {image_path}, 너비: {desired_width}px")
 
         except FileNotFoundError as e:
             QMessageBox.warning(self, "오류", str(e))
@@ -339,11 +344,12 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         if not self._stamp_pixmap or not self.current_page_item:
             return
 
-        # insert_utils를 사용하여 스탬프 아이템 생성 및 추가
+        # 2. 저장해 둔 너비(_stamp_desired_width)를 desired_width 인자로 전달합니다.
         stamp_item = add_stamp_item(
             stamp_pixmap=self._stamp_pixmap,
             page_item=self.current_page_item,
-            position=position
+            position=position,
+            desired_width=self._stamp_desired_width # 이 부분을 수정
         )
 
         # 페이지별로 스탬프 "데이터"를 관리 (QGraphicsPixmapItem 객체 대신)
