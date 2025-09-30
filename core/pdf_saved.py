@@ -6,6 +6,7 @@ import gc
 import os
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
+import logging
 
 
 def compress_pdf_file(
@@ -239,33 +240,41 @@ def compress_pdf_file(
         src.close()
         dst.close()
 
-def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_size_mb=3, rotations=None, stamp_data=None, page_order: list[int] = None):
+def compress_pdf_with_multiple_stages(
+    input_bytes: bytes,
+    output_path: str,
+    target_size_mb: float,
+    rotations: dict[int, int] | None = None,
+    stamp_data: dict[int, list[dict]] | None = None,
+    page_order: list[int] | None = None
+) -> bool:
     """
-    여러 단계의 압축을 시도하여 PDF를 목표 크기로 압축하는 함수
+    여러 단계를 거쳐 PDF를 압축하고 저장한다.
     
     Args:
         input_bytes (bytes): 입력 PDF 바이트 데이터
         output_path (str): 출력 PDF 파일 경로
-        target_size_mb (int): 목표 파일 크기 (MB)
+        target_size_mb (float): 목표 파일 크기 (MB)
         rotations (dict, optional): {page_num: rotation_angle} 형태의 딕셔너리. Defaults to None.
-        force_resize_pages (set, optional): 강제 크기 조정을 적용할 페이지 번호. Defaults to None.
         stamp_data (dict, optional): 페이지별 스탬프 데이터. Defaults to None.
+        page_order (list, optional): 페이지 순서를 지정하는 리스트. None이면 원본 순서 유지. Defaults to None.
     
     Returns:
-        bool: 압축 성공 여부
+        bool: 압축 및 저장 성공 여부.
     """
     import os
     
-    rotations = rotations if rotations is not None else {}
-    stamp_data = stamp_data if stamp_data is not None else {}
-
-    # 페이지 순서가 변경되었는지 확인하는 플래그
-    is_order_changed = True
+    if not rotations:
+        rotations = {}
+    if not stamp_data:
+        stamp_data = {}
+    
+    # 페이지 순서가 변경되었는지 확인
+    is_order_changed = False
     if page_order is not None:
-        if page_order == list(range(len(page_order))):
-            is_order_changed = False
-    else:
-        is_order_changed = False
+        # page_order가 [0, 1, 2, ...] 순서와 다르면 변경된 것으로 간주
+        expected_order = list(range(len(page_order)))
+        is_order_changed = page_order != expected_order
 
     # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전/스탬프/순서 변경이 있으면 압축 시도)
     orig_mb = len(input_bytes) / (1024 * 1024)

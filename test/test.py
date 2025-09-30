@@ -17,6 +17,25 @@ from PyQt6.QtGui import QPixmap
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def _create_random_stamp_entry(pixmap: QPixmap) -> dict:
+    """주어진 QPixmap에 대해 랜덤 위치 및 크기 정보를 담은 dict를 생성한다."""
+    w_ratio = random.uniform(0.15, 0.30)  # 너비 비율을 15% ~ 30% 사이에서 랜덤하게 설정
+    aspect = pixmap.height() / max(1, pixmap.width())
+    h_ratio = w_ratio * aspect
+    
+    max_x = max(0.0, 1.0 - w_ratio - 0.02)
+    max_y = max(0.0, 1.0 - h_ratio - 0.02)
+    x_ratio = random.uniform(0.02, max_x if max_x > 0.02 else 0.02)
+    y_ratio = random.uniform(0.02, max_y if max_y > 0.02 else 0.02)
+    
+    entry = {
+        'pixmap': pixmap,
+        'x_ratio': x_ratio, 'y_ratio': y_ratio,
+        'w_ratio': w_ratio, 'h_ratio': h_ratio,
+    }
+    logging.info(f"스탬프 정보 생성: x={x_ratio:.2f}, y={y_ratio:.2f}, w={w_ratio:.2f}, h={h_ratio:.2f}")
+    return entry
+
 def batch_process_pdfs(input_dir: str, output_dir: str):
     """
     지정된 디렉토리의 모든 PDF 파일을 열고 다른 디렉토리에 저장한다.
@@ -60,68 +79,94 @@ def process_single_pdf(pdf_file: Path, output_dir: Path):
         if QApplication.instance() is None:
             _ = QApplication(sys.argv)
 
-        # 1) 테스트PDF 열기 -> 2초 대기
+        # 1) 테스트PDF 열기
         logging.info(f"파일 여는 중: {pdf_file}")
         renderer = PdfRender()
-        # PdfRender.load_pdf는 경로 리스트를 받음
         renderer.load_pdf([str(pdf_file)])
         total_pages = renderer.get_page_count()
         logging.info(f"성공적으로 파일을 열었습니다. 총 페이지 수: {total_pages}")
-        time.sleep(2)
+        
+        # 사용할 스탬프 이미지 로드
+        stamp_paths = [
+            Path(__file__).resolve().parent.parent / "assets" / "도장1.png",
+            Path(__file__).resolve().parent.parent / "assets" / "원본대조필.png"
+        ]
+        stamp_pixmaps = [QPixmap(str(p)) for p in stamp_paths if p.exists() and not QPixmap(str(p)).isNull()]
+        if not stamp_pixmaps:
+            logging.warning("사용 가능한 도장 이미지가 없습니다. 도장 삽입을 건너뜁니다.")
 
-        # 2) 10% 확률로 첫 페이지 90도 회전 -> 2초 대기
+        # 변수 초기화
         rotations: dict[int, int] = {}
-        if random.random() < 0.10:
-            rotations[0] = 90
-            logging.info("무작위 회전 적용: 첫 페이지 90도 회전")
-        else:
-            logging.info("회전 미적용 (90%) 경로")
-        time.sleep(2)
-
-        # 3) 50% 확률로 포커스를 2페이지로 이동(없으면 1페이지 유지) -> 1초 대기
-        target_page = 0
-        if total_pages >= 2 and random.random() < 0.50:
-            target_page = 1
-            logging.info("포커스 페이지: 2페이지로 이동")
-        else:
-            logging.info("포커스 페이지: 1페이지 유지")
-        time.sleep(1)
-
-        # 4) 도장 활성화 -> 1초 대기
-        stamp_path = Path(__file__).resolve().parent.parent / "assets" / "도장1.png"
-        stamp_pixmap = QPixmap(str(stamp_path))
-        if stamp_pixmap.isNull():
-            logging.warning(f"도장 이미지를 로드할 수 없습니다: {stamp_path}")
-        else:
-            logging.info(f"도장 활성화: {stamp_path.name}")
-        time.sleep(1)
-
-        # 5) 현재 페이지 랜덤 위치에 삽입 -> 1초 대기
         stamp_data: dict[int, list[dict]] = {}
-        if not stamp_pixmap.isNull():
-            # 스탬프 크기 비율: 너비 18% 고정, 높이는 원본 비율 유지
-            w_ratio = 0.18
-            aspect = stamp_pixmap.height() / max(1, stamp_pixmap.width())
-            h_ratio = w_ratio * aspect
-            # 페이지 안쪽에 배치되도록 여백 고려
-            max_x = max(0.0, 1.0 - w_ratio - 0.02)
-            max_y = max(0.0, 1.0 - h_ratio - 0.02)
-            x_ratio = random.uniform(0.02, max_x if max_x > 0.02 else 0.02)
-            y_ratio = random.uniform(0.02, max_y if max_y > 0.02 else 0.02)
-            stamp_entry = {
-                'pixmap': stamp_pixmap,
-                'x_ratio': x_ratio,
-                'y_ratio': y_ratio,
-                'w_ratio': w_ratio,
-                'h_ratio': h_ratio,
-            }
-            stamp_data[target_page] = [stamp_entry]
-            logging.info(f"도장 삽입: page={target_page+1}, x={x_ratio:.2f}, y={y_ratio:.2f}, w={w_ratio:.2f}, h={h_ratio:.2f}")
-        else:
-            logging.info("도장 삽입 스킵: 스탬프 이미지를 찾지 못함")
-        time.sleep(1)
+        page_order: list[int] | None = None
 
-        # 6) 파일 저장(결과 폴더에)
+        # 테스트 케이스 랜덤 선택
+        test_cases = ['case1', 'case2']
+        if total_pages < 2:
+            # 페이지가 1개인 경우 순서 변경 테스트는 의미가 없으므로 스킵
+            logging.warning("페이지가 1개뿐이므로 순서 변경 테스트를 건너뜁니다.")
+            return
+        
+        selected_case = random.choice(test_cases)
+        logging.info(f"실행할 테스트 케이스: {selected_case}")
+
+        # if selected_case == 'original':
+        #     # 기존 테스트 로직 (주석처리)
+        #     logging.info(">>> 'original' 테스트 케이스 실행...")
+        #     if random.random() < 0.10:
+        #         rotations[0] = 90
+        #         logging.info("무작위 회전 적용: 첫 페이지 90도 회전")
+        #     
+        #     target_page = 0
+        #     if total_pages >= 2 and random.random() < 0.50:
+        #         target_page = 1
+        #         logging.info("포커스 페이지: 2페이지로 이동")
+
+        #     if stamp_pixmaps:
+        #         stamp_to_insert = random.choice(stamp_pixmaps)
+        #         stamp_entry = _create_random_stamp_entry(stamp_to_insert)
+        #         stamp_data[target_page] = [stamp_entry]
+        #         logging.info(f"페이지 {target_page + 1}에 도장 삽입")
+
+        elif selected_case == 'case2':
+            # 케이스 2: 1페이지에 이미지 삽입 후, 마지막 페이지와 순서 변경
+            logging.info(">>> 'case2' 테스트 케이스 실행...")
+            page_order = list(range(total_pages))
+            page_order[0], page_order[-1] = page_order[-1], page_order[0]
+            logging.info(f"페이지 순서 변경: 첫 페이지와 마지막 페이지 교환. 새로운 순서: {page_order}")
+
+            if stamp_pixmaps:
+                # 원본 1페이지(page_num=0)에 도장 삽입
+                stamp_to_insert = random.choice(stamp_pixmaps)
+                stamp_entry = _create_random_stamp_entry(stamp_to_insert)
+                stamp_data[0] = [stamp_entry]
+                logging.info("원본 1페이지에 도장 삽입")
+
+        elif selected_case == 'case1':
+            # 케이스 1: 1페이지와 마지막 페이지 순서 변경 후, 두 페이지에 각각 이미지 삽입
+            logging.info(">>> 'case1' 테스트 케이스 실행...")
+            page_order = list(range(total_pages))
+            page_order[0], page_order[-1] = page_order[-1], page_order[0]
+            logging.info(f"페이지 순서 변경: 첫 페이지와 마지막 페이지 교환. 새로운 순서: {page_order}")
+
+            if stamp_pixmaps:
+                # 원본 첫 페이지(page_num=0)에 도장 삽입
+                stamp_to_insert1 = random.choice(stamp_pixmaps)
+                stamp_entry1 = _create_random_stamp_entry(stamp_to_insert1)
+                if 0 not in stamp_data:
+                    stamp_data[0] = []
+                stamp_data[0].append(stamp_entry1)
+                logging.info("원본 1페이지에 도장 삽입")
+
+                # 원본 마지막 페이지(page_num=total_pages-1)에 도장 삽입
+                stamp_to_insert2 = random.choice(stamp_pixmaps)
+                stamp_entry2 = _create_random_stamp_entry(stamp_to_insert2)
+                if total_pages - 1 not in stamp_data:
+                    stamp_data[total_pages - 1] = []
+                stamp_data[total_pages - 1].append(stamp_entry2)
+                logging.info(f"원본 마지막 페이지({total_pages})에 도장 삽입")
+
+        # 파일 저장(결과 폴더에)
         logging.info(f"파일 저장 중: {output_file}")
         input_bytes = renderer.get_pdf_bytes()
         success = compress_pdf_with_multiple_stages(
@@ -129,8 +174,8 @@ def process_single_pdf(pdf_file: Path, output_dir: Path):
             output_path=str(output_file),
             target_size_mb=3,
             rotations=rotations,
-            force_resize_pages=set(),
             stamp_data=stamp_data,
+            page_order=page_order,
         )
 
         if success:
