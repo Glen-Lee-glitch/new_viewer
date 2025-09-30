@@ -2,7 +2,9 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QWidget
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QWidget, QTableWidgetItem
+
+from core.sql_manager import fetch_recent_subsidy_applications
 
 
 class PdfLoadWidget(QWidget):
@@ -31,8 +33,32 @@ class PdfLoadWidget(QWidget):
         """테이블 위젯 초기 설정"""
         table = self.complement_table_widget
         table.setColumnCount(4)
-        table.setHorizontalHeaderLabels(['RN', '지역', '임시칼럼1', '임시칼럼2'])
+        table.setHorizontalHeaderLabels(['RN', '지역', '작업자', '파일여부'])
         table.setAlternatingRowColors(True)
+        self.populate_recent_subsidy_rows()
+
+    def populate_recent_subsidy_rows(self):
+        """최근 지원금 신청 데이터를 테이블에 채운다."""
+        table = self.complement_table_widget
+        try:
+            df = fetch_recent_subsidy_applications()
+        except Exception as error:  # pragma: no cover - UI 경고용
+            QMessageBox.warning(self, "데이터 로드 실패", f"지원금 신청 데이터 조회 중 오류가 발생했습니다.\n{error}")
+            table.setRowCount(0)
+            return
+
+        if df is None or df.empty:
+            table.setRowCount(0)
+            return
+
+        row_count = len(df)
+        table.setRowCount(row_count)
+
+        for row_index, (_, row) in enumerate(df.iterrows()):
+            table.setItem(row_index, 0, QTableWidgetItem(str(row.get('RN', ''))))
+            table.setItem(row_index, 1, QTableWidgetItem(str(row.get('region', ''))))
+            table.setItem(row_index, 2, QTableWidgetItem(''))
+            table.setItem(row_index, 3, QTableWidgetItem(''))
     
     def setup_connections(self):
         """시그널-슬롯 연결"""
