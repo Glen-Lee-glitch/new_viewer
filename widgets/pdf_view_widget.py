@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal, QPointF, QSizeF)
-from PyQt6.QtGui import QImage, QPainter, QPixmap, QFont, QFontMetrics
+from PyQt6.QtGui import QImage, QPainter, QPixmap, QFont, QFontMetrics, QPen
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QGraphicsPixmapItem,
                                  QGraphicsScene, QGraphicsView, QMessageBox,
                                  QWidget, QGraphicsItem)
@@ -108,6 +108,7 @@ class MovableStampItem(QGraphicsPixmapItem):
         self._drag_start_pos = QPointF()
 
         self.setFlag(QGraphicsPixmapItem.GraphicsItemFlag.ItemIsMovable)
+        self.setFlag(QGraphicsPixmapItem.GraphicsItemFlag.ItemIsSelectable)
 
     def mousePressEvent(self, event):
         """Stores the starting position of the drag."""
@@ -126,6 +127,21 @@ class MovableStampItem(QGraphicsPixmapItem):
                 self.stamp_data['x_ratio'] = new_pos.x() / page_width
                 self.stamp_data['y_ratio'] = new_pos.y() / page_height
                 print(f"Stamp moved, updated ratio: {self.stamp_data['x_ratio']:.3f}, {self.stamp_data['y_ratio']:.3f}")
+
+    def paint(self, painter, option, widget=None):
+        """Draws the pixmap and a dashed border if the item is selected."""
+        # 1. Draw the original pixmap first
+        super().paint(painter, option, widget)
+
+        # 2. If the item is selected, draw a dashed border
+        if self.isSelected():
+            pen = QPen(Qt.GlobalColor.black, 2, Qt.PenStyle.DashLine)
+            # Make the pen cosmetic to keep the line width constant regardless of zoom
+            pen.setCosmetic(True) 
+            painter.setPen(pen)
+            
+            # Draw rectangle around the bounding rect of the pixmap
+            painter.drawRect(self.boundingRect())
 
 class PdfViewWidget(QWidget, ViewModeMixin):
     """PDF 뷰어 위젯"""
@@ -550,7 +566,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
             self._history_stack.append(('add_stamp', self.current_page, None))
             print(f"페이지 {self.current_page + 1}에 스탬프 추가 및 이동 가능: {stamp_item.pos()}")
-            
+
     def resizeEvent(self, event):
         """뷰어 크기가 변경될 때 툴바 위치를 재조정한다."""
         super().resizeEvent(event)
