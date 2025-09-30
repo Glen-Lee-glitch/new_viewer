@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PyQt6 import uic
-from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal)
+from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal, QPointF, QSizeF)
 from PyQt6.QtGui import QImage, QPainter, QPixmap, QFont, QFontMetrics
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QGraphicsPixmapItem,
                                  QGraphicsScene, QGraphicsView, QMessageBox,
@@ -98,6 +98,34 @@ class PdfSaveWorker(QRunnable):
         except Exception as e:
             self.signals.save_error.emit(str(e))
 
+class MovableStampItem(QGraphicsPixmapItem):
+    """A stamp item that can be moved and updates its data dictionary when moved."""
+
+    def __init__(self, pixmap, parent_item, stamp_data: dict, page_size: QSizeF):
+        super().__init__(pixmap, parent_item)
+        self.stamp_data = stamp_data
+        self.page_size = page_size
+        self._drag_start_pos = QPointF()
+
+        self.setFlag(QGraphicsPixmapItem.GraphicsItemFlag.ItemIsMovable)
+
+    def mousePressEvent(self, event):
+        """Stores the starting position of the drag."""
+        self._drag_start_pos = self.pos()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """When drag is finished, updates the data dictionary if position changed."""
+        super().mouseReleaseEvent(event)
+        new_pos = self.pos()
+        if new_pos != self._drag_start_pos:
+            page_width = self.page_size.width()
+            page_height = self.page_size.height()
+            
+            if page_width > 0 and page_height > 0:
+                self.stamp_data['x_ratio'] = new_pos.x() / page_width
+                self.stamp_data['y_ratio'] = new_pos.y() / page_height
+                print(f"Stamp moved, updated ratio: {self.stamp_data['x_ratio']:.3f}, {self.stamp_data['y_ratio']:.3f}")
 
 class PdfViewWidget(QWidget, ViewModeMixin):
     """PDF 뷰어 위젯"""
@@ -457,41 +485,72 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             super().mousePressEvent(event)
 
     def _add_stamp_to_page(self, position):
-        """페이지에 스탬프를 추가한다."""
+        """페이지에 스탬프를 추가하고, MovableStampItem으로 관리한다."""
         if not self._stamp_pixmap or not self.current_page_item:
             return
 
-        # 2. 저장해 둔 너비(_stamp_desired_width)를 desired_width 인자로 전달합니다.
-        stamp_item = add_stamp_item(
-            stamp_pixmap=self._stamp_pixmap,
-            page_item=self.current_page_item,
-            position=position,
-            desired_width=self._stamp_desired_width # 이 부분을 수정
-        )
+        # --- Begin integrated logic from core.insert_utils ---
+        
+        # 1. Scale pixmap if needed
+        if self._stamp_desired_width > 0:
+            scaled_pixmap = self._stamp_pixmap.scaledToWidth(
+                self._stamp_desired_width, Qt.TransformationMode.SmoothTransformation
+            )
+        else:
+            scaled_pixmap = self._stamp_pixmap
 
-        # 페이지별로 스탬프 "데이터"를 관리 (QGraphicsPixmapItem 객체 대신)
+        # 2. Calculate centered position
+        stamp_center_x = scaled_pixmap.width() / 2
+        stamp_center_y = scaled_pixmap.height() / 2
+        final_pos = QPointF(position.x() - stamp_center_x, position.y() - stamp_center_y)
+
+        # 3. Adjust position to stay within page bounds
+        stamp_rect = scaled_pixmap.rect().translated(final_pos.toPoint())
+        page_rect = self.current_page_item.boundingRect()
+        
+        dx = 0
+        dy = 0
+        if stamp_rect.left() < page_rect.left():
+            dx = page_rect.left() - stamp_rect.left()
+        elif stamp_rect.right() > page_rect.right():
+            dx = page_rect.right() - stamp_rect.right()
+
+        if stamp_rect.top() < page_rect.top():
+            dy = page_rect.top() - stamp_rect.top()
+        elif stamp_rect.bottom() > page_rect.bottom():
+            dy = page_rect.bottom() - stamp_rect.bottom()
+
+        if dx != 0 or dy != 0:
+            final_pos += QPointF(dx, dy)
+
+        # --- End integrated logic ---
+
         page_pixmap = self.page_cache.get(self.current_page)
         if page_pixmap:
             page_width = page_pixmap.width()
             page_height = page_pixmap.height()
 
+            # Create the data dictionary FIRST
             stamp_data = {
-                'pixmap': stamp_item.pixmap(),
-                'x_ratio': stamp_item.pos().x() / page_width,
-                'y_ratio': stamp_item.pos().y() / page_height,
-                'w_ratio': stamp_item.boundingRect().width() / page_width,
-                'h_ratio': stamp_item.boundingRect().height() / page_height,
+                'pixmap': scaled_pixmap,
+                'x_ratio': final_pos.x() / page_width,
+                'y_ratio': final_pos.y() / page_height,
+                'w_ratio': scaled_pixmap.width() / page_width,
+                'h_ratio': scaled_pixmap.height() / page_height,
             }
 
             if self.current_page not in self._overlay_items:
                 self._overlay_items[self.current_page] = []
             self._overlay_items[self.current_page].append(stamp_data)
 
-            # 작업 기록에 '스탬프 추가' 동작 추가 (형식 통일)
+            # Create our custom item and add it to the scene
+            page_size = QSizeF(page_width, page_height)
+            stamp_item = MovableStampItem(scaled_pixmap, self.current_page_item, stamp_data, page_size)
+            stamp_item.setPos(final_pos)
+
             self._history_stack.append(('add_stamp', self.current_page, None))
-
-        print(f"페이지 {self.current_page + 1}에 스탬프 추가: {stamp_item.pos()}")
-
+            print(f"페이지 {self.current_page + 1}에 스탬프 추가 및 이동 가능: {stamp_item.pos()}")
+            
     def resizeEvent(self, event):
         """뷰어 크기가 변경될 때 툴바 위치를 재조정한다."""
         super().resizeEvent(event)
@@ -681,7 +740,6 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         # A4 세로 기준 통일된 뷰 적용
         self.set_fit_to_page()
 
-        # --- 이 페이지에 해당하는 오버레이 아이템(스탬프 등)이 있다면 다시 그리기 ---
         if self.current_page in self._overlay_items:
             page_width = pixmap.width()
             page_height = pixmap.height()
@@ -689,9 +747,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             for stamp_data in self._overlay_items[self.current_page]:
                 stamp_pixmap = stamp_data['pixmap']
                 
-                # QGraphicsPixmapItem 재생성 및 부모 설정
-                stamp_item = QGraphicsPixmapItem(stamp_pixmap, self.current_page_item)
-                stamp_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                # QGraphicsPixmapItem 대신 MovableStampItem 사용
+                page_size = QSizeF(pixmap.width(), pixmap.height())
+                stamp_item = MovableStampItem(stamp_pixmap, self.current_page_item, stamp_data, page_size)
                 
                 # 저장된 비율을 기반으로 위치 설정
                 pos_x = stamp_data['x_ratio'] * page_width
