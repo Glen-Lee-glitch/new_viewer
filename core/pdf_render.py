@@ -166,6 +166,14 @@ class PdfRender:
         qimage = qimage.copy()
         return QPixmap.fromImage(qimage)
 
+    def set_pdf_bytes(self, pdf_bytes: bytes):
+        """
+        PDF 문서의 바이트 데이터를 외부에서 설정한다. (되돌리기 기능용)
+        """
+        self.pdf_bytes = pdf_bytes
+        # 새 데이터로 교체되었으므로, doc 객체도 다시 로드해야 함
+        self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
+
     def create_thumbnail(self, page_num: int, max_width: int = 90) -> QIcon:
         """선명한 썸네일(QIcon)을 생성한다.
 

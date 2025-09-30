@@ -293,6 +293,10 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             return
             
         try:
+            # --- 되돌리기를 위해 자르기 전 PDF 데이터(bytes) 저장 ---
+            before_crop_bytes = bytes(self.renderer.get_pdf_bytes())
+            self._history_stack.append(('crop_page', self.current_page, before_crop_bytes))
+
             # 정규화된 QRectF를 튜플로 변환
             crop_tuple = (
                 crop_rect_normalized.x(),
@@ -437,8 +441,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 self._overlay_items[self.current_page] = []
             self._overlay_items[self.current_page].append(stamp_data)
 
-            # 작업 기록에 '스탬프 추가' 동작 추가
-            self._history_stack.append(('add_stamp', self.current_page))
+            # 작업 기록에 '스탬프 추가' 동작 추가 (형식 통일)
+            self._history_stack.append(('add_stamp', self.current_page, None))
 
         print(f"페이지 {self.current_page + 1}에 스탬프 추가: {stamp_item.pos()}")
 
@@ -648,23 +652,31 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             print("되돌릴 작업이 없습니다.")
             return
 
-        action, page_num = self._history_stack.pop()
+        action, page_num, data = self._history_stack.pop()
 
         if action == 'add_stamp':
             if page_num in self._overlay_items and self._overlay_items[page_num]:
-                # 해당 페이지의 마지막 스탬프 '데이터'를 제거
                 self._overlay_items[page_num].pop()
                 print(f"페이지 {page_num + 1}의 마지막 스탬프를 제거했습니다.")
+        
+        elif action == 'rotate_page':
+            old_rotation = data
+            self.page_rotations[page_num] = old_rotation
+            # 캐시 제거해서 새로 렌더링하도록 함
+            if page_num in self.page_cache:
+                del self.page_cache[page_num]
+            print(f"페이지 {page_num + 1}의 회전을 되돌렸습니다.")
 
-                # 현재 보고 있는 페이지의 작업을 되돌렸다면, 화면을 새로고침
-                if page_num == self.current_page:
-                    if self.current_page in self.page_cache:
-                        self._display_pixmap(self.page_cache[self.current_page])
-                    else:
-                        # 드물지만, 캐시에 페이지가 없다면 다시 로드
-                        self.show_page(self.current_page)
-            else:
-                print(f"되돌리기 오류: 페이지 {page_num + 1}에 제거할 스탬프가 없습니다.")
+        elif action == 'crop_page':
+            before_crop_bytes = data
+            self.renderer.set_pdf_bytes(before_crop_bytes)
+            # 자르기는 모든 페이지에 영향을 줄 수 있으므로 전체 캐시를 비움
+            self.page_cache.clear()
+            print(f"페이지 {page_num + 1}의 자르기를 되돌렸습니다.")
+
+        # 현재 보고 있는 페이지의 작업을 되돌렸다면, 화면을 새로고침
+        if page_num == self.current_page:
+            self.show_page(self.current_page)
 
     def _show_loading_message(self):
         """로딩 중 메시지를 표시한다."""
@@ -726,6 +738,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         current_user_rotation = self.page_rotations.get(self.current_page, 0)
         new_user_rotation = (current_user_rotation + 90) % 360
         self.page_rotations[self.current_page] = new_user_rotation
+
+        # 되돌리기를 위해 이전 회전 값 저장
+        self._history_stack.append(('rotate_page', self.current_page, current_user_rotation))
         
         # 현재 페이지를 다시 렌더링 (회전 적용)
         if self.current_page >= 0:
