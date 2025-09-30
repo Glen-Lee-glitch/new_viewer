@@ -5,7 +5,7 @@ from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal, QPoin
 from PyQt6.QtGui import QImage, QPainter, QPixmap, QFont, QFontMetrics, QPen
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QGraphicsPixmapItem,
                                  QGraphicsScene, QGraphicsView, QMessageBox,
-                                 QWidget, QGraphicsItem)
+                                 QWidget, QGraphicsItem, QMenu)
 
 import pymupdf
 from core.edit_mixin import ViewModeMixin
@@ -164,6 +164,15 @@ class MovableStampItem(QGraphicsPixmapItem):
                 self.stamp_data['x_ratio'] = new_pos.x() / page_width
                 self.stamp_data['y_ratio'] = new_pos.y() / page_height
                 print(f"Stamp moved, updated ratio: {self.stamp_data['x_ratio']:.3f}, {self.stamp_data['y_ratio']:.3f}")
+
+    def contextMenuEvent(self, event):
+        """Creates and shows a context menu on right-click."""
+        menu = QMenu()
+        apply_background_action = menu.addAction("배경 입히기")
+
+        # 메뉴를 화면의 이벤트 발생 위치에 표시합니다.
+        # 나중에 선택된 액션에 따라 기능을 연결할 수 있습니다.
+        menu.exec(event.screenPos())
 
     def paint(self, painter, option, widget=None):
         """Draws the pixmap and a dashed border if the item is selected."""
