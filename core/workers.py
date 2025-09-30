@@ -1,8 +1,8 @@
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal
 from PyQt6.QtGui import QPixmap
 
-from pdf_render import PdfRender
-from pdf_saved import compress_pdf_with_multiple_stages
+from core.pdf_render import PdfRender
+from core.pdf_saved import compress_pdf_with_multiple_stages
 
 
 class WorkerSignals(QObject):
