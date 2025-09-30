@@ -247,18 +247,40 @@ class MainWindow(QMainWindow):
             self._initial_resize_done = True
         
     def start_batch_test(self):
-        """PDF 일괄 테스트 Worker를 시작한다."""
+        """PDF 일괄 테스트를 시작한다 (test.py의 로직 사용)."""
         self.statusBar.showMessage("PDF 일괄 테스트를 시작합니다...", 0)
-        self.test_worker = PdfBatchTestWorker()
-        self.test_worker.signals.progress.connect(self.statusBar.showMessage)
-        self.test_worker.signals.error.connect(self._on_batch_test_error)
-        self.test_worker.signals.finished.connect(self._on_batch_test_finished)
-        self.test_worker.signals.load_pdf.connect(self.load_document_for_test)
-        self.test_worker.signals.rotate_90_maybe.connect(self._rotate_90_maybe_for_test)
-        self.test_worker.signals.focus_page2_maybe.connect(self._focus_page2_maybe_for_test)
-        self.test_worker.signals.save_pdf.connect(self._save_document_for_test)
         
-        self.thread_pool.start(self.test_worker)
+        # test.py의 batch_process_pdfs 함수를 백그라운드에서 실행
+        import sys
+        from pathlib import Path as TestPath
+        
+        # test.py 모듈 임포트
+        test_dir = TestPath(__file__).parent.parent / "test"
+        if str(test_dir) not in sys.path:
+            sys.path.insert(0, str(test_dir))
+        
+        try:
+            from test import batch_process_pdfs
+            
+            input_dir = r'C:\Users\HP\Desktop\files\테스트PDF'
+            output_dir = r'C:\Users\HP\Desktop\files\결과'
+            
+            # 백그라운드 스레드에서 실행
+            import threading
+            def run_test():
+                try:
+                    batch_process_pdfs(input_dir, output_dir)
+                    self.statusBar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
+                except Exception as e:
+                    self.statusBar.showMessage(f"테스트 중 오류 발생: {e}", 10000)
+            
+            thread = threading.Thread(target=run_test, daemon=True)
+            thread.start()
+            
+        except ImportError as e:
+            QMessageBox.critical(self, "오류", f"test.py 모듈을 찾을 수 없습니다: {e}")
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"테스트 시작 중 오류: {e}")
 
     def _rotate_90_maybe_for_test(self):
         """10% 확률로 현재 페이지를 90도 회전(첫 페이지 기준)"""

@@ -15,7 +15,11 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QPixmap
 
 # 로깅 설정
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, 
+    format='[TEST] %(asctime)s - %(levelname)s - %(message)s',
+    force=True  # 기존 로거 설정 덮어쓰기
+)
 
 def _create_random_stamp_entry(pixmap: QPixmap) -> dict:
     """주어진 QPixmap에 대해 랜덤 위치 및 크기 정보를 담은 dict를 생성한다."""
@@ -70,7 +74,9 @@ def process_single_pdf(pdf_file: Path, output_dir: Path):
     """
     단일 PDF 파일을 열고 저장하는 과정을 처리하며 오류를 기록한다.
     """
-    logging.info(f"--- 처리 시작: {pdf_file.name} ---")
+    print("\n" + "="*80)
+    logging.info(f"처리 시작: {pdf_file.name}")
+    print("="*80 + "\n")
     output_file = output_dir / f"{pdf_file.stem}_processed.pdf"
     renderer = None
 
@@ -128,47 +134,69 @@ def process_single_pdf(pdf_file: Path, output_dir: Path):
         #         stamp_data[target_page] = [stamp_entry]
         #         logging.info(f"페이지 {target_page + 1}에 도장 삽입")
 
+        if selected_case == 'case1':
+            # 케이스 1: 1페이지와 마지막 페이지 순서 변경 후, 두 페이지에 각각 이미지 삽입
+            logging.info(">>> 'case1' 테스트 케이스 실행...")
+            
+            # 1단계: 페이지 순서 변경 (사용자가 썸네일 드래그하는 동작)
+            page_order = list(range(total_pages))
+            page_order[0], page_order[-1] = page_order[-1], page_order[0]
+            logging.info(f"1단계: 페이지 순서 변경 (첫 페이지 ↔ 마지막 페이지)")
+            logging.info(f"  변경 전 순서: [0, 1, ..., {total_pages-1}]")
+            logging.info(f"  변경 후 순서: {page_order}")
+            logging.info(f"  -> 저장 시 {page_order[0]+1}페이지가 첫 번째에, {page_order[-1]+1}페이지가 마지막에 옴")
+            
+            # 2단계: 변경된 순서 기준으로 이미지 삽입
+            # stamp_data의 키는 항상 '원본 페이지 번호'를 사용해야 함!
+            # 저장 로직이 page_order.index()로 위치를 찾기 때문
+            if stamp_pixmaps:
+                # 변경된 순서의 첫 번째 위치(새 페이지 1)에 보일 도장
+                # = 원본 마지막 페이지(page_order[0])에 도장 삽입
+                original_page_for_first = page_order[0]  # 원본 마지막 페이지 번호
+                stamp_to_insert1 = random.choice(stamp_pixmaps)
+                stamp_entry1 = _create_random_stamp_entry(stamp_to_insert1)
+                stamp_data[original_page_for_first] = [stamp_entry1]
+                logging.info(f"2단계: 원본 {original_page_for_first + 1}페이지에 도장 삽입 (저장 후 첫 번째 페이지가 됨)")
+
+                # 변경된 순서의 마지막 위치(새 페이지 마지막)에 보일 도장
+                # = 원본 첫 페이지(page_order[-1])에 도장 삽입
+                original_page_for_last = page_order[-1]  # 원본 첫 페이지 번호 (0)
+                stamp_to_insert2 = random.choice(stamp_pixmaps)
+                stamp_entry2 = _create_random_stamp_entry(stamp_to_insert2)
+                stamp_data[original_page_for_last] = [stamp_entry2]
+                logging.info(f"2단계: 원본 {original_page_for_last + 1}페이지에 도장 삽입 (저장 후 마지막 페이지가 됨)")
+
         elif selected_case == 'case2':
             # 케이스 2: 1페이지에 이미지 삽입 후, 마지막 페이지와 순서 변경
             logging.info(">>> 'case2' 테스트 케이스 실행...")
-            page_order = list(range(total_pages))
-            page_order[0], page_order[-1] = page_order[-1], page_order[0]
-            logging.info(f"페이지 순서 변경: 첫 페이지와 마지막 페이지 교환. 새로운 순서: {page_order}")
-
+            
+            # 1단계: 원본 순서 기준으로 1페이지에 이미지 삽입
             if stamp_pixmaps:
-                # 원본 1페이지(page_num=0)에 도장 삽입
                 stamp_to_insert = random.choice(stamp_pixmaps)
                 stamp_entry = _create_random_stamp_entry(stamp_to_insert)
                 stamp_data[0] = [stamp_entry]
-                logging.info("원본 1페이지에 도장 삽입")
-
-        elif selected_case == 'case1':
-            # 케이스 1: 1페이지와 마지막 페이지 순서 변경 후, 두 페이지에 각각 이미지 삽입
-            logging.info(">>> 'case1' 테스트 케이스 실행...")
+                logging.info("1단계: 원본 1페이지(인덱스 0)에 도장 삽입")
+            
+            # 2단계: 페이지 순서 변경 (사용자가 썸네일 드래그하는 동작)
             page_order = list(range(total_pages))
             page_order[0], page_order[-1] = page_order[-1], page_order[0]
-            logging.info(f"페이지 순서 변경: 첫 페이지와 마지막 페이지 교환. 새로운 순서: {page_order}")
-
-            if stamp_pixmaps:
-                # 원본 첫 페이지(page_num=0)에 도장 삽입
-                stamp_to_insert1 = random.choice(stamp_pixmaps)
-                stamp_entry1 = _create_random_stamp_entry(stamp_to_insert1)
-                if 0 not in stamp_data:
-                    stamp_data[0] = []
-                stamp_data[0].append(stamp_entry1)
-                logging.info("원본 1페이지에 도장 삽입")
-
-                # 원본 마지막 페이지(page_num=total_pages-1)에 도장 삽입
-                stamp_to_insert2 = random.choice(stamp_pixmaps)
-                stamp_entry2 = _create_random_stamp_entry(stamp_to_insert2)
-                if total_pages - 1 not in stamp_data:
-                    stamp_data[total_pages - 1] = []
-                stamp_data[total_pages - 1].append(stamp_entry2)
-                logging.info(f"원본 마지막 페이지({total_pages})에 도장 삽입")
+            logging.info(f"2단계: 페이지 순서 변경 (첫 페이지 ↔ 마지막 페이지)")
+            logging.info(f"  변경 후 순서: {page_order}")
+            logging.info(f"  -> 원본 1페이지의 도장이 저장 후 마지막 페이지에 나타남")
 
         # 파일 저장(결과 폴더에)
         logging.info(f"파일 저장 중: {output_file}")
+        logging.info(f"=== 저장 시 전달할 파라미터 디버그 ===")
+        logging.info(f"  총 페이지 수: {total_pages}")
+        logging.info(f"  page_order: {page_order}")
+        logging.info(f"  rotations: {rotations}")
+        logging.info(f"  stamp_data 키들: {list(stamp_data.keys())}")
+        for key, stamps in stamp_data.items():
+            logging.info(f"    페이지 {key}: {len(stamps)}개의 도장")
+        
         input_bytes = renderer.get_pdf_bytes()
+        logging.info(f"  input_bytes 크기: {len(input_bytes)} bytes")
+        
         success = compress_pdf_with_multiple_stages(
             input_bytes=input_bytes,
             output_path=str(output_file),
@@ -182,6 +210,33 @@ def process_single_pdf(pdf_file: Path, output_dir: Path):
             logging.info(f"성공적으로 파일을 저장했습니다: {output_file}")
         else:
             logging.warning(f"압축 저장에 실패하여 원본 파일을 복사했습니다: {output_file}")
+        
+        # === 저장된 파일 검증 ===
+        try:
+            import pymupdf
+            logging.info(f"=== 저장된 PDF 검증 시작 ===")
+            saved_doc = pymupdf.open(str(output_file))
+            logging.info(f"  저장된 PDF 총 페이지: {saved_doc.page_count}")
+            
+            # 원본 PDF의 각 페이지 텍스트 샘플 (처음 50자)
+            original_texts = []
+            for i in range(total_pages):
+                page = renderer.doc.load_page(i)
+                text = page.get_text()[:50].replace('\n', ' ').strip()
+                original_texts.append(text)
+                logging.info(f"  원본 페이지 {i+1} 텍스트 샘플: {text}")
+            
+            logging.info(f"")
+            logging.info(f"  저장된 PDF의 페이지 순서:")
+            for i in range(saved_doc.page_count):
+                page = saved_doc.load_page(i)
+                text = page.get_text()[:50].replace('\n', ' ').strip()
+                logging.info(f"  저장본 페이지 {i+1} 텍스트: {text}")
+            
+            saved_doc.close()
+            logging.info(f"=== 저장된 PDF 검증 완료 ===")
+        except Exception as e:
+            logging.error(f"저장된 PDF 검증 중 오류: {e}")
 
     except Exception as e:
         logging.error(f"'{pdf_file.name}' 처리 중 오류 발생: {e}", exc_info=True)
