@@ -119,6 +119,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         # --- 페이지 별 오버레이 아이템 "데이터" 관리 ---
         self._overlay_items: dict[int, list[dict]] = {}
         
+        # --- 되돌리기(Undo)를 위한 작업 기록 ---
+        self._history_stack: list[tuple] = []
+
         # --- 오버레이 위젯 ---
         self.stamp_overlay = None
 
@@ -434,6 +437,9 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 self._overlay_items[self.current_page] = []
             self._overlay_items[self.current_page].append(stamp_data)
 
+            # 작업 기록에 '스탬프 추가' 동작 추가
+            self._history_stack.append(('add_stamp', self.current_page))
+
         print(f"페이지 {self.current_page + 1}에 스탬프 추가: {stamp_item.pos()}")
 
     def resizeEvent(self, event):
@@ -447,8 +453,10 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             self.stamp_overlay.setGeometry(0, 0, self.width(), self.height())
     
     def keyPressEvent(self, event):
-        """키보드 'Q', 'E'를 눌러 페이지를 변경한다."""
-        if event.key() == Qt.Key.Key_Q:
+        """키보드 'Q', 'E'를 눌러 페이지를 변경하고, Ctrl+Z로 되돌리기를 실행한다."""
+        if event.key() == Qt.Key.Key_Z and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            self._undo_last_action()
+        elif event.key() == Qt.Key.Key_Q:
             self.page_change_requested.emit(-1)
         elif event.key() == Qt.Key.Key_E:
             self.page_change_requested.emit(1)
@@ -633,6 +641,30 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 pos_x = stamp_data['x_ratio'] * page_width
                 pos_y = stamp_data['y_ratio'] * page_height
                 stamp_item.setPos(pos_x, pos_y)
+
+    def _undo_last_action(self):
+        """마지막으로 수행한 작업을 되돌린다."""
+        if not self._history_stack:
+            print("되돌릴 작업이 없습니다.")
+            return
+
+        action, page_num = self._history_stack.pop()
+
+        if action == 'add_stamp':
+            if page_num in self._overlay_items and self._overlay_items[page_num]:
+                # 해당 페이지의 마지막 스탬프 '데이터'를 제거
+                self._overlay_items[page_num].pop()
+                print(f"페이지 {page_num + 1}의 마지막 스탬프를 제거했습니다.")
+
+                # 현재 보고 있는 페이지의 작업을 되돌렸다면, 화면을 새로고침
+                if page_num == self.current_page:
+                    if self.current_page in self.page_cache:
+                        self._display_pixmap(self.page_cache[self.current_page])
+                    else:
+                        # 드물지만, 캐시에 페이지가 없다면 다시 로드
+                        self.show_page(self.current_page)
+            else:
+                print(f"되돌리기 오류: 페이지 {page_num + 1}에 제거할 스탬프가 없습니다.")
 
     def _show_loading_message(self):
         """로딩 중 메시지를 표시한다."""
