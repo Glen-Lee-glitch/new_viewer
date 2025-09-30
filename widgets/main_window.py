@@ -191,6 +191,7 @@ class MainWindow(QMainWindow):
         self.thumbnail_viewer.page_change_requested.connect(self.change_page)
         self.thumbnail_viewer.page_order_changed.connect(self._update_page_order)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
+        self.thumbnail_viewer.undo_requested.connect(self._handle_undo_request)
         self.pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
         self.pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
         self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
@@ -454,6 +455,11 @@ class MainWindow(QMainWindow):
     def adjust_viewer_layout(self, is_landscape: bool):
         """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
         self.set_splitter_sizes(is_landscape)
+
+    def _handle_undo_request(self):
+        """썸네일에서 Undo 요청이 왔을 때 PDF 뷰어의 되돌리기를 실행한다."""
+        if self.pdf_view_widget and self.renderer:
+            self.pdf_view_widget.undo_last_action()
 
     def set_splitter_sizes(self, is_landscape: bool):
         """가로/세로 모드에 따라 QSplitter의 크기를 설정한다."""

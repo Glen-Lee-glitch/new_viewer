@@ -709,6 +709,10 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         if page_num == self.current_page:
             self.show_page(self.current_page)
 
+    def undo_last_action(self):
+        """공개 메서드: 마지막 작업을 되돌린다."""
+        self._undo_last_action()
+
     def _show_loading_message(self):
         """로딩 중 메시지를 표시한다."""
         self.scene.clear()

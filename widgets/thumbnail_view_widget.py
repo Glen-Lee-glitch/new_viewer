@@ -11,6 +11,7 @@ class ThumbnailViewWidget(QWidget):
     page_selected = pyqtSignal(int)  # 페이지 번호를 전달하는 시그널
     page_change_requested = pyqtSignal(int)
     page_order_changed = pyqtSignal(list) # 변경된 페이지 순서를 전달하는 새 시그널
+    undo_requested = pyqtSignal()
     
     def __init__(self):
         super().__init__()
@@ -25,7 +26,10 @@ class ThumbnailViewWidget(QWidget):
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         """이벤트 필터. thumbnail_list_widget의 키 이벤트를 가로챈다."""
         if watched == self.thumbnail_list_widget and event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Q:
+            if event.key() == Qt.Key.Key_Z and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                self.undo_requested.emit()
+                return True
+            elif event.key() == Qt.Key.Key_Q:
                 self.page_change_requested.emit(-1)
                 return True  # 이벤트가 처리되었음을 알림
             elif event.key() == Qt.Key.Key_E:
