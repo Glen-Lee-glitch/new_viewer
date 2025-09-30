@@ -21,12 +21,26 @@ logging.basicConfig(
     force=True  # 기존 로거 설정 덮어쓰기
 )
 
-def _create_random_stamp_entry(pixmap: QPixmap) -> dict:
-    """주어진 QPixmap에 대해 랜덤 위치 및 크기 정보를 담은 dict를 생성한다."""
-    w_ratio = random.uniform(0.15, 0.30)  # 너비 비율을 15% ~ 30% 사이에서 랜덤하게 설정
-    aspect = pixmap.height() / max(1, pixmap.width())
-    h_ratio = w_ratio * aspect
+def _create_stamp_entry_from_fixed_width(pixmap: QPixmap, desired_width_px: int, page_width: int, page_height: int) -> dict:
+    """
+    UI와 동일한 방식으로 도장 정보를 생성한다.
+    고정 픽셀 너비를 받아서 페이지 비율로 변환한다.
     
+    Args:
+        pixmap: 도장 이미지
+        desired_width_px: 원하는 도장 너비 (픽셀)
+        page_width: 페이지 너비 (픽셀)
+        page_height: 페이지 높이 (픽셀)
+    """
+    # UI와 동일: 고정 픽셀 너비 기준으로 계산
+    aspect = pixmap.height() / max(1, pixmap.width())
+    desired_height_px = int(desired_width_px * aspect)
+    
+    # 비율로 변환 (UI의 방식과 동일)
+    w_ratio = desired_width_px / page_width
+    h_ratio = desired_height_px / page_height
+    
+    # 랜덤 위치 계산 (페이지 안쪽에 여백 2%)
     max_x = max(0.0, 1.0 - w_ratio - 0.02)
     max_y = max(0.0, 1.0 - h_ratio - 0.02)
     x_ratio = random.uniform(0.02, max_x if max_x > 0.02 else 0.02)
@@ -37,7 +51,7 @@ def _create_random_stamp_entry(pixmap: QPixmap) -> dict:
         'x_ratio': x_ratio, 'y_ratio': y_ratio,
         'w_ratio': w_ratio, 'h_ratio': h_ratio,
     }
-    logging.info(f"스탬프 정보 생성: x={x_ratio:.2f}, y={y_ratio:.2f}, w={w_ratio:.2f}, h={h_ratio:.2f}")
+    logging.info(f"스탬프 정보 생성 (고정 너비 {desired_width_px}px): x={x_ratio:.2f}, y={y_ratio:.2f}, w={w_ratio:.2f}, h={h_ratio:.2f}")
     return entry
 
 def batch_process_pdfs(input_dir: str, output_dir: str):
@@ -134,6 +148,12 @@ def process_single_pdf(pdf_file: Path, output_dir: Path):
         #         stamp_data[target_page] = [stamp_entry]
         #         logging.info(f"페이지 {target_page + 1}에 도장 삽입")
 
+        # 도장 크기 정보 매핑 (UI의 stamp_overlay_widget과 동일)
+        stamp_size_map = {
+            '도장1.png': 90,      # stamp_button_1의 width
+            '원본대조필.png': 320  # stamp_button_2의 width
+        }
+
         if selected_case == 'case1':
             # 케이스 1: 1페이지와 마지막 페이지 순서 변경 후, 두 페이지에 각각 이미지 삽입
             logging.info(">>> 'case1' 테스트 케이스 실행...")
@@ -154,17 +174,26 @@ def process_single_pdf(pdf_file: Path, output_dir: Path):
                 # = 원본 마지막 페이지(page_order[0])에 도장 삽입
                 original_page_for_first = page_order[0]  # 원본 마지막 페이지 번호
                 stamp_to_insert1 = random.choice(stamp_pixmaps)
-                stamp_entry1 = _create_random_stamp_entry(stamp_to_insert1)
+                stamp_name1 = stamp_paths[stamp_pixmaps.index(stamp_to_insert1)].name
+                desired_width1 = stamp_size_map.get(stamp_name1, 110)  # 기본값 110px
+                
+                # 페이지 크기를 얻기 위해 간단히 렌더링
+                page_pix1 = PdfRender.render_page_thread_safe(renderer.get_pdf_bytes(), original_page_for_first, zoom_factor=2.0, user_rotation=0)
+                stamp_entry1 = _create_stamp_entry_from_fixed_width(stamp_to_insert1, desired_width1, page_pix1.width(), page_pix1.height())
                 stamp_data[original_page_for_first] = [stamp_entry1]
-                logging.info(f"2단계: 원본 {original_page_for_first + 1}페이지에 도장 삽입 (저장 후 첫 번째 페이지가 됨)")
+                logging.info(f"2단계: 원본 {original_page_for_first + 1}페이지에 도장 삽입 (크기: {desired_width1}px, 저장 후 첫 번째 페이지가 됨)")
 
                 # 변경된 순서의 마지막 위치(새 페이지 마지막)에 보일 도장
                 # = 원본 첫 페이지(page_order[-1])에 도장 삽입
                 original_page_for_last = page_order[-1]  # 원본 첫 페이지 번호 (0)
                 stamp_to_insert2 = random.choice(stamp_pixmaps)
-                stamp_entry2 = _create_random_stamp_entry(stamp_to_insert2)
+                stamp_name2 = stamp_paths[stamp_pixmaps.index(stamp_to_insert2)].name
+                desired_width2 = stamp_size_map.get(stamp_name2, 110)
+                
+                page_pix2 = PdfRender.render_page_thread_safe(renderer.get_pdf_bytes(), original_page_for_last, zoom_factor=2.0, user_rotation=0)
+                stamp_entry2 = _create_stamp_entry_from_fixed_width(stamp_to_insert2, desired_width2, page_pix2.width(), page_pix2.height())
                 stamp_data[original_page_for_last] = [stamp_entry2]
-                logging.info(f"2단계: 원본 {original_page_for_last + 1}페이지에 도장 삽입 (저장 후 마지막 페이지가 됨)")
+                logging.info(f"2단계: 원본 {original_page_for_last + 1}페이지에 도장 삽입 (크기: {desired_width2}px, 저장 후 마지막 페이지가 됨)")
 
         elif selected_case == 'case2':
             # 케이스 2: 1페이지에 이미지 삽입 후, 마지막 페이지와 순서 변경
@@ -173,9 +202,13 @@ def process_single_pdf(pdf_file: Path, output_dir: Path):
             # 1단계: 원본 순서 기준으로 1페이지에 이미지 삽입
             if stamp_pixmaps:
                 stamp_to_insert = random.choice(stamp_pixmaps)
-                stamp_entry = _create_random_stamp_entry(stamp_to_insert)
+                stamp_name = stamp_paths[stamp_pixmaps.index(stamp_to_insert)].name
+                desired_width = stamp_size_map.get(stamp_name, 110)
+                
+                page_pix = PdfRender.render_page_thread_safe(renderer.get_pdf_bytes(), 0, zoom_factor=2.0, user_rotation=0)
+                stamp_entry = _create_stamp_entry_from_fixed_width(stamp_to_insert, desired_width, page_pix.width(), page_pix.height())
                 stamp_data[0] = [stamp_entry]
-                logging.info("1단계: 원본 1페이지(인덱스 0)에 도장 삽입")
+                logging.info(f"1단계: 원본 1페이지(인덱스 0)에 도장 삽입 (크기: {desired_width}px)")
             
             # 2단계: 페이지 순서 변경 (사용자가 썸네일 드래그하는 동작)
             page_order = list(range(total_pages))
