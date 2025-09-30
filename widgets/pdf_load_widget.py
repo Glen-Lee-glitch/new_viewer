@@ -1,8 +1,14 @@
 from pathlib import Path
 
 from PyQt6 import uic
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QWidget, QTableWidgetItem
+from PyQt6.QtCore import pyqtSignal, QPoint
+from PyQt6.QtWidgets import (
+    QFileDialog,
+    QMessageBox,
+    QWidget,
+    QTableWidgetItem,
+    QMenu,
+)
 
 from core.sql_manager import fetch_recent_subsidy_applications
 
@@ -36,6 +42,7 @@ class PdfLoadWidget(QWidget):
         table.setHorizontalHeaderLabels(['RN', '지역', '작업자', '파일여부'])
         table.setAlternatingRowColors(True)
         self.populate_recent_subsidy_rows()
+        table.customContextMenuRequested.connect(self.show_context_menu)
 
     def populate_recent_subsidy_rows(self):
         """최근 지원금 신청 데이터를 테이블에 채운다."""
@@ -67,6 +74,15 @@ class PdfLoadWidget(QWidget):
                 3,
                 QTableWidgetItem(str(row.get('file_status', '부')))
             )
+
+    def show_context_menu(self, pos: QPoint):
+        """테이블 컨텍스트 메뉴 표시"""
+        table = self.complement_table_widget
+        global_pos = table.viewport().mapToGlobal(pos)
+
+        menu = QMenu(self)
+        start_action = menu.addAction("작업 시작하기")
+        menu.exec(global_pos)
     
     def setup_connections(self):
         """시그널-슬롯 연결"""
