@@ -246,8 +246,11 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         try:
             # --- 되돌리기를 위해 자르기 전 PDF 데이터(bytes) 저장 ---
             before_crop_bytes = bytes(self.renderer.get_pdf_bytes())
-            # 여러 페이지 자르기인 경우 첫 번째 페이지를 대표로 기록
-            self._history_stack.append(('crop_page', page_nums[0], before_crop_bytes))
+            self._history_stack.append((
+                'crop_pages',
+                -1,  # 대표 페이지는 쓰지 않음
+                {'pages': list(page_nums), 'bytes': before_crop_bytes}
+            ))
 
             # 정규화된 QRectF를 튜플로 변환
             crop_tuple = (
@@ -679,12 +682,28 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 del self.page_cache[page_num]
             print(f"페이지 {page_num + 1}의 회전을 되돌렸습니다.")
 
-        elif action == 'crop_page':
-            before_crop_bytes = data
-            self.renderer.set_pdf_bytes(before_crop_bytes)
-            # 자르기는 모든 페이지에 영향을 줄 수 있으므로 전체 캐시를 비움
-            self.page_cache.clear()
-            print(f"페이지 {page_num + 1}의 자르기를 되돌렸습니다.")
+        elif action in ('crop_page', 'crop_pages'):
+            pages = []
+            if action == 'crop_pages' and isinstance(data, dict):
+                before_bytes = data.get('bytes')
+                pages = data.get('pages', [])
+            else:
+                # 과거 호환: ('crop_page', page_num, bytes)
+                before_bytes = data
+                if page_num >= 0:
+                    pages = [page_num]
+
+            if before_bytes:
+                self.renderer.set_pdf_bytes(before_bytes)
+                self.page_cache.clear()
+                print(
+                    "여러 페이지 자르기를 되돌렸습니다."
+                    if len(pages) != 1 else f"페이지 {pages[0] + 1}의 자르기를 되돌렸습니다."
+                )
+
+            # 현재 페이지가 영향받은 페이지였다면 화면 갱신
+            if not pages or self.current_page in pages:
+                self.show_page(self.current_page)
 
         # 현재 보고 있는 페이지의 작업을 되돌렸다면, 화면을 새로고침
         if page_num == self.current_page:
