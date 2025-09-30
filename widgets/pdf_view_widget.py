@@ -73,13 +73,15 @@ class PdfSaveWorker(QRunnable):
 
     def __init__(self, input_bytes: bytes, output_path: str,
                  rotations: dict | None = None,
-                 stamp_data: dict[int, list[dict]] | None = None):
+                 stamp_data: dict[int, list[dict]] | None = None,
+                 page_order: list[int] | None = None):
         super().__init__()
         self.signals = WorkerSignals()
         self.input_bytes = input_bytes
         self.output_path = output_path
         self.rotations = rotations if rotations is not None else {}
         self.stamp_data = stamp_data if stamp_data is not None else {}
+        self.page_order = page_order
 
     def run(self):
         """백그라운드 스레드에서 PDF 저장 및 압축 실행."""
@@ -89,7 +91,8 @@ class PdfSaveWorker(QRunnable):
                 output_path=self.output_path,
                 target_size_mb=3,
                 rotations=self.rotations,
-                stamp_data=self.stamp_data
+                stamp_data=self.stamp_data,
+                page_order=self.page_order
             )
             self.signals.save_finished.emit(self.output_path, success)
         except Exception as e:
@@ -450,11 +453,14 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         else:
             super().keyPressEvent(event)
 
-    def save_pdf(self):
+    def save_pdf(self, page_order: list[int] | None = None):
         """PDF 저장 프로세스를 시작한다."""
         if not self.renderer or not self.renderer.get_pdf_bytes():
             QMessageBox.warning(self, "저장 오류", "저장할 PDF 파일이 없습니다.")
             return
+
+        if page_order is None:
+            page_order = list(range(self.renderer.get_page_count()))
 
         default_path = self.get_current_pdf_path() or "untitled.pdf"
         output_path, _ = QFileDialog.getSaveFileName(
@@ -471,7 +477,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         worker = PdfSaveWorker(
             input_bytes=input_bytes, output_path=output_path,
             rotations=rotations,
-            stamp_data=stamp_data
+            stamp_data=stamp_data,
+            page_order=page_order
         )
 
         worker.signals.save_finished.connect(self._on_save_finished)

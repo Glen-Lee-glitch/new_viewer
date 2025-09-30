@@ -130,6 +130,9 @@ class MainWindow(QMainWindow):
         self.info_panel = InfoPanelWidget()
         self.todo_widget = ToDoWidget(self)
 
+        # --- 페이지 순서 관리 ---
+        self._page_order: list[int] = []
+
         # --- 메인 레이아웃 설정 ---
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -186,6 +189,7 @@ class MainWindow(QMainWindow):
         self.pdf_load_widget.pdf_selected.connect(self.load_document)
         self.thumbnail_viewer.page_selected.connect(self.go_to_page)
         self.thumbnail_viewer.page_change_requested.connect(self.change_page)
+        self.thumbnail_viewer.page_order_changed.connect(self._update_page_order)
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
         self.pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
@@ -387,6 +391,23 @@ class MainWindow(QMainWindow):
                     error_filename = Path(self.renderer.pdf_path[0]).name
                 self.test_worker.signals.error.emit(error_filename, str(e))
 
+    def _update_page_order(self, new_order: list[int]):
+        """페이지 순서가 변경되면 호출되는 슬롯"""
+        self._page_order = new_order
+        print(f"MainWindow가 새 페이지 순서를 받음: {self._page_order}")
+
+    def _update_page_navigation(self):
+        """페이지 네비게이션 상태(라벨, 버튼 활성화)를 업데이트한다."""
+        total_pages = len(self._page_order)
+        current_visual_page = self.current_page
+        
+        if total_pages > 0:
+            self.label_page_nav.setText(f"{current_visual_page + 1} / {total_pages}")
+        else:
+            self.label_page_nav.setText("N/A")
+
+        self.pushButton_prev.setEnabled(total_pages > 0 and current_visual_page > 0)
+        self.pushButton_next.setEnabled(total_pages > 0 and current_visual_page < total_pages - 1)
 
     def _on_batch_test_error(self, filename: str, error_msg: str):
         """일괄 테스트 중 오류 발생 시 호출될 슬롯"""
@@ -422,16 +443,6 @@ class MainWindow(QMainWindow):
             # 세로 페이지: 뷰어 75%, 썸네일 25% (기존과 유사)
             self.main_splitter.setSizes([int(self.width() * 0.25), int(self.width() * 0.75)])
     
-    def _update_page_navigation(self, current_page: int, total_pages: int):
-        """페이지 네비게이션 상태(라벨, 버튼 활성화)를 업데이트한다."""
-        if total_pages > 0:
-            self.label_page_nav.setText(f"{current_page + 1} / {total_pages}")
-        else:
-            self.label_page_nav.setText("N/A")
-
-        self.pushButton_prev.setEnabled(total_pages > 0 and current_page > 0)
-        self.pushButton_next.setEnabled(total_pages > 0 and current_page < total_pages - 1)
-
     def load_document(self, pdf_paths: list):
         """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
         if not pdf_paths:
@@ -448,6 +459,9 @@ class MainWindow(QMainWindow):
             self.renderer = None
             return
 
+        # 페이지 순서 초기화
+        self._page_order = list(range(self.renderer.get_page_count()))
+
         # 첫 번째 파일 이름을 기준으로 창 제목 설정
         self.setWindowTitle(f"PDF Viewer - {Path(pdf_paths[0]).name}")
         
@@ -461,6 +475,11 @@ class MainWindow(QMainWindow):
         self.pdf_view_widget.show()
         self.thumbnail_viewer.show()
         self.info_panel.show()
+
+    def _save_document(self):
+        """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
+        if self.renderer:
+            self.pdf_view_widget.save_pdf(page_order=self._page_order)
         
     def show_load_view(self):
         """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
@@ -481,15 +500,19 @@ class MainWindow(QMainWindow):
         self.info_panel.hide()
         self.info_panel.clear_info()
 
-        self._update_page_navigation(0, 0)
+        self._update_page_navigation()
 
-    def go_to_page(self, page_num: int):
-        """지정된 페이지 번호로 뷰를 이동시킨다."""
-        if self.renderer and 0 <= page_num < self.renderer.get_page_count():
-            self.current_page = page_num
-            self.pdf_view_widget.show_page(page_num)
-            self.thumbnail_viewer.set_current_page(page_num)
-            self._update_page_navigation(self.current_page, self.renderer.get_page_count())
+    def go_to_page(self, visual_page_num: int):
+        """'보이는' 페이지 번호로 뷰를 이동시킨다."""
+        if self.renderer and 0 <= visual_page_num < len(self._page_order):
+            self.current_page = visual_page_num
+            
+            # '보이는' 순서를 '실제' 페이지 번호로 변환
+            actual_page_num = self._page_order[visual_page_num]
+            
+            self.pdf_view_widget.show_page(actual_page_num)
+            self.thumbnail_viewer.set_current_page(visual_page_num)
+            self._update_page_navigation()
     
     def change_page(self, delta: int):
         """현재 페이지에서 delta만큼 페이지를 이동시킨다."""

@@ -16,6 +16,7 @@ def compress_pdf_file(
         size_threshold_kb: int = 300,
         user_rotations: dict = None,
         stamp_data: dict[int, list[dict]] = None,
+        page_order: list[int] = None,
 ):
     """
     이미지·스캔으로 추정되거나 강제 조정이 요청된 페이지만 재렌더링-압축하고,
@@ -29,11 +30,17 @@ def compress_pdf_file(
     dst = pymupdf.open()
     user_rotations = user_rotations or {}
     stamp_data = stamp_data or {}
+
+    if page_order is None:
+        page_order = list(range(src.page_count))
+
     try:
-        for i, page in enumerate(src):
-            user_rotation = user_rotations.get(i, 0)
+        for actual_page_idx in page_order:
+            page = src.load_page(actual_page_idx)
+            # 루프 내에서 'i' 대신 'actual_page_idx' 사용
+            user_rotation = user_rotations.get(actual_page_idx, 0)
             # 스탬프가 있는 페이지인지 확인
-            has_stamps = i in stamp_data
+            has_stamps = actual_page_idx in stamp_data
 
             image_list = []
             image_size = 0
@@ -69,7 +76,7 @@ def compress_pdf_file(
             if (not image_list or image_size / 1024 < size_threshold_kb) and not has_stamps:
                 # 하지만, 회전이 없는 페이지만 복사하도록 내부에서 한 번 더 체크
                 if user_rotation == 0:
-                    dst.insert_pdf(src, from_page=i, to_page=i)
+                    dst.insert_pdf(src, from_page=actual_page_idx, to_page=actual_page_idx)
                     continue
 
             # ── 여기부터 '무거운' 페이지 또는 '강제 조정' 또는 '회전된' 페이지만 이미지-재렌더링 ──
@@ -170,7 +177,7 @@ def compress_pdf_file(
 
                 # 9. 스탬프 데이터가 있으면 페이지에 삽입
                 if has_stamps:
-                    for stamp in stamp_data[i]:
+                    for stamp in stamp_data[actual_page_idx]:
                         try:
                             stamp_pix: QPixmap = stamp['pixmap']
                             
@@ -193,12 +200,12 @@ def compress_pdf_file(
                             new_p.insert_image(stamp_rect, stream=stamp_bytes, overlay=True)
 
                         except Exception as e_stamp:
-                            print(f"[compress] page {i+1} stamp insertion error: {e_stamp}")
+                            print(f"[compress] page {actual_page_idx+1} stamp insertion error: {e_stamp}")
                 
             except Exception as e:
                 # 실패하면 그대로 복사(품질 보존 우선)
-                print(f"[compress] page {i+1} fallback copy: {e}")
-                dst.insert_pdf(src, from_page=i, to_page=i)
+                print(f"[compress] page {actual_page_idx+1} fallback copy: {e}")
+                dst.insert_pdf(src, from_page=actual_page_idx, to_page=actual_page_idx)
 
             finally:
                 gc.collect()
@@ -214,7 +221,7 @@ def compress_pdf_file(
         src.close()
         dst.close()
 
-def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_size_mb=3, rotations=None, stamp_data=None):
+def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_size_mb=3, rotations=None, stamp_data=None, page_order: list[int] = None):
     """
     여러 단계의 압축을 시도하여 PDF를 목표 크기로 압축하는 함수
     
@@ -249,7 +256,8 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
         dpi=146,
         size_threshold_kb=300,
         user_rotations=rotations,
-        stamp_data=stamp_data
+        stamp_data=stamp_data,
+        page_order=page_order
     )
     print(f"1단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
@@ -263,7 +271,8 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
         dpi=125,
         size_threshold_kb=0,
         user_rotations=rotations,
-        stamp_data=stamp_data
+        stamp_data=stamp_data,
+        page_order=page_order
     )
     print(f"2단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:
@@ -277,7 +286,8 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
         dpi=100,
         size_threshold_kb=0,
         user_rotations=rotations,
-        stamp_data=stamp_data
+        stamp_data=stamp_data,
+        page_order=page_order
     )
     print(f"3단계 압축 후 크기: {compressed_mb} MB")
     if compressed_mb is not None and compressed_mb <= target_size_mb:

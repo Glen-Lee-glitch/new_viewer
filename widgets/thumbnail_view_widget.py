@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
-from PyQt6.QtWidgets import QListWidgetItem, QWidget
+from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget
 
 from core.pdf_render import PdfRender
 
@@ -10,6 +10,7 @@ class ThumbnailViewWidget(QWidget):
     """썸네일 뷰어 위젯"""
     page_selected = pyqtSignal(int)  # 페이지 번호를 전달하는 시그널
     page_change_requested = pyqtSignal(int)
+    page_order_changed = pyqtSignal(list) # 변경된 페이지 순서를 전달하는 새 시그널
     
     def __init__(self):
         super().__init__()
@@ -46,9 +47,16 @@ class ThumbnailViewWidget(QWidget):
     def setup_list_widget(self):
         """리스트 위젯 초기 설정"""
         list_widget = self.thumbnail_list_widget
-        list_widget.setIconSize(list_widget.iconSize())  # UI에서 설정한 크기 유지
+        list_widget.setIconSize(list_widget.iconSize())
         list_widget.setSpacing(2)
-        list_widget.setGridSize(list_widget.gridSize())  # UI에서 설정한 그리드 크기 유지
+        list_widget.setGridSize(list_widget.gridSize())
+        
+        # --- 드래그 앤 드롭 활성화 ---
+        list_widget.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        list_widget.setMovement(QListWidget.Movement.Snap)
+        
+        # --- 모델의 데이터 변경 시그널 연결 ---
+        list_widget.model().rowsMoved.connect(self._on_rows_moved)
     
     def setup_connections(self):
         """시그널-슬롯 연결"""
@@ -74,10 +82,21 @@ class ThumbnailViewWidget(QWidget):
 
     def on_thumbnail_clicked(self, item):
         """썸네일 클릭 시 호출"""
-        page_number = item.data(Qt.ItemDataRole.UserRole)
-        if page_number is not None:
-            self.page_selected.emit(page_number)
+        # UserRole(실제 번호) 대신 리스트의 '보이는' 순서(row)를 전달
+        row = self.thumbnail_list_widget.row(item)
+        if row != -1:
+            self.page_selected.emit(row)
     
+    def _on_rows_moved(self):
+        """드래그 앤 드롭으로 아이템 순서가 바뀌었을 때 호출"""
+        new_order = []
+        for i in range(self.thumbnail_list_widget.count()):
+            item = self.thumbnail_list_widget.item(i)
+            actual_page_num = item.data(Qt.ItemDataRole.UserRole)
+            new_order.append(actual_page_num)
+        
+        self.page_order_changed.emit(new_order)
+
     def set_current_page(self, page_num: int):
         """지정된 페이지 번호에 해당하는 썸네일을 선택 상태로 만든다."""
         if hasattr(self, 'thumbnail_list_widget'):
