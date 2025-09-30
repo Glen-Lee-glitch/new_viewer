@@ -241,9 +241,17 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
     rotations = rotations if rotations is not None else {}
     stamp_data = stamp_data if stamp_data is not None else {}
 
-    # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전, 강제 조정, 스탬프 정보가 있으면 압축 시도)
+    # 페이지 순서가 변경되었는지 확인하는 플래그
+    is_order_changed = True
+    if page_order is not None:
+        if page_order == list(range(len(page_order))):
+            is_order_changed = False
+    else:
+        is_order_changed = False
+
+    # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전/스탬프/순서 변경이 있으면 압축 시도)
     orig_mb = len(input_bytes) / (1024 * 1024)
-    if orig_mb <= target_size_mb and not rotations and not stamp_data:
+    if orig_mb <= target_size_mb and not rotations and not stamp_data and not is_order_changed:
         with open(output_path, "wb") as f:
             f.write(input_bytes)
         return True

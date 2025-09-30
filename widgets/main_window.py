@@ -299,7 +299,6 @@ class MainWindow(QMainWindow):
 
         input_bytes = self.renderer.get_pdf_bytes()
         rotations = self.pdf_view_widget.get_page_rotations()
-        force_resize_pages = self.pdf_view_widget.get_force_resize_pages()
 
         # 난수 기반 도장 데이터 구성: 현재 페이지(또는 2페이지)에 1개 삽입
         stamp_data: dict[int, list[dict]] = {}
@@ -380,7 +379,6 @@ class MainWindow(QMainWindow):
                 output_path=save_path,
                 target_size_mb=3,
                 rotations=rotations,
-                force_resize_pages=force_resize_pages,
                 stamp_data=stamp_data
             )
         except Exception as e:
