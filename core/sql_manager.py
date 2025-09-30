@@ -21,8 +21,13 @@ def fetch_recent_subsidy_applications():
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = (
-                "SELECT RN, region "
-                "FROM subsidy_applications "
+                "SELECT sa.RN, sa.region, "
+                "       CASE WHEN fp.file_path IS NULL OR fp.file_path = '' "
+                "            THEN '부' "
+                "            ELSE '여' "
+                "       END AS file_status "
+                "FROM subsidy_applications sa "
+                "LEFT JOIN filepath fp ON fp.RN = sa.RN "
                 "WHERE recent_received_date >= %s "
                 "ORDER BY recent_received_date DESC "
                 "LIMIT 10"
@@ -32,14 +37,14 @@ def fetch_recent_subsidy_applications():
 
         if df.empty:
             print('조회된 데이터가 없습니다.')
-            return df
+            return df[['RN', 'region', 'file_status']]
 
-        print(df[['RN', 'region']])
-        return df[['RN', 'region']]
+        print(df[['RN', 'region', 'file_status']])
+        return df[['RN', 'region', 'file_status']]
 
     except Exception:  # pragma: no cover - 긴급 디버깅용
         traceback.print_exc()
-        raise
+        return pd.DataFrame(columns=['RN', 'region', 'file_status'])
 
 if __name__ == "__main__":
     fetch_recent_subsidy_applications()

@@ -58,7 +58,11 @@ class PdfLoadWidget(QWidget):
             table.setItem(row_index, 0, QTableWidgetItem(str(row.get('RN', ''))))
             table.setItem(row_index, 1, QTableWidgetItem(str(row.get('region', ''))))
             table.setItem(row_index, 2, QTableWidgetItem(''))
-            table.setItem(row_index, 3, QTableWidgetItem(''))
+            table.setItem(
+                row_index,
+                3,
+                QTableWidgetItem(str(row.get('file_status', '부')))
+            )
     
     def setup_connections(self):
         """시그널-슬롯 연결"""
