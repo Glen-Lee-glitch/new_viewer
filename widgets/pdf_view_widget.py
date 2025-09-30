@@ -384,7 +384,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         if self._is_stamp_mode and event.button() == Qt.MouseButton.LeftButton:
             if self.current_page_item:
                 # 뷰의 좌표를 씬 좌표로 변환
-                scene_pos = self.pdf_graphics_view.mapToScene(event.pos())
+                scene_pos = self.pdf_graphics_view.mapToScene(self.pdf_graphics_view.mapFrom(self, event.pos()))
                 # 씬 좌표를 현재 페이지 아이템의 내부 좌표로 변환
                 item_pos = self.current_page_item.mapFromScene(scene_pos)
                 self._add_stamp_to_page(item_pos)
