@@ -239,11 +239,26 @@ class PdfRender:
             page_num: 0-based 페이지 인덱스
             crop_rect_normalized: (x, y, width, height) 정규화된 자르기 영역 (0.0~1.0)
         """
+        self.apply_crop_to_pages([page_num], crop_rect_normalized)
+
+    def apply_crop_to_pages(self, page_nums: list[int], crop_rect_normalized: tuple) -> None:
+        """
+        여러 페이지에 동일한 자르기를 적용하고 A4 세로 규격으로 확대한다.
+        
+        Args:
+            page_nums: 0-based 페이지 인덱스 리스트
+            crop_rect_normalized: (x, y, width, height) 정규화된 자르기 영역 (0.0~1.0)
+        """
         if not self.pdf_bytes:
             raise RuntimeError("PDF가 로드되지 않았습니다.")
         
-        if page_num < 0 or page_num >= self.page_count:
-            raise IndexError(f"잘못된 페이지 번호: {page_num}")
+        if not page_nums:
+            return
+        
+        # 페이지 번호 검증
+        for page_num in page_nums:
+            if page_num < 0 or page_num >= self.page_count:
+                raise IndexError(f"잘못된 페이지 번호: {page_num}")
         
         x, y, width, height = crop_rect_normalized
         
@@ -252,14 +267,16 @@ class PdfRender:
                 0.0 < width <= 1.0 and 0.0 < height <= 1.0):
             raise ValueError("자르기 영역이 유효하지 않습니다.")
         
+        page_nums_set = set(page_nums)  # 빠른 조회를 위해 set 사용
+        
         try:
             # 현재 PDF 바이트에서 새 문서 생성
             with pymupdf.open(stream=self.pdf_bytes, filetype="pdf") as source_doc:
                 new_doc = pymupdf.open()
                 
-                # 모든 페이지를 복사하되, 지정된 페이지만 자르기 적용
+                # 모든 페이지를 복사하되, 지정된 페이지들만 자르기 적용
                 for i, page in enumerate(source_doc):
-                    if i == page_num:
+                    if i in page_nums_set:
                         # 자르기 적용할 페이지
                         page_rect = page.rect
                         
@@ -316,7 +333,10 @@ class PdfRender:
                     self.doc.close()
                 self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
                 
-                print(f"페이지 {page_num + 1}에 자르기 적용 완료")
+                if len(page_nums) == 1:
+                    print(f"페이지 {page_nums[0] + 1}에 자르기 적용 완료")
+                else:
+                    print(f"{len(page_nums)}개 페이지에 자르기 적용 완료: {[p+1 for p in sorted(page_nums)]}")
                 
         except Exception as e:
             traceback.print_exc()

@@ -141,6 +141,13 @@ class CropDialog(QDialog):
         
         cancel_button = self.buttonBox.button(self.buttonBox.StandardButton.Cancel)
         if cancel_button: cancel_button.setText("취소")
+        
+        # 체크박스 상태 변경 시 lineEdit 활성화/비활성화
+        if hasattr(self, 'checkBox_dummy'):
+            self.checkBox_dummy.stateChanged.connect(self._on_multi_page_toggle)
+            # 초기 상태: 비활성화
+            if hasattr(self, 'lineEdit_page'):
+                self.lineEdit_page.setEnabled(False)
 
     def set_page_pixmap(self, pixmap: QPixmap):
         """미리보기 Scene에 QPixmap과 A4 비율의 자르기 영역을 설정한다."""
@@ -203,6 +210,65 @@ class CropDialog(QDialog):
         """다이얼로그 크기가 변경될 때마다 호출된다."""
         super().resizeEvent(event)
         self._fit_view_with_margin()
+
+    def _on_multi_page_toggle(self, state):
+        """체크박스 상태 변경 시 페이지 입력란 활성화/비활성화"""
+        if hasattr(self, 'lineEdit_page'):
+            self.lineEdit_page.setEnabled(state == Qt.CheckState.Checked.value)
+    
+    def is_multi_page_mode(self) -> bool:
+        """여러 페이지 자르기 모드인지 확인한다."""
+        if hasattr(self, 'checkBox_dummy'):
+            return self.checkBox_dummy.isChecked()
+        return False
+    
+    def get_target_pages(self) -> list[int]:
+        """자르기를 적용할 페이지 목록을 파싱하여 반환한다.
+        
+        Returns:
+            list[int]: 0-based 페이지 인덱스 리스트 (정렬되고 중복 제거됨)
+        """
+        if not self.is_multi_page_mode():
+            return []
+        
+        if not hasattr(self, 'lineEdit_page'):
+            return []
+        
+        page_text = self.lineEdit_page.text().strip()
+        if not page_text:
+            return []
+        
+        pages = set()  # 중복 제거를 위해 set 사용
+        
+        try:
+            # 쉼표로 구분된 각 항목 처리
+            for part in page_text.split(','):
+                part = part.strip()
+                if not part:
+                    continue
+                
+                # 범위 표기 확인 (예: "1-4")
+                if '-' in part:
+                    range_parts = part.split('-')
+                    if len(range_parts) == 2:
+                        start = int(range_parts[0].strip())
+                        end = int(range_parts[1].strip())
+                        # 1-based를 0-based로 변환
+                        for page_num in range(start - 1, end):
+                            if page_num >= 0:  # 음수 페이지 제외
+                                pages.add(page_num)
+                else:
+                    # 단일 페이지
+                    page_num = int(part) - 1  # 1-based를 0-based로 변환
+                    if page_num >= 0:  # 음수 페이지 제외
+                        pages.add(page_num)
+        
+        except ValueError:
+            # 파싱 오류 시 빈 리스트 반환
+            return []
+        
+        # 정렬하여 반환
+        return sorted(list(pages))
 
     def get_crop_rect_in_page_coords(self) -> QRectF:
         """페이지 좌표계에서의 자르기 영역 사각형을 반환한다."""

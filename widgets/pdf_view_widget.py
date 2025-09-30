@@ -279,20 +279,50 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             # 자르기 적용
             crop_rect = dialog.get_crop_rect_in_page_coords()
             if not crop_rect.isEmpty():
-                self._apply_crop_to_current_page(crop_rect)
+                # 여러 페이지 모드인지 확인
+                if dialog.is_multi_page_mode():
+                    target_pages = dialog.get_target_pages()
+                    if target_pages:
+                        # 총 페이지 수로 유효성 검증
+                        total_pages = self.renderer.get_page_count()
+                        valid_pages = [p for p in target_pages if 0 <= p < total_pages]
+                        invalid_pages = [p for p in target_pages if p >= total_pages]
+                        
+                        if invalid_pages:
+                            QMessageBox.warning(
+                                self, "경고",
+                                f"유효하지 않은 페이지 번호가 있습니다: {[p+1 for p in invalid_pages]}\n"
+                                f"(총 {total_pages}페이지)\n\n"
+                                f"유효한 페이지에만 자르기를 적용합니다."
+                            )
+                        
+                        if valid_pages:
+                            self._apply_crop_to_multiple_pages(crop_rect, valid_pages)
+                        else:
+                            QMessageBox.warning(self, "오류", "적용할 유효한 페이지가 없습니다.")
+                    else:
+                        QMessageBox.warning(self, "오류", "페이지 번호를 올바르게 입력해주세요.\n예: 1,2,3 또는 1-5 또는 1-3,7,9-10")
+                else:
+                    # 단일 페이지 모드
+                    self._apply_crop_to_current_page(crop_rect)
         else:
             # '취소' 눌렀을 때
             print("자르기 취소됨")
 
     def _apply_crop_to_current_page(self, crop_rect_normalized):
         """현재 페이지에 자르기를 적용하고 화면을 업데이트한다."""
-        if not self.renderer:
+        self._apply_crop_to_multiple_pages(crop_rect_normalized, [self.current_page])
+
+    def _apply_crop_to_multiple_pages(self, crop_rect_normalized, page_nums: list[int]):
+        """여러 페이지에 동일한 자르기를 적용하고 화면을 업데이트한다."""
+        if not self.renderer or not page_nums:
             return
             
         try:
             # --- 되돌리기를 위해 자르기 전 PDF 데이터(bytes) 저장 ---
             before_crop_bytes = bytes(self.renderer.get_pdf_bytes())
-            self._history_stack.append(('crop_page', self.current_page, before_crop_bytes))
+            # 여러 페이지 자르기인 경우 첫 번째 페이지를 대표로 기록
+            self._history_stack.append(('crop_page', page_nums[0], before_crop_bytes))
 
             # 정규화된 QRectF를 튜플로 변환
             crop_tuple = (
@@ -302,27 +332,58 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 crop_rect_normalized.height()
             )
             
+            # 스탬프가 있는 페이지 확인 및 경고
+            pages_with_stamps = [p for p in page_nums if p in self._overlay_items and self._overlay_items[p]]
+            if pages_with_stamps:
+                reply = QMessageBox.question(
+                    self, '경고',
+                    f'다음 페이지에 스탬프가 있습니다: {[p+1 for p in sorted(pages_with_stamps)]}\n\n'
+                    f'해당 페이지의 모든 스탬프가 삭제됩니다.\n계속하시겠습니까?',
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                
+                if reply == QMessageBox.StandardButton.No:
+                    return
+                
+                # 스탬프 삭제
+                for page_num in pages_with_stamps:
+                    del self._overlay_items[page_num]
+            
             # 자르기 적용
-            self.renderer.apply_crop_to_page(self.current_page, crop_tuple)
+            self.renderer.apply_crop_to_pages(page_nums, crop_tuple)
             
             # --- 중요 ---
             # 자르기가 적용되면 PDF 데이터 자체가 변경되므로, 기존의 모든 페이지 캐시는 무효화됩니다.
             # 캐시를 비워서 모든 페이지(현재 페이지 포함)를 새로운 데이터로 다시 렌더링하도록 강제합니다.
             self.page_cache.clear()
             
-            # 현재 페이지 다시 렌더링
-            self._start_render_job(self.current_page)
+            # 현재 페이지가 자른 페이지 중 하나라면 다시 렌더링
+            if self.current_page in page_nums:
+                self._start_render_job(self.current_page)
             
-            # 썸네일 업데이트
+            # 썸네일 업데이트 (자른 모든 페이지)
             if hasattr(self, 'thumbnail_updated'):
-                self.thumbnail_updated.emit(self.current_page)
-                
-            print(f"페이지 {self.current_page + 1} 자르기 적용 완료")
+                for page_num in page_nums:
+                    self.thumbnail_updated.emit(page_num)
+            
+            if len(page_nums) == 1:
+                print(f"페이지 {page_nums[0] + 1} 자르기 적용 완료")
+            else:
+                print(f"{len(page_nums)}개 페이지 자르기 적용 완료: {[p+1 for p in sorted(page_nums)]}")
+            
+            # 성공 메시지 표시
+            QMessageBox.information(
+                self, "자르기 완료",
+                f"{len(page_nums)}개 페이지에 자르기가 적용되었습니다.\n"
+                f"페이지: {', '.join(str(p+1) for p in sorted(page_nums))}"
+            )
             
         except Exception as e:
             print(f"자르기 적용 오류: {e}")
             import traceback
             traceback.print_exc()
+            QMessageBox.critical(self, "오류", f"자르기 적용 중 오류가 발생했습니다:\n{e}")
 
     def apply_default_crop_to_current_page_sync(self):
         """(공개 메소드, 동기식) 현재 페이지에 기본 자르기를 적용하고 렌더링이 끝날 때까지 기다린다."""
