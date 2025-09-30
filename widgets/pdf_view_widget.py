@@ -115,6 +115,43 @@ class MovableStampItem(QGraphicsPixmapItem):
         self._drag_start_pos = self.pos()
         super().mousePressEvent(event)
 
+    def mouseMoveEvent(self, event):
+        """Handles item dragging and constrains movement to the parent's bounds."""
+        super().mouseMoveEvent(event)
+
+        # parentItem() is the page QGraphicsPixmapItem
+        parent = self.parentItem()
+        if not parent:
+            return
+
+        # Get the bounding rectangles
+        parent_rect = parent.boundingRect()
+        item_rect = self.boundingRect()
+        
+        # Current item position in parent coordinates
+        current_pos = self.pos()
+        
+        # Calculate the next position based on the bounding rect
+        new_x = current_pos.x()
+        new_y = current_pos.y()
+
+        # Constrain X position
+        if new_x < parent_rect.left():
+            new_x = parent_rect.left()
+        elif new_x + item_rect.width() > parent_rect.right():
+            new_x = parent_rect.right() - item_rect.width()
+            
+        # Constrain Y position
+        if new_y < parent_rect.top():
+            new_y = parent_rect.top()
+        elif new_y + item_rect.height() > parent_rect.bottom():
+            new_y = parent_rect.bottom() - item_rect.height()
+            
+        # Apply the constrained position
+        constrained_pos = QPointF(new_x, new_y)
+        if current_pos != constrained_pos:
+            self.setPos(constrained_pos)
+
     def mouseReleaseEvent(self, event):
         """When drag is finished, updates the data dictionary if position changed."""
         super().mouseReleaseEvent(event)
@@ -546,6 +583,11 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             page_width = page_pixmap.width()
             page_height = page_pixmap.height()
 
+            # --- 방어 코드 추가 ---
+            if page_width == 0 or page_height == 0:
+                print("오류: 페이지 크기가 0이라 스탬프를 추가할 수 없습니다.")
+                return 
+
             # Create the data dictionary FIRST
             stamp_data = {
                 'pixmap': scaled_pixmap,
@@ -768,8 +810,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 stamp_item = MovableStampItem(stamp_pixmap, self.current_page_item, stamp_data, page_size)
                 
                 # 저장된 비율을 기반으로 위치 설정
-                pos_x = stamp_data['x_ratio'] * page_width
-                pos_y = stamp_data['y_ratio'] * page_height
+                pos_x = stamp_data.get('x_ratio', 0.0) * page_width
+                pos_y = stamp_data.get('y_ratio', 0.0) * page_height
                 stamp_item.setPos(pos_x, pos_y)
 
     def _undo_last_action(self):
