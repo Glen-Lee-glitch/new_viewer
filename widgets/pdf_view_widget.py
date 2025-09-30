@@ -442,6 +442,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 'y_ratio': final_pos.y() / page_height,
                 'w_ratio': scaled_pixmap.width() / page_width,
                 'h_ratio': scaled_pixmap.height() / page_height,
+                'original_pixmap': scaled_pixmap.copy(),
+                'background_applied': False,
             }
 
             if self.current_page not in self._overlay_items:
@@ -450,7 +452,14 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
             # Create our custom item and add it to the scene
             page_size = QSizeF(page_width, page_height)
-            stamp_item = MovableStampItem(scaled_pixmap, self.current_page_item, stamp_data, page_size)
+            stamp_item = MovableStampItem(
+                scaled_pixmap,
+                self.current_page_item,
+                stamp_data,
+                page_size,
+                page_index=self.current_page,
+                history_callback=self._on_stamp_background_toggled,
+            )
             stamp_item.setPos(final_pos)
 
             self._history_stack.append(('add_stamp', self.current_page, None))
@@ -654,12 +663,49 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 
                 # QGraphicsPixmapItem 대신 MovableStampItem 사용
                 page_size = QSizeF(pixmap.width(), pixmap.height())
-                stamp_item = MovableStampItem(stamp_pixmap, self.current_page_item, stamp_data, page_size)
+                stamp_item = MovableStampItem(
+                    stamp_pixmap,
+                    self.current_page_item,
+                    stamp_data,
+                    page_size,
+                    page_index=self.current_page,
+                    history_callback=self._on_stamp_background_toggled,
+                )
                 
                 # 저장된 비율을 기반으로 위치 설정
                 pos_x = stamp_data.get('x_ratio', 0.0) * page_width
                 pos_y = stamp_data.get('y_ratio', 0.0) * page_height
                 stamp_item.setPos(pos_x, pos_y)
+
+    def _on_stamp_background_toggled(
+        self,
+        *,
+        page_index: int,
+        stamp_data: dict,
+        previous_pixmap: QPixmap,
+        previous_state: bool,
+        new_pixmap: QPixmap,
+        new_state: bool,
+    ) -> None:
+        """콜백: 스탬프 배경 토글 시 히스토리에 기록한다."""
+        stamp_data['pixmap'] = new_pixmap
+        stamp_data['background_applied'] = new_state
+        if 'original_pixmap' not in stamp_data:
+            stamp_data['original_pixmap'] = previous_pixmap.copy()
+
+        self._history_stack.append(
+            (
+                'stamp_background',
+                page_index,
+                {
+                    'stamp_data': stamp_data,
+                    'previous_pixmap': previous_pixmap,
+                    'previous_state': previous_state,
+                    'new_pixmap': new_pixmap,
+                    'new_state': new_state,
+                },
+            )
+        )
 
     def _undo_last_action(self):
         """마지막으로 수행한 작업을 되돌린다."""
@@ -704,6 +750,21 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             # 현재 페이지가 영향받은 페이지였다면 화면 갱신
             if not pages or self.current_page in pages:
                 self.show_page(self.current_page)
+
+        elif action == 'stamp_background':
+            info = data or {}
+            stamp_data = info.get('stamp_data')
+            previous_pixmap = info.get('previous_pixmap')
+            previous_state = info.get('previous_state')
+
+            if stamp_data and previous_pixmap is not None:
+                stamp_data['pixmap'] = previous_pixmap
+                stamp_data['background_applied'] = bool(previous_state)
+                if 'original_pixmap' not in stamp_data:
+                    stamp_data['original_pixmap'] = previous_pixmap.copy()
+
+                if page_num == self.current_page:
+                    self.show_page(self.current_page)
 
         # 현재 보고 있는 페이지의 작업을 되돌렸다면, 화면을 새로고침
         if page_num == self.current_page:

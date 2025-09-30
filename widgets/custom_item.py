@@ -1,15 +1,36 @@
+from typing import Callable
+
 from PyQt6.QtCore import pyqtSignal, QPointF, QSizeF, Qt, QRectF
-from PyQt6.QtGui import QPen
+from PyQt6.QtGui import QPen, QPainter, QPixmap
 from PyQt6.QtWidgets import QGraphicsPixmapItem, QMenu
 
 class MovableStampItem(QGraphicsPixmapItem):
     """A stamp item that can be moved and updates its data dictionary when moved."""
 
-    def __init__(self, pixmap, parent_item, stamp_data: dict, page_size: QSizeF):
+    def __init__(
+        self,
+        pixmap,
+        parent_item,
+        stamp_data: dict,
+        page_size: QSizeF,
+        page_index: int,
+        history_callback: Callable | None = None,
+    ):
         super().__init__(pixmap, parent_item)
         self.stamp_data = stamp_data
         self.page_size = page_size
+        self._page_index = page_index
+        self._history_callback = history_callback
         self._drag_start_pos = QPointF()
+
+        original_pixmap = self.stamp_data.get('original_pixmap')
+        if isinstance(original_pixmap, QPixmap) and not original_pixmap.isNull():
+            self._base_pixmap = original_pixmap.copy()
+        else:
+            self._base_pixmap = pixmap.copy()
+            self.stamp_data['original_pixmap'] = self._base_pixmap
+
+        self._background_applied = bool(self.stamp_data.get('background_applied', False))
 
         self.setFlag(QGraphicsPixmapItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsPixmapItem.GraphicsItemFlag.ItemIsSelectable)
@@ -72,11 +93,12 @@ class MovableStampItem(QGraphicsPixmapItem):
     def contextMenuEvent(self, event):
         """Creates and shows a context menu on right-click."""
         menu = QMenu()
-        apply_background_action = menu.addAction("배경 입히기")
+        action_text = "배경 제거" if self._background_applied else "배경 입히기"
+        background_action = menu.addAction(action_text)
 
-        # 메뉴를 화면의 이벤트 발생 위치에 표시합니다.
-        # 나중에 선택된 액션에 따라 기능을 연결할 수 있습니다.
-        menu.exec(event.screenPos())
+        selected_action = menu.exec(event.screenPos())
+        if selected_action == background_action:
+            self._toggle_background()
 
     def paint(self, painter, option, widget=None):
         """Draws the pixmap and a dashed border if the item is selected."""
@@ -92,3 +114,56 @@ class MovableStampItem(QGraphicsPixmapItem):
             
             # Draw rectangle around the bounding rect of the pixmap
             painter.drawRect(self.boundingRect())
+
+    def _toggle_background(self):
+        """Toggle a white background behind the stamp pixmap."""
+        previous_pixmap = self.pixmap().copy()
+
+        if not self._background_applied:
+            new_pixmap = QPixmap(self._base_pixmap.size())
+            new_pixmap.fill(Qt.GlobalColor.white)
+
+            painter = QPainter(new_pixmap)
+            painter.drawPixmap(0, 0, self._base_pixmap)
+            painter.end()
+
+            self._apply_pixmap_change(
+                previous_pixmap=previous_pixmap,
+                new_pixmap=new_pixmap,
+                previous_state=False,
+                new_state=True,
+            )
+        else:
+            new_pixmap = self._base_pixmap.copy()
+            self._apply_pixmap_change(
+                previous_pixmap=previous_pixmap,
+                new_pixmap=new_pixmap,
+                previous_state=True,
+                new_state=False,
+            )
+
+    def _apply_pixmap_change(
+        self,
+        *,
+        previous_pixmap: QPixmap,
+        new_pixmap: QPixmap,
+        previous_state: bool,
+        new_state: bool,
+    ) -> None:
+        self.setPixmap(new_pixmap)
+        self.stamp_data['pixmap'] = new_pixmap
+        self.stamp_data['background_applied'] = new_state
+        if 'original_pixmap' not in self.stamp_data:
+            self.stamp_data['original_pixmap'] = self._base_pixmap
+
+        self._background_applied = new_state
+
+        if self._history_callback:
+            self._history_callback(
+                page_index=self._page_index,
+                stamp_data=self.stamp_data,
+                previous_pixmap=previous_pixmap.copy(),
+                previous_state=previous_state,
+                new_pixmap=new_pixmap.copy(),
+                new_state=new_state,
+            )
