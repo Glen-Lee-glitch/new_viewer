@@ -6,6 +6,8 @@ import traceback
 
 from contextlib import closing
 
+FETCH_COLUMNS = ['RN', 'region', 'worker', 'file_status', 'file_path']
+
 # MySQL 연결 정보
 DB_CONFIG = {
     'host': '192.168.0.114',
@@ -25,7 +27,8 @@ def fetch_recent_subsidy_applications():
                 "       CASE WHEN fp.file_path IS NULL OR fp.file_path = '' "
                 "            THEN '부' "
                 "            ELSE '여' "
-                "       END AS file_status "
+                "       END AS file_status, "
+                "       fp.file_path "
                 "FROM subsidy_applications sa "
                 "LEFT JOIN filepath fp ON fp.RN = sa.RN "
                 "WHERE recent_received_date >= %s "
@@ -37,14 +40,14 @@ def fetch_recent_subsidy_applications():
 
         if df.empty:
             print('조회된 데이터가 없습니다.')
-            return df[['RN', 'region', 'worker', 'file_status']]
+            return df[FETCH_COLUMNS]
 
-        print(df[['RN', 'region', 'worker', 'file_status']])
-        return df[['RN', 'region', 'worker', 'file_status']]
+        print(df[FETCH_COLUMNS])
+        return df[FETCH_COLUMNS]
 
     except Exception:  # pragma: no cover - 긴급 디버깅용
         traceback.print_exc()
-        return pd.DataFrame(columns=['RN', 'region', 'worker', 'file_status'])
+        return pd.DataFrame(columns=FETCH_COLUMNS)
 
 if __name__ == "__main__":
     fetch_recent_subsidy_applications()
