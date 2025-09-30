@@ -57,7 +57,11 @@ class PdfLoadWidget(QWidget):
         for row_index, (_, row) in enumerate(df.iterrows()):
             table.setItem(row_index, 0, QTableWidgetItem(str(row.get('RN', ''))))
             table.setItem(row_index, 1, QTableWidgetItem(str(row.get('region', ''))))
-            table.setItem(row_index, 2, QTableWidgetItem(''))
+            table.setItem(
+                row_index,
+                2,
+                QTableWidgetItem(str(row.get('worker', '')))
+            )
             table.setItem(
                 row_index,
                 3,

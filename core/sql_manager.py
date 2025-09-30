@@ -21,7 +21,7 @@ def fetch_recent_subsidy_applications():
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = (
-                "SELECT sa.RN, sa.region, "
+                "SELECT sa.RN, sa.region, sa.worker, "
                 "       CASE WHEN fp.file_path IS NULL OR fp.file_path = '' "
                 "            THEN '부' "
                 "            ELSE '여' "
@@ -37,14 +37,14 @@ def fetch_recent_subsidy_applications():
 
         if df.empty:
             print('조회된 데이터가 없습니다.')
-            return df[['RN', 'region', 'file_status']]
+            return df[['RN', 'region', 'worker', 'file_status']]
 
-        print(df[['RN', 'region', 'file_status']])
-        return df[['RN', 'region', 'file_status']]
+        print(df[['RN', 'region', 'worker', 'file_status']])
+        return df[['RN', 'region', 'worker', 'file_status']]
 
     except Exception:  # pragma: no cover - 긴급 디버깅용
         traceback.print_exc()
-        return pd.DataFrame(columns=['RN', 'region', 'file_status'])
+        return pd.DataFrame(columns=['RN', 'region', 'worker', 'file_status'])
 
 if __name__ == "__main__":
     fetch_recent_subsidy_applications()
