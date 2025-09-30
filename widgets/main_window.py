@@ -193,6 +193,7 @@ class MainWindow(QMainWindow):
         self.pdf_view_widget.page_change_requested.connect(self.change_page)
         self.pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
         self.pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
+        self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
         
         # 정보 패널 업데이트 연결
         self.pdf_view_widget.pdf_loaded.connect(self.info_panel.update_file_info)
@@ -477,6 +478,7 @@ class MainWindow(QMainWindow):
     def _save_document(self):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
         if self.renderer:
+            print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
             self.pdf_view_widget.save_pdf(page_order=self._page_order)
         
     def show_load_view(self):

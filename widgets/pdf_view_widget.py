@@ -152,7 +152,6 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
         self.toolbar.rotate_90_requested.connect(self._rotate_current_page)
         self.toolbar.crop_requested.connect(self._open_crop_dialog) # 자르기 신호 연결
-        self.toolbar.save_pdf_requested.connect(self.save_pdf) # 저장 신호 연결
 
         # --- 스탬프 오버레이 시그널 연결 ---
         self.stamp_overlay.stamp_selected.connect(self._activate_stamp_mode)
@@ -471,8 +470,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
             return
 
         input_bytes = self.renderer.get_pdf_bytes()
-        rotations = self.get_page_rotations()
-        stamp_data = self.get_stamp_items_data()
+        rotations = self.get_page_rotations()  # <--- 파라미터 없이 원본 데이터 전달
+        stamp_data = self.get_stamp_items_data() # <--- 파라미터 없이 원본 데이터 전달
 
         worker = PdfSaveWorker(
             input_bytes=input_bytes, output_path=output_path,
@@ -507,9 +506,12 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     def get_stamp_items_data(self) -> dict[int, list[dict]]:
         """
         모든 페이지에 추가된 스탬프 아이템들의 "데이터"를 반환한다.
-        이제 이 메서드는 QGraphicsPixmapItem 객체에 접근하지 않으므로 안전하다.
         """
         return self._overlay_items
+
+    def get_page_rotations(self) -> dict:
+        """사용자가 적용한 페이지별 회전 정보를 반환한다."""
+        return self.page_rotations
 
     def set_renderer(self, renderer: PdfRender | None):
         """PDF 렌더러를 설정하고 캐시를 초기화한다."""

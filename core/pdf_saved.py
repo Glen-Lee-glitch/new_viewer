@@ -33,14 +33,32 @@ def compress_pdf_file(
 
     if page_order is None:
         page_order = list(range(src.page_count))
+    
+    # --- 여기서 데이터 키 변환 ---
+    final_stamp_data = {}
+    for actual_page_num, stamp_list in stamp_data.items():
+        try:
+            new_position = page_order.index(actual_page_num)
+            final_stamp_data[new_position] = stamp_list
+        except ValueError:
+            pass # 순서에 없는 페이지는 무시
+            
+    final_rotations = {}
+    for actual_page_num, rotation in user_rotations.items():
+        try:
+            new_position = page_order.index(actual_page_num)
+            final_rotations[new_position] = rotation
+        except ValueError:
+            pass
 
     try:
-        for actual_page_idx in page_order:
+        # for i, page in enumerate(src): # <--- 기존 루프를 아래 코드로 변경
+        for new_idx, actual_page_idx in enumerate(page_order):
             page = src.load_page(actual_page_idx)
             # 루프 내에서 'i' 대신 'actual_page_idx' 사용
-            user_rotation = user_rotations.get(actual_page_idx, 0)
+            user_rotation = final_rotations.get(new_idx, 0) # <--- 변환된 데이터 사용
             # 스탬프가 있는 페이지인지 확인
-            has_stamps = actual_page_idx in stamp_data
+            has_stamps = new_idx in final_stamp_data # <--- 변환된 데이터 사용
 
             image_list = []
             image_size = 0
@@ -177,7 +195,7 @@ def compress_pdf_file(
 
                 # 9. 스탬프 데이터가 있으면 페이지에 삽입
                 if has_stamps:
-                    for stamp in stamp_data[actual_page_idx]:
+                    for stamp in final_stamp_data[new_idx]: # <--- 변환된 데이터 사용
                         try:
                             stamp_pix: QPixmap = stamp['pixmap']
                             
