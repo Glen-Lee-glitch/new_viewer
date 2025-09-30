@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QGraphicsPixmapItem
+from PyQt6.QtWidgets import QGraphicsPixmapItem, QGraphicsItem
 
 
 def add_stamp_item(
@@ -33,6 +33,7 @@ def add_stamp_item(
 
     # 페이지 아이템의 좌표계를 기준으로 스탬프 QGraphicsPixmapItem 생성
     stamp_item = QGraphicsPixmapItem(scaled_pixmap, page_item)
+    stamp_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
 
     # 1. 마우스가 찍히는 지점이 '도장'의 중앙이 위치되도록 삽입.
     stamp_center_x = scaled_pixmap.width() / 2

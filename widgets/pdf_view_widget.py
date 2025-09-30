@@ -5,7 +5,7 @@ from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal)
 from PyQt6.QtGui import QImage, QPainter, QPixmap, QFont, QFontMetrics
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QGraphicsPixmapItem,
                                  QGraphicsScene, QGraphicsView, QMessageBox,
-                                 QWidget)
+                                 QWidget, QGraphicsItem)
 
 import pymupdf
 from core.edit_mixin import ViewModeMixin
@@ -691,6 +691,7 @@ class PdfViewWidget(QWidget, ViewModeMixin):
                 
                 # QGraphicsPixmapItem 재생성 및 부모 설정
                 stamp_item = QGraphicsPixmapItem(stamp_pixmap, self.current_page_item)
+                stamp_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                 
                 # 저장된 비율을 기반으로 위치 설정
                 pos_x = stamp_data['x_ratio'] * page_width
