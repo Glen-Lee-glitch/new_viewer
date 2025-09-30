@@ -73,14 +73,12 @@ class PdfSaveWorker(QRunnable):
 
     def __init__(self, input_bytes: bytes, output_path: str,
                  rotations: dict | None = None,
-                 force_resize_pages: set | None = None,
                  stamp_data: dict[int, list[dict]] | None = None):
         super().__init__()
         self.signals = WorkerSignals()
         self.input_bytes = input_bytes
         self.output_path = output_path
         self.rotations = rotations if rotations is not None else {}
-        self.force_resize_pages = force_resize_pages if force_resize_pages is not None else set()
         self.stamp_data = stamp_data if stamp_data is not None else {}
 
     def run(self):
@@ -91,7 +89,6 @@ class PdfSaveWorker(QRunnable):
                 output_path=self.output_path,
                 target_size_mb=3,
                 rotations=self.rotations,
-                force_resize_pages=self.force_resize_pages,
                 stamp_data=self.stamp_data
             )
             self.signals.save_finished.emit(self.output_path, success)
@@ -136,7 +133,6 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.rendering_jobs = set()  # 현재 렌더링 중인 페이지 번호
         self.current_page = -1
         self.page_rotations = {}  # 페이지별 사용자 회전 각도 저장 {page_num: rotation}
-        self.force_resize_pages = set() # 사용자가 수동으로 크기 조정을 요청한 페이지 번호
 
         self.init_ui()
 
@@ -148,7 +144,6 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.stamp_overlay = StampOverlayWidget(self)
 
         # --- 툴바 시그널 연결 ---
-        self.toolbar.resize_page_requested.connect(self._toggle_force_resize)
         self.toolbar.stamp_menu_requested.connect(self._toggle_stamp_overlay)
         self.toolbar.fit_to_width_requested.connect(self.set_fit_to_width)
         self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
@@ -354,18 +349,6 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         # 3. 화면 업데이트를 강제로 처리하고 기다림
         QApplication.instance().processEvents()
 
-    def _toggle_force_resize(self):
-        """현재 페이지를 강제 크기 조정 목록에 추가하거나 제거한다."""
-        if self.current_page < 0:
-            return
-            
-        if self.current_page in self.force_resize_pages:
-            self.force_resize_pages.remove(self.current_page)
-            print(f"페이지 {self.current_page + 1}: 크기 조정 해제")
-        else:
-            self.force_resize_pages.add(self.current_page)
-            print(f"페이지 {self.current_page + 1}: 크기 조정 적용")
-
     def _toggle_stamp_overlay(self):
         """스탬프 오버레이를 토글한다."""
         if self.stamp_overlay.isVisible():
@@ -483,12 +466,11 @@ class PdfViewWidget(QWidget, ViewModeMixin):
 
         input_bytes = self.renderer.get_pdf_bytes()
         rotations = self.get_page_rotations()
-        force_resize_pages = self.get_force_resize_pages()
         stamp_data = self.get_stamp_items_data()
 
         worker = PdfSaveWorker(
             input_bytes=input_bytes, output_path=output_path,
-            rotations=rotations, force_resize_pages=force_resize_pages,
+            rotations=rotations,
             stamp_data=stamp_data
         )
 
@@ -534,7 +516,6 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         self.rendering_jobs.clear()
         self.current_page = -1 # 지금 보고 있는 페이지 없음 (존재하지 않는 페이지 번호로 -1로 설정)
         self.page_rotations = {} # 새 파일 로드 시 회전 정보 초기화
-        self.force_resize_pages.clear() # 새 파일 로드 시 크기 조정 정보 초기화
         self._overlay_items.clear() # 새 파일 로드 시 오버레이 아이템 초기화
 
         # --- 파일 정보 시그널 발생 ---
@@ -758,7 +739,3 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     def get_page_rotations(self) -> dict:
         """사용자가 적용한 페이지별 회전 정보를 반환한다."""
         return self.page_rotations
-
-    def get_force_resize_pages(self) -> set:
-        """사용자가 수동으로 크기 조정을 요청한 페이지 목록을 반환한다."""
-        return self.force_resize_pages

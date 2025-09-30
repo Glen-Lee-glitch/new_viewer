@@ -13,7 +13,6 @@ class FloatingToolbarWidget(QWidget):
     fit_to_page_requested = pyqtSignal()
     rotate_90_requested = pyqtSignal()
     save_pdf_requested = pyqtSignal()
-    resize_page_requested = pyqtSignal()
     crop_requested = pyqtSignal() # 자르기 신호 추가
     
     def __init__(self, parent=None):
@@ -32,9 +31,8 @@ class FloatingToolbarWidget(QWidget):
         self._is_dragging = False
         self._drag_start_position = None
         
-        if hasattr(self, 'pushButton_2'):
-            self.pushButton_2.clicked.connect(self.resize_page_requested.emit)
-            
+        if hasattr(self, 'pushButton_2'): # 추후 사용 예정
+            pass            
         if hasattr(self, 'pushButton_stamp'):
             try:
                 self.pushButton_stamp.clicked.connect(self.stamp_menu_requested.emit)

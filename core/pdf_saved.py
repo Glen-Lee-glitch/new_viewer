@@ -15,7 +15,6 @@ def compress_pdf_file(
         dpi: int = 120,
         size_threshold_kb: int = 300,
         user_rotations: dict = None,
-        force_resize_pages: set = None,
         stamp_data: dict[int, list[dict]] = None,
 ):
     """
@@ -29,20 +28,16 @@ def compress_pdf_file(
     src = pymupdf.open(stream=input_bytes, filetype="pdf")
     dst = pymupdf.open()
     user_rotations = user_rotations or {}
-    force_resize_pages = force_resize_pages or set()
     stamp_data = stamp_data or {}
     try:
         for i, page in enumerate(src):
             user_rotation = user_rotations.get(i, 0)
-            # 강제 크기 조정이 요청된 페이지인지 확인
-            is_forced = i in force_resize_pages
             # 스탬프가 있는 페이지인지 확인
             has_stamps = i in stamp_data
 
             image_list = []
             image_size = 0
             # --- 개선된 용량 추정 --------------------------
-            # 페이지와 관련된 모든 객체의 크기를 측정
             try:
                 # 1. content stream 크기
                 content_size = 0
@@ -68,10 +63,10 @@ def compress_pdf_file(
             except Exception:
                 total_size = 0
 
-            # 조건: (이미지가 없거나 이미지 크기가 임계값 미만) 이고 (강제 조정이 아닐 때) -> 복사
+            # 조건: (이미지가 없거나 이미지 크기가 임계값 미만) -> 복사
             # 회전이 적용된 페이지는 이 조건을 건너뛰고 재렌더링되도록 user_rotation == 0 조건을 제거
             # 스탬프가 있는 페이지는 항상 재렌더링
-            if (not image_list or image_size / 1024 < size_threshold_kb) and not is_forced and not has_stamps:
+            if (not image_list or image_size / 1024 < size_threshold_kb) and not has_stamps:
                 # 하지만, 회전이 없는 페이지만 복사하도록 내부에서 한 번 더 체크
                 if user_rotation == 0:
                     dst.insert_pdf(src, from_page=i, to_page=i)
@@ -219,7 +214,7 @@ def compress_pdf_file(
         src.close()
         dst.close()
 
-def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_size_mb=3, rotations=None, force_resize_pages=None, stamp_data=None):
+def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_size_mb=3, rotations=None, stamp_data=None):
     """
     여러 단계의 압축을 시도하여 PDF를 목표 크기로 압축하는 함수
     
@@ -237,12 +232,11 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
     import os
     
     rotations = rotations if rotations is not None else {}
-    force_resize_pages = force_resize_pages if force_resize_pages is not None else set()
     stamp_data = stamp_data if stamp_data is not None else {}
 
     # 1) 원본 파일이 목표 크기 이하면 그대로 사용 (단, 회전, 강제 조정, 스탬프 정보가 있으면 압축 시도)
     orig_mb = len(input_bytes) / (1024 * 1024)
-    if orig_mb <= target_size_mb and not rotations and not force_resize_pages and not stamp_data:
+    if orig_mb <= target_size_mb and not rotations and not stamp_data:
         with open(output_path, "wb") as f:
             f.write(input_bytes)
         return True
@@ -255,7 +249,6 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
         dpi=146,
         size_threshold_kb=300,
         user_rotations=rotations,
-        force_resize_pages=force_resize_pages,
         stamp_data=stamp_data
     )
     print(f"1단계 압축 후 크기: {compressed_mb} MB")
@@ -270,7 +263,6 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
         dpi=125,
         size_threshold_kb=0,
         user_rotations=rotations,
-        force_resize_pages=force_resize_pages,
         stamp_data=stamp_data
     )
     print(f"2단계 압축 후 크기: {compressed_mb} MB")
@@ -285,7 +277,6 @@ def compress_pdf_with_multiple_stages(input_bytes: bytes, output_path, target_si
         dpi=100,
         size_threshold_kb=0,
         user_rotations=rotations,
-        force_resize_pages=force_resize_pages,
         stamp_data=stamp_data
     )
     print(f"3단계 압축 후 크기: {compressed_mb} MB")
