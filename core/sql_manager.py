@@ -70,7 +70,24 @@ def test_fetch_emails():
     except Exception:
         traceback.print_exc()
 
+def get_worker_names():
+    """
+    workers 테이블에서 모든 작업자 이름(name) 리스트를 반환한다.
+    """
+    workers = []
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT name FROM workers"
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                workers = [row[0] for row in rows]
+    except Exception:
+        traceback.print_exc()
+    return workers
+
 
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
-    test_fetch_emails()
+    # test_fetch_emails()
+    print(get_worker_names())
