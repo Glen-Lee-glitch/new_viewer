@@ -68,7 +68,7 @@ class PdfLoadWidget(QWidget):
             worker_item.setData(Qt.ItemDataRole.UserRole, row.get('worker'))
             table.setItem(row_index, 2, worker_item)
 
-            file_path = self._normalize_file_path(row.get('file_path'))
+            file_path = self._normalize_file_path(row.get('original_filepath'))
             status_text = str(row.get('file_status', '부')) if file_path else '부'
             status_item = QTableWidgetItem(status_text)
             status_item.setData(Qt.ItemDataRole.UserRole, file_path)

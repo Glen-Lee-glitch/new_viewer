@@ -6,7 +6,7 @@ import traceback
 
 from contextlib import closing
 
-FETCH_COLUMNS = ['RN', 'region', 'worker', 'file_status', 'file_path']
+FETCH_COLUMNS = ['RN', 'region', 'worker', 'file_status', 'original_filepath']
 
 # MySQL 연결 정보
 DB_CONFIG = {
@@ -24,11 +24,11 @@ def fetch_recent_subsidy_applications():
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = (
                 "SELECT sa.RN, sa.region, sa.worker, "
-                "       CASE WHEN fp.file_path IS NULL OR fp.file_path = '' "
+                "       CASE WHEN fp.original_filepath IS NULL OR fp.original_filepath = '' "
                 "            THEN '부' "
                 "            ELSE '여' "
                 "       END AS file_status, "
-                "       fp.file_path "
+                "       fp.original_filepath "
                 "FROM subsidy_applications sa "
                 "LEFT JOIN filepath fp ON fp.RN = sa.RN "
                 "WHERE recent_received_date >= %s "
