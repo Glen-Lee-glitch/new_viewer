@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, QThreadPool, QRunnable, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
                              QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar,
-                             QPushButton, QLabel)
+                             QPushButton, QLabel, QDialog)
 from PyQt6 import uic
 from qt_material import apply_stylesheet
 
@@ -19,6 +19,7 @@ from widgets.thumbnail_view_widget import ThumbnailViewWidget
 from widgets.info_panel_widget import InfoPanelWidget
 from widgets.todo_widget import ToDoWidget
 from widgets.settings_dialog import SettingsDialog
+from widgets.login_dialog import LoginDialog
 
 
 class BatchTestSignals(QObject):
@@ -159,6 +160,12 @@ class MainWindow(QMainWindow):
 
         # --- 전역 단축키 설정 ---
         self._setup_global_shortcuts()
+
+        # 로그인 다이얼로그 초기화
+        self._login_dialog = LoginDialog(self)
+        self._worker_name = ""  # 작업자 이름 저장용
+        # 앱 시작 시 로그인 다이얼로그 표시
+        self._show_login_dialog()
 
     def _setup_ui_containers(self):
         """UI 컨테이너에 위젯들을 배치한다."""
@@ -763,6 +770,22 @@ class MainWindow(QMainWindow):
         if self.renderer:
             self.renderer.close()
         event.accept()
+
+    def _show_login_dialog(self):
+        """로그인 다이얼로그를 표시하고 작업자 이름을 설정한다."""
+        if self._login_dialog.exec() == QDialog.DialogCode.Accepted:
+            self._worker_name = self._login_dialog.get_worker_name()
+            self._update_worker_label()
+        else:
+            # 취소 시 앱 종료
+            self.close()
+
+    def _update_worker_label(self):
+        """worker_label_2에 작업자 이름을 표시한다."""
+        if hasattr(self, 'ui_worker_label_2') and self._worker_name:
+            self.ui_worker_label_2.setText(f"작업자: {self._worker_name}")
+        elif hasattr(self, 'ui_worker_label_2'):
+            self.ui_worker_label_2.setText("작업자: 미로그인")
 
 def create_app():
     """QApplication을 생성하고 메인 윈도우를 반환한다."""
