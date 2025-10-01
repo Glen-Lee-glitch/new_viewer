@@ -3,7 +3,7 @@ import time
 import os
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QThreadPool, QRunnable, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, QThreadPool, QRunnable, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
                              QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar,
@@ -187,6 +187,9 @@ class MainWindow(QMainWindow):
         
         # 스플리터 크기 설정
         # self.ui_main_splitter.setSizes([600, 600])
+
+        # QHBoxLayout 구조에서는 각 컨테이너의 사이즈 정책으로 제어
+        # UI 파일에서 horstretch 값으로 기본 비율이 설정되어 있음
 
     # 속성 접근을 위한 프로퍼티들 (기존 코드와의 호환성을 위해)
     @property
@@ -590,7 +593,22 @@ class MainWindow(QMainWindow):
             self._pdf_view_widget.undo_last_action()
 
     def set_splitter_sizes(self, is_landscape: bool):
-        pass
+        # 현재 UI는 QHBoxLayout 구조이므로 각 컨테이너의 고정 크기를 설정한다.
+        try:
+            # 썸네일 컨테이너 고정 크기 설정
+            thumbnail_width = 220
+            self.ui_thumbnail_container.setFixedWidth(thumbnail_width)
+            
+            # 정보 패널 컨테이너 고정 크기 설정
+            info_width = 340 if is_landscape else 300
+            self.ui_info_panel_container.setFixedWidth(info_width)
+            
+            # 중앙 컨테이너는 나머지 공간을 차지하도록 설정 (기본 확장 정책 유지)
+            self.ui_content_container.setMinimumWidth(400)
+            
+        except Exception:
+            # 안전 장치: 실패해도 크래시 방지
+            pass
     
     def load_document(self, pdf_paths: list):
         """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
@@ -617,13 +635,17 @@ class MainWindow(QMainWindow):
         self._thumbnail_viewer.set_renderer(self.renderer)
         self._pdf_view_widget.set_renderer(self.renderer)
 
-        if self.renderer.get_page_count() > 0:
-            self.go_to_page(0)
-
         self._pdf_load_widget.hide()
         self._pdf_view_widget.show()
         self._thumbnail_viewer.show()
         self._info_panel.show()
+
+        # 기본 스플리터 사이즈를 즉시 한 번 강제하여 초기 힌트를 통일
+        self.set_splitter_sizes(False)
+
+        # UI가 표시된 다음 틱에 첫 페이지 렌더를 예약하여 초기 크기 기준을 보장한다.
+        if self.renderer.get_page_count() > 0:
+            QTimer.singleShot(0, lambda: self.go_to_page(0))
 
     def _save_document(self):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
