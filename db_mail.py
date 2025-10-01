@@ -197,7 +197,7 @@ def extract_info_from_subject(subject):
     date_match = re.search(r'\[(\d{1,2})/(\d{1,2})\]', subject)
     date_str = None
     if date_match:
-        month, day = date_match.groups()
+        month, day = map(int, date_match.groups())
         if 1 <= month <= 12 and 1 <= day <= 31:
             date_str = f'2025-{int(month):02d}-{int(day):02d}'
     else:
