@@ -218,9 +218,25 @@ def extract_info_from_subject(subject):
     if region and any(word in region for word in lease_word):
         region = '한국환경공단'
 
-    # 신청인(성명) 추출: 네 번째 / 이후의 문자열
-    applier_match = re.search(r'([^/]+/[^/]+/[^/]+/[^/]+/)\s*([^/]+)', subject)
-    applier = applier_match.group(2).strip() if applier_match else None
+    # 신청인(성명) 추출: '/'로 분리 후 'Model' 키워드 뒤 항목을 추출하는 방식으로 변경
+    applier = None
+    try:
+        # subject를 '/' 기준으로 분리하고 각 항목의 공백 제거
+        parts = [p.strip() for p in subject.split('/')]
+        
+        # 'Model' 문자열이 포함된 부분의 인덱스를 찾음
+        model_index = -1
+        for i, part in enumerate(parts):
+            if 'Model' in part:
+                model_index = i
+                break
+        
+        # 'Model'을 찾았고, 그 다음 항목이 존재하며 비어있지 않으면 이름으로 간주
+        if model_index != -1 and model_index + 1 < len(parts) and parts[model_index + 1]:
+            applier = parts[model_index + 1]
+    except Exception:
+        # 로직 수행 중 어떤 에러가 발생하더라도 applier는 None으로 유지
+        applier = None
 
     return {
         'date': date_str,
