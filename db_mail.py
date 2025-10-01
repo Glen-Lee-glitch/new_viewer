@@ -61,13 +61,15 @@ def insert_new_application(conn, rn, received_date, thread_id, region, delivery_
     try:
         sql = """
             INSERT INTO subsidy_applications 
-            (RN, mail_count, recent_received_date, recent_thread_id, region, delivery_date, name, special_note, status)
-            VALUES (%s, 1, %s, %s, %s, %s, %s, %s, '신규')
+            (RN, mail_count, recent_received_date, recent_thread_id, region, delivery_date, name, special_note, status, status_updated_at)
+            VALUES (%s, 1, %s, %s, %s, %s, %s, %s, '신규', %s)
         """
         
         # delivery_date가 None이거나 빈 문자열일 경우 DB에 NULL로 들어가도록 처리
         if not delivery_date:
             delivery_date = None
+
+        now_kst = datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
 
         cursor.execute(sql, (
             rn,
@@ -76,7 +78,8 @@ def insert_new_application(conn, rn, received_date, thread_id, region, delivery_
             region,
             delivery_date,
             name,
-            special_note
+            special_note,
+            now_kst
         ))
         
         print(f"✅ 신규 신청 건 저장 완료 (MySQL): {rn}")
