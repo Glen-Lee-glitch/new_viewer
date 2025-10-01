@@ -19,11 +19,6 @@ from .stamp_overlay_widget import StampOverlayWidget
 from .zoomable_graphics_view import ZoomableGraphicsView
 from .custom_item import MovableStampItem
 
-
-# --- 백그라운드 Worker 정의 ---
-
-
-
 class PdfViewWidget(QWidget, ViewModeMixin):
     """PDF 뷰어 위젯"""
     page_change_requested = pyqtSignal(int)
@@ -339,6 +334,10 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         
         # 3. 화면 업데이트를 강제로 처리하고 기다림
         QApplication.instance().processEvents()
+
+    def toggle_stamp_overlay(self):
+        """(공개 메서드) 스탬프 오버레이를 토글한다."""
+        self._toggle_stamp_overlay()
 
     def _toggle_stamp_overlay(self):
         """스탬프 오버레이를 토글한다."""

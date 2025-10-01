@@ -46,7 +46,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QKeySequenceEdit" name="keySequenceEdit_insert"/>
+           <widget class="QKeySequenceEdit" name="keySequenceEdit_toggleStampOverlay"/>
           </item>
          </layout>
         </item>

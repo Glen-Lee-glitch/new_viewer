@@ -187,10 +187,16 @@ class MainWindow(QMainWindow):
 
     def _setup_global_shortcuts(self):
         """전역 단축키를 설정하고 액션에 연결한다."""
+        # ToDo 리스트 토글 액션
         self.toggle_todo_action = QAction(self)
         self.addAction(self.toggle_todo_action)
         self.toggle_todo_action.triggered.connect(self.todo_widget.toggle_overlay)
         
+        # 스탬프 오버레이 토글 액션
+        self.toggle_stamp_overlay_action = QAction(self)
+        self.addAction(self.toggle_stamp_overlay_action)
+        self.toggle_stamp_overlay_action.triggered.connect(self.pdf_view_widget.toggle_stamp_overlay)
+
         self._apply_shortcuts()
 
     def _apply_shortcuts(self):
@@ -200,6 +206,10 @@ class MainWindow(QMainWindow):
         # TODO: settings.ui 위젯 이름이 확정되면 키 값을 맞춰야 함
         todo_shortcut = settings.value("shortcuts/toggle_todo", "grave") # '`' 키
         self.toggle_todo_action.setShortcut(QKeySequence.fromString(todo_shortcut, QKeySequence.SequenceFormat.PortableText))
+
+        # 스탬프 오버레이 단축키 적용
+        stamp_overlay_shortcut = settings.value("shortcuts/toggle_stamp_overlay", "Ctrl+T")
+        self.toggle_stamp_overlay_action.setShortcut(QKeySequence.fromString(stamp_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
 
     def _open_settings_dialog(self):
         """설정 다이얼로그를 연다."""

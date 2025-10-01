@@ -21,11 +21,14 @@ class SettingsDialog(QDialog):
         """저장된 단축키 설정을 불러와 UI에 적용합니다."""
         # TODO: settings.ui의 위젯 이름들이 명확해지면 키 값도 그에 맞게 수정해야 합니다.
         shortcut_toggle_todo = self.settings.value("shortcuts/toggle_todo", "`")
-        self.keySequenceEdit_insert.setKeySequence(QKeySequence.fromString(shortcut_toggle_todo, QKeySequence.SequenceFormat.PortableText))
+        stamp_overlay_shortcut = self.settings.value("shortcuts/toggle_stamp_overlay", "T")
+
+        self.keySequenceEdit_to_do.setKeySequence(QKeySequence.fromString(shortcut_toggle_todo, QKeySequence.SequenceFormat.PortableText))
+        self.keySequenceEdit_toggleStampOverlay.setKeySequence(QKeySequence.fromString(stamp_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
 
         # 나머지 단축키 설정 로드 (임시)
         self.keySequenceEdit_insert_2.setKeySequence(QKeySequence(self.settings.value("shortcuts/unused_1", "")))
-        self.keySequenceEdit_insert_3.setKeySequence(QKeySequence(self.settings.value("shortcuts/unused_2", "")))
+        #self.keySequenceEdit_insert_3.setKeySequence(QKeySequence(self.settings.value("shortcuts/unused_2", "")))
         self.keySequenceEdit_insert_4.setKeySequence(QKeySequence(self.settings.value("shortcuts/unused_3", "")))
         self.keySequenceEdit_insert_5.setKeySequence(QKeySequence(self.settings.value("shortcuts/unused_4", "")))
         self.keySequenceEdit_insert_6.setKeySequence(QKeySequence(self.settings.value("shortcuts/unused_5", "")))
@@ -35,11 +38,13 @@ class SettingsDialog(QDialog):
 
     def _save_settings(self):
         """UI에 설정된 단축키를 저장합니다."""
-        self.settings.setValue("shortcuts/toggle_todo", self.keySequenceEdit_todo.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
-        
+        self.settings.setValue("shortcuts/toggle_todo", self.keySequenceEdit_to_do.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
+        self.settings.setValue("shortcuts/toggle_stamp_overlay", self.keySequenceEdit_toggleStampOverlay.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
+
+
         # 나머지 설정들도 동일하게 저장 (임시)
-        self.settings.setValue("shortcuts/unused_1", self.keySequenceEdit_insert.keySequence().toString())
-        self.settings.setValue("shortcuts/unused_2", self.keySequenceEdit_insert_3.keySequence().toString())
+        self.settings.setValue("shortcuts/unused_1", self.keySequenceEdit_insert_2.keySequence().toString())
+        # self.settings.setValue("shortcuts/unused_2", self.keySequenceEdit_insert_3.keySequence().toString())
         self.settings.setValue("shortcuts/unused_3", self.keySequenceEdit_insert_4.keySequence().toString())
         self.settings.setValue("shortcuts/unused_4", self.keySequenceEdit_insert_5.keySequence().toString())
         self.settings.setValue("shortcuts/unused_5", self.keySequenceEdit_insert_6.keySequence().toString())
