@@ -7,6 +7,8 @@ import os
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
 import logging
+from pathlib import Path
+from datetime import datetime
 
 
 def compress_pdf_file(
@@ -336,3 +338,40 @@ def compress_pdf_with_multiple_stages(
     except Exception as e:
         print(f"[오류] 최종 파일 복사 실패: {e}")
         return False
+
+def export_deleted_pages(
+        pdf_bytes: bytes,
+        page_indices: list[int],
+        output_dir: str | Path,
+        base_name: str,
+) -> list[Path]:
+    """삭제된 페이지를 원본 그대로 개별 PDF로 저장한다."""
+    if not pdf_bytes:
+        return []
+
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    exported_files: list[Path] = []
+    try:
+        with pymupdf.open(stream=pdf_bytes, filetype="pdf") as src:
+            total_pages = src.page_count
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            for page_idx in sorted(set(page_indices)):
+                if not (0 <= page_idx < total_pages):
+                    continue
+
+                temp_doc = pymupdf.open()
+                try:
+                    temp_doc.insert_pdf(src, from_page=page_idx, to_page=page_idx)
+                    file_name = f"{base_name}_page_{page_idx + 1}_{timestamp}.pdf"
+                    dest_path = destination / file_name
+                    temp_doc.save(str(dest_path), deflate=False, clean=False)
+                    exported_files.append(dest_path)
+                finally:
+                    temp_doc.close()
+    except Exception as exc:
+        print(f"[export_deleted_pages] 오류: {exc}")
+
+    return exported_files

@@ -12,7 +12,7 @@ from core.workers import PdfRenderWorker, PdfSaveWorker
 from core.edit_mixin import ViewModeMixin, EditMixin
 from core.insert_utils import add_stamp_item
 from core.pdf_render import PdfRender
-from core.pdf_saved import compress_pdf_with_multiple_stages
+from core.pdf_saved import compress_pdf_with_multiple_stages, export_deleted_pages
 from .crop_dialog import CropDialog
 from .floating_toolbar import FloatingToolbarWidget
 from .stamp_overlay_widget import StampOverlayWidget
@@ -511,7 +511,22 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         """(공개 메서드) 지정된 '실제' 페이지 인덱스를 삭제하고 데이터를 업데이트한다."""
         if not self.renderer or not pages_to_delete:
             return
-        
+
+        pdf_bytes = self.renderer.get_pdf_bytes()
+        if pdf_bytes:
+            try:
+                pdf_copy = bytes(pdf_bytes)
+                base_path = self.get_current_pdf_path()
+                base_name = Path(base_path).stem if base_path else "untitled"
+                export_deleted_pages(
+                    pdf_bytes=pdf_copy,
+                    page_indices=pages_to_delete,
+                    output_dir=r"\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\2025_4Q_deleted",
+                    base_name=base_name,
+                )
+            except Exception as save_error:
+                print(f"삭제 페이지 보관 중 오류: {save_error}")
+
         try:
             # EditMixin의 메서드를 사용하여 페이지 삭제 및 데이터 재정렬
             self._delete_pages_and_update_data(pages_to_delete)
