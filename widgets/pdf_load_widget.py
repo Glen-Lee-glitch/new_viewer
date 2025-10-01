@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
 
 from core.sql_manager import fetch_recent_subsidy_applications
 
-
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
     pdf_selected = pyqtSignal(list)  # 여러 파일 경로(리스트)를 전달하도록 변경

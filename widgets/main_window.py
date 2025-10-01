@@ -161,28 +161,32 @@ class MainWindow(QMainWindow):
 
     def _setup_ui_containers(self):
         """UI 컨테이너에 위젯들을 배치한다."""
-        # 썸네일 뷰어 컨테이너에 배치
+
+        if hasattr(self, 'ui_main_layout'):
+            self.ui_main_layout.setSpacing(0)
+            self.ui_main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 썸네일
         thumbnail_layout = QHBoxLayout(self.ui_thumbnail_container)
         thumbnail_layout.setContentsMargins(0, 0, 0, 0)
+        thumbnail_layout.setSpacing(0)
         thumbnail_layout.addWidget(self._thumbnail_viewer)
         
-        # PDF 로드 위젯 컨테이너에 배치
-        pdf_load_layout = QHBoxLayout(self.ui_pdf_load_container)
-        pdf_load_layout.setContentsMargins(0, 0, 0, 0)
-        pdf_load_layout.addWidget(self._pdf_load_widget)
-        
-        # PDF 뷰 위젯 컨테이너에 배치
-        pdf_view_layout = QHBoxLayout(self.ui_pdf_view_container)
-        pdf_view_layout.setContentsMargins(0, 0, 0, 0)
-        pdf_view_layout.addWidget(self._pdf_view_widget)
+        # 콘텐츠 영역 (load와 view를 같은 공간에 배치)
+        content_layout = QHBoxLayout(self.ui_content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+        content_layout.addWidget(self._pdf_load_widget)
+        content_layout.addWidget(self._pdf_view_widget)
         
         # 정보 패널 컨테이너에 배치
         info_panel_layout = QHBoxLayout(self.ui_info_panel_container)
         info_panel_layout.setContentsMargins(0, 0, 0, 0)
+        info_panel_layout.setSpacing(0)
         info_panel_layout.addWidget(self._info_panel)
         
         # 스플리터 크기 설정
-        self.ui_main_splitter.setSizes([600, 600])
+        # self.ui_main_splitter.setSizes([600, 600])
 
     # 속성 접근을 위한 프로퍼티들 (기존 코드와의 호환성을 위해)
     @property
@@ -208,11 +212,7 @@ class MainWindow(QMainWindow):
     @property
     def settings_dialog(self):
         return self._settings_dialog
-    
-    @property
-    def main_splitter(self):
-        return self.ui_main_splitter
-    
+  
     @property
     def statusBar(self):
         return self.ui_status_bar
@@ -554,13 +554,7 @@ class MainWindow(QMainWindow):
             self._pdf_view_widget.undo_last_action()
 
     def set_splitter_sizes(self, is_landscape: bool):
-        """가로/세로 모드에 따라 QSplitter의 크기를 설정한다."""
-        if is_landscape:
-            # 가로 페이지: 뷰어 85%, 썸네일 15%
-            self.ui_main_splitter.setSizes([int(self.width() * 0.15), int(self.width() * 0.85)])
-        else:
-            # 세로 페이지: 뷰어 75%, 썸네일 25% (기존과 유사)
-            self.ui_main_splitter.setSizes([int(self.width() * 0.25), int(self.width() * 0.75)])
+        pass
     
     def load_document(self, pdf_paths: list):
         """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
