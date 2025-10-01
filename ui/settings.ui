@@ -27,7 +27,7 @@
           <item>
            <widget class="QLabel" name="label">
             <property name="text">
-             <string>d할 일 목록</string>
+             <string>할 일 목록</string>
             </property>
            </widget>
           </item>
@@ -55,7 +55,7 @@
           <item>
            <widget class="QLabel" name="label_4">
             <property name="text">
-             <string>삽입 도구</string>
+             <string>임시1</string>
             </property>
            </widget>
           </item>
@@ -69,7 +69,7 @@
           <item>
            <widget class="QLabel" name="label_5">
             <property name="text">
-             <string>삽입 도구</string>
+             <string>임시 2</string>
             </property>
            </widget>
           </item>
@@ -92,7 +92,7 @@
           <item>
            <widget class="QLabel" name="label_2">
             <property name="text">
-             <string>삽입 도구</string>
+             <string>임시 3</string>
             </property>
            </widget>
           </item>
@@ -106,7 +106,7 @@
           <item>
            <widget class="QLabel" name="label_8">
             <property name="text">
-             <string>삽입 도구</string>
+             <string>임시 4</string>
             </property>
            </widget>
           </item>
@@ -120,7 +120,7 @@
           <item>
            <widget class="QLabel" name="label_7">
             <property name="text">
-             <string>삽입 도구</string>
+             <string>임시 5</string>
             </property>
            </widget>
           </item>
@@ -134,7 +134,7 @@
           <item>
            <widget class="QLabel" name="label_6">
             <property name="text">
-             <string>삽입 도구</string>
+             <string>임시 6</string>
             </property>
            </widget>
           </item>
