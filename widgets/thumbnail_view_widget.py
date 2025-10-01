@@ -5,6 +5,7 @@ from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
 from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget, QMessageBox
 
 from core.pdf_render import PdfRender
+from core.edit_mixin import EditMixin
 
 class ThumbnailViewWidget(QWidget):
     """썸네일 뷰어 위젯"""
@@ -12,6 +13,7 @@ class ThumbnailViewWidget(QWidget):
     page_change_requested = pyqtSignal(int)
     page_order_changed = pyqtSignal(list) # 변경된 페이지 순서를 전달하는 새 시그널
     undo_requested = pyqtSignal()
+    page_delete_requested = pyqtSignal(int) # '보이는' 페이지 번호로 삭제 요청
     
     def __init__(self):
         super().__init__()
@@ -130,4 +132,4 @@ class ThumbnailViewWidget(QWidget):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            print(f"TODO: {self.current_page + 1} 페이지 삭제 로직 구현")
+            self.page_delete_requested.emit(self.current_page)

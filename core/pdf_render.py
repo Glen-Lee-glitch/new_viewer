@@ -375,3 +375,37 @@ class PdfRender:
         finally:
             if doc:
                 doc.close()
+
+    def delete_pages(self, page_nums_to_delete: list[int]):
+        """지정된 페이지들을 PDF에서 삭제하고 내부 데이터를 갱신한다."""
+        if not self.pdf_bytes:
+            raise RuntimeError("PDF가 로드되지 않았습니다.")
+        
+        # 중복 제거 및 정렬
+        pages_to_delete = sorted(list(set(page_nums_to_delete)), reverse=True)
+        
+        try:
+            with pymupdf.open(stream=self.pdf_bytes, filetype="pdf") as source_doc:
+                # 유효한 페이지 번호인지 확인
+                for page_num in pages_to_delete:
+                    if not (0 <= page_num < source_doc.page_count):
+                         raise IndexError(f"잘못된 페이지 번호: {page_num}")
+                
+                # 지정된 페이지들을 삭제
+                # 역순으로 정렬했으므로 인덱스 문제 없이 한 번에 삭제 가능
+                source_doc.delete_pages(pages_to_delete)
+                
+                # 변경된 내용으로 새로운 바이트 데이터 생성
+                self.pdf_bytes = source_doc.tobytes(garbage=4, deflate=True)
+
+            # 새 데이터로 내부 문서 객체와 페이지 수 갱신
+            if self.doc:
+                self.doc.close()
+            self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
+            self.page_count = self.doc.page_count
+            
+            print(f"페이지 삭제 완료: {[p + 1 for p in sorted(page_nums_to_delete)]}. 현재 페이지 수: {self.page_count}")
+
+        except Exception as e:
+            traceback.print_exc()
+            raise ValueError(f"페이지 삭제 중 오류 발생: {e}")

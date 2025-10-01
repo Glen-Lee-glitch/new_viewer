@@ -2,6 +2,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTransform
 from PyQt6.QtWidgets import QGraphicsView, QStyle
 
+from core.pdf_render import PdfRender
+
 
 class ViewModeMixin:
     """
@@ -94,3 +96,64 @@ class ViewModeMixin:
         # 페이지를 뷰 중앙에 배치
         view.centerOn(self.current_page_item)
 
+class EditMixin():
+
+    def __init__(self):
+        super().__init__()
+        self.renderer = PdfRender()
+    
+    def _delete_pages_and_update_data(self, page_indexes_to_delete: list[int]):
+        """
+        페이지를 삭제하고 관련된 모든 내부 데이터(오버레이, 회전 등)를 업데이트하는 Mixin.
+        이 메서드는 self.renderer, self._overlay_items, self.page_rotations, self.page_cache를
+        가진 클래스에서 사용되어야 합니다.
+        """
+        if not hasattr(self, 'renderer') or not self.renderer:
+            print("EditMixin: 렌더러가 없어 페이지를 삭제할 수 없습니다.")
+            return
+
+        # --- 1. 실제 PDF 데이터에서 페이지 삭제 ---
+        self.renderer.delete_pages(page_indexes_to_delete)
+
+        # --- 2. 관련 데이터 구조 업데이트 ---
+        # 삭제되는 페이지의 데이터는 제거하고, 그 이후 페이지들의 인덱스는 앞으로 당긴다.
+        
+        # 새 데이터 구조를 임시로 생성
+        new_overlay_items = {}
+        new_page_rotations = {}
+        
+        # 삭제 목록을 set으로 만들어 조회 성능 향상
+        deleted_set = set(page_indexes_to_delete)
+        
+        # 기존 페이지 수 기반으로 순회
+        # self.renderer.get_page_count()는 삭제가 반영된 후의 값.
+        # 따라서 삭제 전 페이지 수를 기준으로 해야 함.
+        old_page_count = self.renderer.get_page_count() + len(page_indexes_to_delete)
+
+        # offset: 삭제된 페이지 수만큼 인덱스를 당기기 위한 값
+        offset = 0
+        for old_idx in range(old_page_count):
+            if old_idx in deleted_set:
+                offset += 1  # 삭제된 페이지를 만나면 오프셋 증가
+                continue
+
+            new_idx = old_idx - offset
+
+            if old_idx in self._overlay_items:
+                new_overlay_items[new_idx] = self._overlay_items[old_idx]
+            
+            if old_idx in self.page_rotations:
+                new_page_rotations[new_idx] = self.page_rotations[old_idx]
+        
+        # 계산된 새 데이터로 교체
+        self._overlay_items.clear()
+        self._overlay_items.update(new_overlay_items)
+
+        self.page_rotations.clear()
+        self.page_rotations.update(new_page_rotations)
+
+        # --- 3. 캐시 초기화 ---
+        # 페이지 인덱스가 모두 변경되었으므로 캐시는 완전히 무효화됨
+        self.page_cache.clear()
+
+        print("Mixin: 페이지 데이터 및 관련 정보(오버레이, 회전) 업데이트 완료.")

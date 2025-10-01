@@ -336,3 +336,5 @@ def compress_pdf_with_multiple_stages(
     except Exception as e:
         print(f"[오류] 최종 파일 복사 실패: {e}")
         return False
+
+
