@@ -500,7 +500,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             '페이지 삭제 확인',
             f'{visual_page_num} 페이지를 정말로 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes
         )
 
         if reply == QMessageBox.StandardButton.Yes:
