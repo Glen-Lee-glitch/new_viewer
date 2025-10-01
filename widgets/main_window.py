@@ -532,6 +532,7 @@ class MainWindow(QMainWindow):
         new_total_pages = len(self._page_order)
         if new_total_pages == 0:
             self.show_load_view() # 모든 페이지 삭제 시 로드 화면으로
+            return                # 로드 화면으로 전환했으므로 여기서 함수 종료
         else:
             # 삭제 후 현재 위치 또는 그 앞으로 포커스 이동
             next_visual_page = min(visual_page_num, new_total_pages - 1)
