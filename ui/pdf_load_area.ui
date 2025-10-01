@@ -32,8 +32,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>619</width>
-          <height>694</height>
+          <width>625</width>
+          <height>700</height>
          </rect>
         </property>
         <layout class="QGridLayout" name="gridLayout">
@@ -93,7 +93,7 @@
                </widget>
               </item>
               <item>
-               <widget class="QPushButton" name="center_import_btn">
+               <widget class="QPushButton" name="center_refresh_btn">
                 <property name="minimumSize">
                  <size>
                   <width>200</width>
@@ -107,7 +107,7 @@
                  </size>
                 </property>
                 <property name="text">
-                 <string>메일에서 가져오기</string>
+                 <string>데이터 새로고침</string>
                 </property>
                </widget>
               </item>
@@ -128,6 +128,9 @@
             </item>
             <item>
              <widget class="QTableWidget" name="complement_table_widget">
+              <property name="contextMenuPolicy">
+               <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+              </property>
               <property name="editTriggers">
                <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
               </property>
@@ -137,9 +140,6 @@
               <property name="selectionBehavior">
                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
               </property>
-             <property name="contextMenuPolicy">
-              <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
-             </property>
              </widget>
             </item>
            </layout>

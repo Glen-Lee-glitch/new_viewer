@@ -30,8 +30,8 @@ class PdfLoadWidget(QWidget):
         
         if hasattr(self, 'center_open_btn'):
             self.center_open_btn.setText("로컬에서 PDF 열기")
-        if hasattr(self, 'center_import_btn'):
-            self.center_import_btn.setText("메일에서 가져오기")
+        if hasattr(self, 'center_refresh_btn'):
+            self.center_refresh_btn.setText("데이터 새로고침")
             
         if hasattr(self, 'complement_table_widget'):
             self.setup_table()
@@ -146,8 +146,8 @@ class PdfLoadWidget(QWidget):
         """시그널-슬롯 연결"""
         if hasattr(self, 'center_open_btn'):
             self.center_open_btn.clicked.connect(self.open_pdf_file)
-        if hasattr(self, 'center_import_btn'):
-            self.center_import_btn.clicked.connect(self.import_from_email)
+        if hasattr(self, 'center_refresh_btn'):
+            self.center_refresh_btn.clicked.connect(self.refresh_data)
     
     def open_pdf_file(self):
         """로컬에서 PDF 또는 이미지 파일을 연다 (다중 선택 가능)"""
@@ -161,6 +161,6 @@ class PdfLoadWidget(QWidget):
         if paths:
             self.pdf_selected.emit(paths)
     
-    def import_from_email(self):
-        """메일에서 PDF 가져오기 (향후 구현)"""
-        QMessageBox.information(self, "알림", "메일 가져오기 기능은 향후 구현 예정입니다.")
+    def refresh_data(self):
+        """sql 데이터 새로고침"""
+        self.populate_recent_subsidy_rows()
