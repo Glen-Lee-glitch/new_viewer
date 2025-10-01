@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QTableWidgetItem,
     QMenu,
+    QHeaderView,
 )
 
 from core.sql_manager import fetch_recent_subsidy_applications
@@ -40,6 +41,10 @@ class PdfLoadWidget(QWidget):
         table = self.complement_table_widget
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(['RN', '지역', '작업자', '파일여부'])
+
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
         table.setAlternatingRowColors(True)
         self.populate_recent_subsidy_rows()
         table.customContextMenuRequested.connect(self.show_context_menu)
