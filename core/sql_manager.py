@@ -7,6 +7,7 @@ import traceback
 from contextlib import closing
 
 FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
+FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath']
 
 # MySQL 연결 정보
 DB_CONFIG = {
@@ -40,14 +41,14 @@ def fetch_recent_subsidy_applications():
 
         if df.empty:
             print('조회된 데이터가 없습니다.')
-            return df[FETCH_COLUMNS]
+            return df
 
-        print(df[FETCH_COLUMNS])
-        return df[FETCH_COLUMNS]
+        print(df)
+        return df
 
     except Exception:  # pragma: no cover - 긴급 디버깅용
         traceback.print_exc()
-        return pd.DataFrame(columns=FETCH_COLUMNS)
+        return pd.DataFrame()
 
 def test_fetch_emails():
     """emails 테이블 테스트 조회"""
