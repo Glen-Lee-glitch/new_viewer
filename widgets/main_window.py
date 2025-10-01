@@ -299,7 +299,7 @@ class MainWindow(QMainWindow):
         # 페이지 네비게이션 버튼 클릭 시그널 연결
         self.ui_push_button_prev.clicked.connect(lambda: self.change_page(-1))
         self.ui_push_button_next.clicked.connect(lambda: self.change_page(1))
-        self.ui_push_button_reset.clicked.connect(self.show_load_view)
+        self.ui_push_button_reset.clicked.connect(self._prompt_save_before_reset)
         
         # 테스트 버튼 시그널 연결
         self.ui_test_button.clicked.connect(self.start_batch_test)
@@ -561,6 +561,35 @@ class MainWindow(QMainWindow):
 
         self.ui_push_button_prev.setEnabled(total_pages > 0 and current_visual_page > 0)
         self.ui_push_button_next.setEnabled(total_pages > 0 and current_visual_page < total_pages - 1)
+
+    def _prompt_save_before_reset(self):
+        """'메인 화면' 버튼 클릭 시 저장 여부를 묻는 대화상자를 표시한다."""
+        if not self.renderer:
+            self.show_load_view()
+            return
+
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Question)
+        msg_box.setWindowTitle("메인화면으로 돌아가기")
+        msg_box.setText("변경사항을 저장하시겠습니까?")
+        msg_box.setInformativeText("저장하지 않으면 변경사항이 모두 사라집니다.")
+
+        # 사용자 요청에 따른 버튼 생성
+        no_save_button = msg_box.addButton("저장X", QMessageBox.ButtonRole.DestructiveRole)
+        save_button = msg_box.addButton("저장O", QMessageBox.ButtonRole.AcceptRole)
+        cancel_button = msg_box.addButton("취소", QMessageBox.ButtonRole.RejectRole)
+        
+        msg_box.setDefaultButton(cancel_button)
+        msg_box.exec()
+        
+        clicked_button = msg_box.clickedButton()
+        
+        if clicked_button == no_save_button:
+            self.show_load_view()
+        elif clicked_button == save_button:
+            # TODO: 다음 요청 시 저장 로직 구현
+            pass
+        # 취소 버튼을 누르면 아무것도 하지 않고 대화상자만 닫힘
 
     def _on_batch_test_error(self, filename: str, error_msg: str):
         """일괄 테스트 중 오류 발생 시 호출될 슬롯"""
