@@ -6,7 +6,7 @@ import traceback
 
 from contextlib import closing
 
-FETCH_COLUMNS = ['RN', 'region', 'worker', 'file_status', 'original_filepath']
+FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
 
 # MySQL 연결 정보
 DB_CONFIG = {
@@ -23,7 +23,7 @@ def fetch_recent_subsidy_applications():
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = (
-                "SELECT sa.RN, sa.region, sa.worker, "
+                "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
                 "       CASE WHEN fp.original_filepath IS NULL OR fp.original_filepath = '' "
                 "            THEN '부' "
                 "            ELSE '여' "
@@ -49,5 +49,28 @@ def fetch_recent_subsidy_applications():
         traceback.print_exc()
         return pd.DataFrame(columns=FETCH_COLUMNS)
 
+def test_fetch_emails():
+    """emails 테이블 테스트 조회"""
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = (
+                "SELECT title FROM emails "
+                "ORDER BY received_date DESC "
+                "LIMIT 30"
+            )
+            df = pd.read_sql(query, connection)
+
+        if df.empty:
+            print('조회된 데이터가 없습니다.')
+            return
+
+        for title in df['title']:
+            print(title)
+
+    except Exception:
+        traceback.print_exc()
+
+
 if __name__ == "__main__":
-    fetch_recent_subsidy_applications()
+    # fetch_recent_subsidy_applications()
+    test_fetch_emails()

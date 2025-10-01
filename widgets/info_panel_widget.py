@@ -23,6 +23,9 @@ class InfoPanelWidget(QWidget):
         self.label_current_page.setText("N/A")
         self.label_page_dims.setText("N/A")
         self.label_page_rotation.setText("N/A")
+        self.lineEdit_name.clear()
+        self.lineEdit_region.clear()
+        self.lineEdit_special.clear()
 
     def update_file_info(self, file_path: str, file_size_mb: float, total_pages: int):
         """파일 관련 정보를 업데이트한다."""
@@ -39,6 +42,12 @@ class InfoPanelWidget(QWidget):
         self.label_current_page.setText(str(page_num + 1))  # 0-based to 1-based
         self.label_page_dims.setText(f"{width:.2f} x {height:.2f} (pt)")
         self.label_page_rotation.setText(f"{rotation}°")
+
+    def update_basic_info(self, name: str, region: str, special_note: str):
+        """기본 정보를 업데이트한다."""
+        self.lineEdit_name.setText(name)
+        self.lineEdit_region.setText(region)
+        self.lineEdit_special.setText(special_note)
 
     def _on_insert_text_clicked(self):
         if hasattr(self, 'text_edit') and hasattr(self, 'font_spinBox'):

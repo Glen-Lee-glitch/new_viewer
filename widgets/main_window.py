@@ -134,6 +134,7 @@ class MainWindow(QMainWindow):
         self._info_panel = InfoPanelWidget()
         self._todo_widget = ToDoWidget(self)
         self._settings_dialog = SettingsDialog(self)
+        self._pending_basic_info: dict | None = None
 
         # --- 페이지 순서 관리 ---
         self._page_order: list[int] = []
@@ -278,7 +279,8 @@ class MainWindow(QMainWindow):
 
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
-        self._pdf_load_widget.pdf_selected.connect(self.load_document)
+        self._pdf_load_widget.pdf_selected.connect(self._handle_pdf_selected)
+        self._pdf_load_widget.work_started.connect(self._handle_work_started)
         self._thumbnail_viewer.page_selected.connect(self.go_to_page)
         self._thumbnail_viewer.page_change_requested.connect(self.change_page)
         self._thumbnail_viewer.page_order_changed.connect(self._update_page_order)
@@ -671,6 +673,9 @@ class MainWindow(QMainWindow):
         # 기본 스플리터 사이즈를 즉시 한 번 강제하여 초기 힌트를 통일
         self.set_splitter_sizes(False)
 
+        name, region, special_note = self._collect_pending_basic_info()
+        self._info_panel.update_basic_info(name, region, special_note)
+
         # UI가 표시된 다음 틱에 첫 페이지 렌더를 예약하여 초기 크기 기준을 보장한다.
         if self.renderer.get_page_count() > 0:
             QTimer.singleShot(0, lambda: self.go_to_page(0))
@@ -701,6 +706,39 @@ class MainWindow(QMainWindow):
         self._info_panel.clear_info()
 
         self._update_page_navigation()
+
+    def _handle_pdf_selected(self, pdf_paths: list):
+        self._pending_basic_info = None
+        self._info_panel.update_basic_info("", "", "")
+        self.load_document(pdf_paths)
+
+    def _handle_work_started(self, pdf_paths: list, metadata: dict):
+        self._pending_basic_info = self._normalize_basic_info(metadata)
+        self.load_document(pdf_paths)
+
+    @staticmethod
+    def _normalize_basic_info(metadata: dict | None) -> dict:
+        if not metadata:
+            return {'name': "", 'region': "", 'special_note': ""}
+
+        def _coerce(value):
+            if value is None:
+                return ""
+            return str(value).strip()
+
+        return {
+            'name': _coerce(metadata.get('name')),
+            'region': _coerce(metadata.get('region')),
+            'special_note': _coerce(metadata.get('special_note')),
+        }
+
+    def _collect_pending_basic_info(self) -> tuple[str, str, str]:
+        info = self._pending_basic_info or {'name': "", 'region': "", 'special_note': ""}
+        name = info.get('name', "")
+        region = info.get('region', "")
+        special_note = info.get('special_note', "")
+        self._pending_basic_info = info
+        return name, region, special_note
 
     def go_to_page(self, visual_page_num: int):
         """'보이는' 페이지 번호로 뷰를 이동시킨다."""

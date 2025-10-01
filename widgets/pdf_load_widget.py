@@ -1,4 +1,5 @@
 from pathlib import Path
+import math
 
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, QPoint, Qt
@@ -16,6 +17,7 @@ from core.sql_manager import fetch_recent_subsidy_applications
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
     pdf_selected = pyqtSignal(list)  # 여러 파일 경로(리스트)를 전달하도록 변경
+    work_started = pyqtSignal(list, dict)
     
     def __init__(self):
         super().__init__()
@@ -67,10 +69,22 @@ class PdfLoadWidget(QWidget):
         table.setRowCount(row_count)
 
         for row_index, (_, row) in enumerate(df.iterrows()):
-            table.setItem(row_index, 0, QTableWidgetItem(str(row.get('RN', ''))))
-            table.setItem(row_index, 1, QTableWidgetItem(str(row.get('region', ''))))
-            worker_item = QTableWidgetItem(str(row.get('worker', '')))
-            worker_item.setData(Qt.ItemDataRole.UserRole, row.get('worker'))
+            row_data = {
+                'rn': self._sanitize_text(row.get('RN', '')),
+                'region': self._sanitize_text(row.get('region', '')),
+                'worker': self._sanitize_text(row.get('worker', '')),
+                'name': self._sanitize_text(row.get('name', '')),
+                'special_note': self._sanitize_text(row.get('special_note', '')),
+            }
+
+            rn_item = QTableWidgetItem(row_data['rn'])
+            rn_item.setData(Qt.ItemDataRole.UserRole, row_data)
+            table.setItem(row_index, 0, rn_item)
+
+            table.setItem(row_index, 1, QTableWidgetItem(row_data['region']))
+
+            worker_item = QTableWidgetItem(row_data['worker'])
+            worker_item.setData(Qt.ItemDataRole.UserRole, row_data['worker'])
             table.setItem(row_index, 2, worker_item)
 
             file_path = self._normalize_file_path(row.get('original_filepath'))
@@ -122,7 +136,10 @@ class PdfLoadWidget(QWidget):
             )
             return
 
-        self.pdf_selected.emit([str(resolved_path)])
+        metadata = self._extract_row_metadata(rn_item)
+        metadata['region'] = metadata.get('region') or self._safe_item_text(table.item(row, 1))
+
+        self.work_started.emit([str(resolved_path)], metadata)
 
     @staticmethod
     def _normalize_file_path(raw_path):
@@ -164,3 +181,32 @@ class PdfLoadWidget(QWidget):
     def refresh_data(self):
         """sql 데이터 새로고침"""
         self.populate_recent_subsidy_rows()
+
+    @staticmethod
+    def _sanitize_text(value) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, float):
+            if math.isnan(value):
+                return ""
+            return str(int(value)) if value.is_integer() else str(value)
+        value_str = str(value).strip()
+        return "" if value_str.lower() == "nan" else value_str
+
+    @staticmethod
+    def _safe_item_text(item: QTableWidgetItem | None) -> str:
+        if item is None:
+            return ""
+        return item.text().strip()
+
+    def _extract_row_metadata(self, rn_item: QTableWidgetItem | None) -> dict:
+        if rn_item is None:
+            return {'name': "", 'region': "", 'special_note': ""}
+        data = rn_item.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(data, dict):
+            return {'name': "", 'region': "", 'special_note': ""}
+        return {
+            'name': data.get('name', ""),
+            'region': data.get('region', ""),
+            'special_note': data.get('special_note', ""),
+        }
