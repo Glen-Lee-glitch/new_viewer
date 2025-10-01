@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QThreadPool, QRunnable, pyqtSignal, QObject
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
                              QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar,
                              QPushButton, QLabel)
@@ -17,6 +17,7 @@ from widgets.pdf_view_widget import PdfViewWidget
 from widgets.thumbnail_view_widget import ThumbnailViewWidget
 from widgets.info_panel_widget import InfoPanelWidget
 from widgets.todo_widget import ToDoWidget
+from widgets.settings_dialog import SettingsDialog
 
 
 class BatchTestSignals(QObject):
@@ -129,6 +130,7 @@ class MainWindow(QMainWindow):
         self.pdf_load_widget = PdfLoadWidget()
         self.info_panel = InfoPanelWidget()
         self.todo_widget = ToDoWidget(self)
+        self.settings_dialog = SettingsDialog(self)
 
         # --- 페이지 순서 관리 ---
         self._page_order: list[int] = []
@@ -180,6 +182,31 @@ class MainWindow(QMainWindow):
         # --- 시그널 연결 ---
         self._setup_connections()
 
+        # --- 전역 단축키 설정 ---
+        self._setup_global_shortcuts()
+
+    def _setup_global_shortcuts(self):
+        """전역 단축키를 설정하고 액션에 연결한다."""
+        self.toggle_todo_action = QAction(self)
+        self.addAction(self.toggle_todo_action)
+        self.toggle_todo_action.triggered.connect(self.todo_widget.toggle_overlay)
+        
+        self._apply_shortcuts()
+
+    def _apply_shortcuts(self):
+        """QSettings에서 단축키를 불러와 액션에 적용한다."""
+        settings = self.settings_dialog.settings
+        
+        # TODO: settings.ui 위젯 이름이 확정되면 키 값을 맞춰야 함
+        todo_shortcut = settings.value("shortcuts/toggle_todo", "grave") # '`' 키
+        self.toggle_todo_action.setShortcut(QKeySequence.fromString(todo_shortcut, QKeySequence.SequenceFormat.PortableText))
+
+    def _open_settings_dialog(self):
+        """설정 다이얼로그를 연다."""
+        if self.settings_dialog.exec():
+            # 사용자가 OK를 누르면 변경된 단축키를 다시 적용
+            self._apply_shortcuts()
+
     def _setup_menus(self):
         """메뉴바를 설정합니다."""
         pass # 메뉴바 설정 로직 추가
@@ -195,6 +222,7 @@ class MainWindow(QMainWindow):
         self.pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
         self.pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
         self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
+        self.pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
         
         # 정보 패널 업데이트 연결
         self.pdf_view_widget.pdf_loaded.connect(self.info_panel.update_file_info)
@@ -209,10 +237,11 @@ class MainWindow(QMainWindow):
         self.test_button.clicked.connect(self.start_batch_test)
         
         # --- 전역 단축키 설정 ---
-        toggle_todo_action = QAction(self)
-        toggle_todo_action.setShortcut(Qt.Key.Key_QuoteLeft) # '~' 키
-        toggle_todo_action.triggered.connect(self.todo_widget.toggle_overlay)
-        self.addAction(toggle_todo_action)
+        # _setup_global_shortcuts() 메서드에서 처리하므로 기존 코드는 제거
+        # toggle_todo_action = QAction(self)
+        # toggle_todo_action.setShortcut(Qt.Key.Key_QuoteLeft) # '~' 키
+        # toggle_todo_action.triggered.connect(self.todo_widget.toggle_overlay)
+        # self.addAction(toggle_todo_action)
 
     def showEvent(self, event):
         """창이 처음 표시될 때 제목 표시줄을 포함한 전체 높이를 화면에 맞게 조정한다."""

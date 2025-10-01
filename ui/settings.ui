@@ -27,12 +27,12 @@
           <item>
            <widget class="QLabel" name="label">
             <property name="text">
-             <string>삽입 도구</string>
+             <string>d할 일 목록</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QKeySequenceEdit" name="keySequenceEdit_insert"/>
+           <widget class="QKeySequenceEdit" name="keySequenceEdit_to_do"/>
           </item>
          </layout>
         </item>
@@ -46,7 +46,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QKeySequenceEdit" name="keySequenceEdit_insert_3"/>
+           <widget class="QKeySequenceEdit" name="keySequenceEdit_insert"/>
           </item>
          </layout>
         </item>

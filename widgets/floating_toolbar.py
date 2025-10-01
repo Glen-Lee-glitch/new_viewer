@@ -14,6 +14,7 @@ class FloatingToolbarWidget(QWidget):
     rotate_90_requested = pyqtSignal()
     save_pdf_requested = pyqtSignal()
     crop_requested = pyqtSignal() # 자르기 신호 추가
+    setting_requested = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -56,6 +57,9 @@ class FloatingToolbarWidget(QWidget):
 
         if hasattr(self, 'pushButton_4'):
             self.pushButton_4.clicked.connect(self.rotate_90_requested.emit)
+
+        if hasattr(self, 'pushButton_setting'):
+            self.pushButton_setting.clicked.connect(self.setting_requested.emit)
 
     def _add_shadow_effect(self):
         """툴바에 그림자 효과를 추가한다."""
