@@ -30,6 +30,10 @@ class InfoPanelWidget(QWidget):
         self.label_file_size.setText(f"{file_size_mb:.2f} MB")
         self.label_total_pages_val.setText(str(total_pages))
 
+    def update_total_pages(self, total_pages: int):
+        """총 페이지 수 정보만 업데이트한다."""
+        self.label_total_pages_val.setText(str(total_pages))
+
     def update_page_info(self, page_num: int, width: float, height: float, rotation: int):
         """현재 페이지 관련 정보를 업데이트한다."""
         self.label_current_page.setText(str(page_num + 1))  # 0-based to 1-based
