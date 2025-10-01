@@ -55,7 +55,7 @@
           <item>
            <widget class="QLabel" name="label_4">
             <property name="text">
-             <string>임시1</string>
+             <string>페이지 삭제</string>
             </property>
            </widget>
           </item>

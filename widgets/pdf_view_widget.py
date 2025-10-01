@@ -478,6 +478,8 @@ class PdfViewWidget(QWidget, ViewModeMixin):
         """키보드 'Q', 'E'를 눌러 페이지를 변경하고, Ctrl+Z로 되돌리기를 실행한다."""
         if event.key() == Qt.Key.Key_Z and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             self._undo_last_action()
+        elif event.key() == Qt.Key.Key_Delete:
+            self._prompt_delete_current_page()
         elif event.key() == Qt.Key.Key_Q:
             self.page_change_requested.emit(-1)
         elif event.key() == Qt.Key.Key_E:
@@ -772,6 +774,22 @@ class PdfViewWidget(QWidget, ViewModeMixin):
     def undo_last_action(self):
         """공개 메서드: 마지막 작업을 되돌린다."""
         self._undo_last_action()
+
+    def _prompt_delete_current_page(self):
+        """현재 페이지를 삭제하는 메시지를 표시한다."""
+        if self.current_page < 0:
+            return
+        
+        reply = QMessageBox.question(
+            self,
+            '페이지 삭제 확인',
+            f'현재 페이지 {self.current_page + 1}을(를) 삭제하시겠습니까?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            print(f"TODO: {self.current_page + 1} 페이지 삭제 로직 구현")
 
     def _show_loading_message(self):
         """로딩 중 메시지를 표시한다."""
