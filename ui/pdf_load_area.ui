@@ -145,7 +145,11 @@
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_3">
               <item>
-               <widget class="QLineEdit" name="lineEdit_worker"/>
+               <widget class="QLabel" name="worker_label_1">
+                <property name="text">
+                 <string/>
+                </property>
+               </widget>
               </item>
              </layout>
             </item>
