@@ -171,7 +171,10 @@ class MainWindow(QMainWindow):
         self.pushButton_prev = QPushButton("이전")
         self.pushButton_next = QPushButton("다음")
         self.label_page_nav = QLabel("N/A")
-        
+        self.pushButton_reset = QPushButton("메인화면")
+
+        nav_layout.addWidget(self.pushButton_reset)
+        nav_layout.addStretch()
         nav_layout.addWidget(self.test_button)
         nav_layout.addWidget(self.pushButton_prev)
         nav_layout.addWidget(self.label_page_nav)
