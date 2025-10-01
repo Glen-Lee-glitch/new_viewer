@@ -587,8 +587,7 @@ class MainWindow(QMainWindow):
         if clicked_button == no_save_button:
             self.show_load_view()
         elif clicked_button == save_button:
-            # TODO: 다음 요청 시 저장 로직 구현
-            pass
+            self._save_document()
         # 취소 버튼을 누르면 아무것도 하지 않고 대화상자만 닫힘
 
     def _on_batch_test_error(self, filename: str, error_msg: str):
