@@ -44,6 +44,27 @@ class ThumbnailViewWidget(QWidget):
         # 처리하지 않은 이벤트는 기본 로직으로 전달
         return super().eventFilter(watched, event)
 
+    def _prompt_delete_selected_page(self):
+        """선택된 페이지의 삭제 여부를 묻는 확인 창을 띄운다."""
+        selected_items = self.thumbnail_list_widget.selectedItems()
+        if not selected_items:
+            return
+
+        item = selected_items[0]
+        page_to_delete = self.thumbnail_list_widget.row(item)
+
+        reply = QMessageBox.question(
+            self,
+            '페이지 삭제 확인',
+            f'{page_to_delete + 1} 페이지를 정말로 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # MainWindow에 선택된 '보이는' 페이지의 삭제를 요청한다.
+            self.page_delete_requested.emit(page_to_delete)
+
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
         ui_path = Path(__file__).parent.parent / "ui" / "thumbnail_viewer.ui"
@@ -117,19 +138,3 @@ class ThumbnailViewWidget(QWidget):
         """썸네일 목록 초기화"""
         if hasattr(self, 'thumbnail_list_widget'):
             self.thumbnail_list_widget.clear()
-
-    def _prompt_delete_current_page(self):
-        """현재 페이지를 삭제하는 메시지를 표시한다."""
-        if self.current_page < 0:
-            return
-        
-        reply = QMessageBox.question(
-            self,
-            '페이지 삭제 확인',
-            f'현재 페이지 {self.current_page + 1}을(를) 삭제하시겠습니까?',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
-            self.page_delete_requested.emit(self.current_page)

@@ -24,6 +24,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     page_change_requested = pyqtSignal(int)
     page_aspect_ratio_changed = pyqtSignal(bool)  # is_landscape: 가로가 긴 페이지 여부
     save_completed = pyqtSignal()  # 저장 완료 후 화면 전환을 위한 신호
+    page_delete_requested = pyqtSignal(int) # '보이는' 페이지 번호로 삭제를 요청하는 신호
 
     # --- 정보 패널 연동을 위한 신호 ---
     pdf_loaded = pyqtSignal(str, float, int)  # file_path, file_size_mb, total_pages
@@ -487,6 +488,36 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         else:
             super().keyPressEvent(event)
 
+    def _prompt_delete_current_page(self):
+        """현재 페이지 삭제 여부를 묻는 확인 창을 띄운다."""
+        if self.current_page < 0:
+            return
+
+        visual_page_num = self.current_page + 1
+
+        reply = QMessageBox.question(
+            self,
+            '페이지 삭제 확인',
+            f'{visual_page_num} 페이지를 정말로 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # MainWindow에 현재 '보이는' 페이지의 삭제를 요청한다.
+            self.page_delete_requested.emit(self.current_page)
+
+    def delete_pages(self, pages_to_delete: list[int]):
+        """(공개 메서드) 지정된 '실제' 페이지 인덱스를 삭제하고 데이터를 업데이트한다."""
+        if not self.renderer or not pages_to_delete:
+            return
+        
+        try:
+            # EditMixin의 메서드를 사용하여 페이지 삭제 및 데이터 재정렬
+            self._delete_pages_and_update_data(pages_to_delete)
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"페이지를 삭제하는 중 오류가 발생했습니다:\n{e}")
+
     def save_pdf(self, page_order: list[int] | None = None):
         """PDF 저장 프로세스를 시작한다."""
         if not self.renderer or not self.renderer.get_pdf_bytes():
@@ -774,60 +805,6 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     def undo_last_action(self):
         """공개 메서드: 마지막 작업을 되돌린다."""
         self._undo_last_action()
-
-    def _prompt_delete_current_page(self):
-        """현재 페이지 삭제 여부를 묻는 확인 창을 띄운다."""
-        if self.current_page < 0:
-            return
-
-        # 현재 보이는 페이지 번호는 1부터 시작하므로 +1
-        # 실제 데이터상의 페이지 번호는 self.current_page
-        visual_page_num = self.current_page + 1
-
-        reply = QMessageBox.question(
-            self,
-            '페이지 삭제 확인',
-            f'{visual_page_num} 페이지를 정말로 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
-            # `self.current_page`는 현재 보고 있는 페이지의 '실제' 인덱스
-            self._delete_page(self.current_page)
-
-    def _delete_page(self, page_to_delete: int):
-        """지정한 페이지를 삭제하고 뷰를 업데이트한다."""
-        if not self.renderer or page_to_delete < 0:
-            return
-        
-        try:
-            # EditMixin의 메서드를 사용하여 페이지 삭제 및 데이터 재정렬
-            self._delete_pages_and_update_data([page_to_delete])
-
-            # 삭제 후 표시할 페이지 결정
-            new_total_pages = self.renderer.get_page_count()
-            
-            if new_total_pages == 0:
-                # 모든 페이지가 삭제된 경우
-                self.scene.clear()
-                self.current_page = -1
-                # TODO: 모든 페이지 삭제 시 처리 (예: 로드 화면으로 돌아가기)
-            else:
-                # 삭제된 페이지 인덱스보다 크거나 같은 페이지를 표시
-                next_page_to_show = min(page_to_delete, new_total_pages - 1)
-                self.current_page = next_page_to_show
-                # show_page는 실제 페이지 번호를 사용해야 함
-                self.show_page(next_page_to_show)
-
-            # MainWindow에 변경사항 알림
-            self.pages_deleted.emit(new_total_pages)
-
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"페이지를 삭제하는 중 오류가 발생했습니다:\n{e}")
-            # 오류 발생 시 다시 로드하는 것이 안전할 수 있음
-            self.show_page(self.current_page)
-
 
     def _show_loading_message(self):
         """로딩 중 메시지를 표시한다."""

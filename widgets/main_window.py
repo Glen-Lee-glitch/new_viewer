@@ -281,10 +281,12 @@ class MainWindow(QMainWindow):
         self._thumbnail_viewer.page_order_changed.connect(self._update_page_order)
         self._pdf_view_widget.page_change_requested.connect(self.change_page)
         self._thumbnail_viewer.undo_requested.connect(self._handle_undo_request)
+        self._thumbnail_viewer.page_delete_requested.connect(self._handle_page_delete_request)
         self._pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
         self._pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
         self._pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
         self._pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
+        self._pdf_view_widget.page_delete_requested.connect(self._handle_page_delete_request)
         
         # 정보 패널 업데이트 연결
         self._pdf_view_widget.pdf_loaded.connect(self._info_panel.update_file_info)
@@ -504,6 +506,39 @@ class MainWindow(QMainWindow):
                 if self.renderer.pdf_path:
                     error_filename = Path(self.renderer.pdf_path[0]).name
                 self.test_worker.signals.error.emit(error_filename, str(e))
+
+    def _handle_page_delete_request(self, visual_page_num: int):
+        """페이지 삭제 요청을 처리하는 중앙 슬롯"""
+        if not self.renderer or not (0 <= visual_page_num < len(self._page_order)):
+            return
+
+        # 1. '보이는' 순서를 '실제' 페이지 번호로 변환
+        actual_page_to_delete = self._page_order[visual_page_num]
+
+        # 2. PdfViewWidget에 실제 페이지 번호를 전달하여 삭제 실행
+        self._pdf_view_widget.delete_pages([actual_page_to_delete])
+        
+        # 3. 페이지 순서 목록 업데이트
+        self._page_order.pop(visual_page_num)
+        # 삭제된 페이지 뒤의 페이지들의 순서 값도 갱신해야 함 (실제 파일 인덱스가 바뀌었으므로)
+        for i in range(len(self._page_order)):
+            if self._page_order[i] > actual_page_to_delete:
+                self._page_order[i] -= 1
+        
+        # 4. 썸네일 뷰 갱신
+        self._thumbnail_viewer.set_renderer(self.renderer)
+
+        # 5. 뷰어 및 네비게이션 갱신
+        new_total_pages = len(self._page_order)
+        if new_total_pages == 0:
+            self.show_load_view() # 모든 페이지 삭제 시 로드 화면으로
+        else:
+            # 삭제 후 현재 위치 또는 그 앞으로 포커스 이동
+            next_visual_page = min(visual_page_num, new_total_pages - 1)
+            self.go_to_page(next_visual_page)
+        
+        # 파일 정보 패널 업데이트
+        self._info_panel.update_total_pages(new_total_pages)
 
     def _update_page_order(self, new_order: list[int]):
         """페이지 순서가 변경되면 호출되는 슬롯"""
