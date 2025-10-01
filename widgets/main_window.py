@@ -13,6 +13,7 @@ from qt_material import apply_stylesheet
 
 from core.pdf_render import PdfRender
 from core.pdf_saved import compress_pdf_with_multiple_stages
+from core.sql_manager import claim_subsidy_work
 from widgets.pdf_load_widget import PdfLoadWidget
 from widgets.pdf_view_widget import PdfViewWidget
 from widgets.thumbnail_view_widget import ThumbnailViewWidget
@@ -720,6 +721,27 @@ class MainWindow(QMainWindow):
         self.load_document(pdf_paths)
 
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
+        if not metadata:
+            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self.load_document(pdf_paths)
+            return
+
+        worker_name = self._worker_name or metadata.get('worker', '')
+        rn_value = metadata.get('rn')
+
+        if not worker_name or not rn_value:
+            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self.load_document(pdf_paths)
+            return
+
+        if not claim_subsidy_work(rn_value, worker_name):
+            QMessageBox.warning(
+                self,
+                "이미 작업 중",
+                "해당 신청 건은 다른 작업자가 진행 중입니다."
+            )
+            return
+
         self._pending_basic_info = self._normalize_basic_info(metadata)
         self.load_document(pdf_paths)
 

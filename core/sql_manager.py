@@ -19,6 +19,46 @@ DB_CONFIG = {
     'charset': 'utf8mb4'
 }
 
+def claim_subsidy_work(rn: str, worker: str) -> bool:
+    if not rn:
+        raise ValueError("rn must be provided")
+    if not worker:
+        raise ValueError("worker must be provided")
+
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            connection.begin()
+            try:
+                with connection.cursor() as cursor:
+                    lock_query = (
+                        "SELECT worker FROM subsidy_applications "
+                        "WHERE RN = %s FOR UPDATE"
+                    )
+                    cursor.execute(lock_query, (rn,))
+                    row = cursor.fetchone()
+
+                    if row is None:
+                        connection.rollback()
+                        return False
+
+                    existing_worker = row[0]
+                    if existing_worker:
+                        connection.rollback()
+                        return existing_worker == worker
+
+                    update_query = (
+                        "UPDATE subsidy_applications SET worker = %s, status = %s "
+                        "WHERE RN = %s"
+                    )
+                    cursor.execute(update_query, (worker, '처리중', rn))
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+    except Exception:
+        traceback.print_exc()
+        return False
 def fetch_recent_subsidy_applications():
     """최근 접수된 지원금 신청 데이터를 조회하고 출력한다."""
     try:

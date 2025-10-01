@@ -137,7 +137,9 @@ class PdfLoadWidget(QWidget):
             return
 
         metadata = self._extract_row_metadata(rn_item)
+        metadata['rn'] = metadata.get('rn') or self._safe_item_text(rn_item)
         metadata['region'] = metadata.get('region') or self._safe_item_text(table.item(row, 1))
+        metadata['worker'] = metadata.get('worker') or self._safe_item_text(table.item(row, 2))
 
         self.work_started.emit([str(resolved_path)], metadata)
 
@@ -201,12 +203,14 @@ class PdfLoadWidget(QWidget):
 
     def _extract_row_metadata(self, rn_item: QTableWidgetItem | None) -> dict:
         if rn_item is None:
-            return {'name': "", 'region': "", 'special_note': ""}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': ""}
         data = rn_item.data(Qt.ItemDataRole.UserRole)
         if not isinstance(data, dict):
-            return {'name': "", 'region': "", 'special_note': ""}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': ""}
         return {
+            'rn': data.get('rn', ""),
             'name': data.get('name', ""),
             'region': data.get('region', ""),
+            'worker': data.get('worker', ""),
             'special_note': data.get('special_note', ""),
         }
