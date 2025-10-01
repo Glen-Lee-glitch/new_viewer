@@ -93,3 +93,4 @@ class ViewModeMixin:
         
         # 페이지를 뷰 중앙에 배치
         view.centerOn(self.current_page_item)
+

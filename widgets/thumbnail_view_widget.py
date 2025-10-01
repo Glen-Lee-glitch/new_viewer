@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
-from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget
+from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget, QMessageBox
 
 from core.pdf_render import PdfRender
 
@@ -28,6 +28,9 @@ class ThumbnailViewWidget(QWidget):
         if watched == self.thumbnail_list_widget and event.type() == QEvent.Type.KeyPress:
             if event.key() == Qt.Key.Key_Z and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                 self.undo_requested.emit()
+                return True
+            elif event.key() == Qt.Key.Key_Delete:
+                self._prompt_delete_selected_page()
                 return True
             elif event.key() == Qt.Key.Key_Q:
                 self.page_change_requested.emit(-1)
@@ -112,3 +115,19 @@ class ThumbnailViewWidget(QWidget):
         """썸네일 목록 초기화"""
         if hasattr(self, 'thumbnail_list_widget'):
             self.thumbnail_list_widget.clear()
+
+    def _prompt_delete_current_page(self):
+        """현재 페이지를 삭제하는 메시지를 표시한다."""
+        if self.current_page < 0:
+            return
+        
+        reply = QMessageBox.question(
+            self,
+            '페이지 삭제 확인',
+            f'현재 페이지 {self.current_page + 1}을(를) 삭제하시겠습니까?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            print(f"TODO: {self.current_page + 1} 페이지 삭제 로직 구현")
