@@ -8,6 +8,7 @@ from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow,
                              QMessageBox, QSplitter, QStackedWidget, QWidget, QFileDialog, QStatusBar,
                              QPushButton, QLabel)
+from PyQt6 import uic
 from qt_material import apply_stylesheet
 
 from core.pdf_render import PdfRender
@@ -116,8 +117,10 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PDF Viewer")
-        self.setGeometry(100, 100, 1200, 800)
+        
+        # UI 파일 로드
+        ui_path = Path(__file__).parent.parent / "ui" / "main_window.ui"
+        uic.loadUi(str(ui_path), self)
 
         self.renderer: PdfRender | None = None
         self.current_page = -1
@@ -125,62 +128,30 @@ class MainWindow(QMainWindow):
         self._initial_resize_done = False  # 초기 크기 조정 완료 플래그
         
         # --- 위젯 인스턴스 생성 ---
-        self.thumbnail_viewer = ThumbnailViewWidget()
-        self.pdf_view_widget = PdfViewWidget()
-        self.pdf_load_widget = PdfLoadWidget()
-        self.info_panel = InfoPanelWidget()
-        self.todo_widget = ToDoWidget(self)
-        self.settings_dialog = SettingsDialog(self)
+        self._thumbnail_viewer = ThumbnailViewWidget()
+        self._pdf_view_widget = PdfViewWidget()
+        self._pdf_load_widget = PdfLoadWidget()
+        self._info_panel = InfoPanelWidget()
+        self._todo_widget = ToDoWidget(self)
+        self._settings_dialog = SettingsDialog(self)
 
         # --- 페이지 순서 관리 ---
         self._page_order: list[int] = []
 
-        # --- 메인 레이아웃 설정 ---
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QHBoxLayout(central_widget)
-        
-        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.main_splitter.addWidget(self.pdf_load_widget)
-        self.main_splitter.addWidget(self.pdf_view_widget)
-        
-        self.main_splitter.setSizes([600, 600])
-
-        main_layout.addWidget(self.thumbnail_viewer, 1)
-        main_layout.addWidget(self.main_splitter, 4)
-        main_layout.addWidget(self.info_panel, 1)
+        # --- UI 컨테이너에 위젯 배치 ---
+        self._setup_ui_containers()
         
         # --- 초기 위젯 상태 설정 ---
-        self.pdf_view_widget.hide()
-        self.thumbnail_viewer.hide()
-        self.info_panel.hide()
-        self.todo_widget.hide()
+        self._pdf_view_widget.hide()
+        self._thumbnail_viewer.hide()
+        self._info_panel.hide()
+        self._todo_widget.hide()
 
         # --- 메뉴바 및 액션 설정 ---
         self._setup_menus()
 
-        # --- 상태바 및 페이지 네비게이션 UI 설정 ---
-        self.statusBar = QStatusBar(self)
-        self.setStatusBar(self.statusBar)
-        
-        nav_widget = QWidget()
-        nav_layout = QHBoxLayout(nav_widget)
-        nav_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.test_button = QPushButton("테스트")
-        self.pushButton_prev = QPushButton("이전")
-        self.pushButton_next = QPushButton("다음")
-        self.label_page_nav = QLabel("N/A")
-        self.pushButton_reset = QPushButton("메인화면")
-
-        nav_layout.addWidget(self.pushButton_reset)
-        nav_layout.addStretch()
-        nav_layout.addWidget(self.test_button)
-        nav_layout.addWidget(self.pushButton_prev)
-        nav_layout.addWidget(self.label_page_nav)
-        nav_layout.addWidget(self.pushButton_next)
-        
-        self.statusBar.addPermanentWidget(nav_widget)
+        # --- 상태바에 네비게이션 위젯 추가 ---
+        self.ui_status_bar.addPermanentWidget(self.ui_nav_widget)
 
         # --- 시그널 연결 ---
         self._setup_connections()
@@ -188,23 +159,101 @@ class MainWindow(QMainWindow):
         # --- 전역 단축키 설정 ---
         self._setup_global_shortcuts()
 
+    def _setup_ui_containers(self):
+        """UI 컨테이너에 위젯들을 배치한다."""
+        # 썸네일 뷰어 컨테이너에 배치
+        thumbnail_layout = QHBoxLayout(self.ui_thumbnail_container)
+        thumbnail_layout.setContentsMargins(0, 0, 0, 0)
+        thumbnail_layout.addWidget(self._thumbnail_viewer)
+        
+        # PDF 로드 위젯 컨테이너에 배치
+        pdf_load_layout = QHBoxLayout(self.ui_pdf_load_container)
+        pdf_load_layout.setContentsMargins(0, 0, 0, 0)
+        pdf_load_layout.addWidget(self._pdf_load_widget)
+        
+        # PDF 뷰 위젯 컨테이너에 배치
+        pdf_view_layout = QHBoxLayout(self.ui_pdf_view_container)
+        pdf_view_layout.setContentsMargins(0, 0, 0, 0)
+        pdf_view_layout.addWidget(self._pdf_view_widget)
+        
+        # 정보 패널 컨테이너에 배치
+        info_panel_layout = QHBoxLayout(self.ui_info_panel_container)
+        info_panel_layout.setContentsMargins(0, 0, 0, 0)
+        info_panel_layout.addWidget(self._info_panel)
+        
+        # 스플리터 크기 설정
+        self.ui_main_splitter.setSizes([600, 600])
+
+    # 속성 접근을 위한 프로퍼티들 (기존 코드와의 호환성을 위해)
+    @property
+    def thumbnail_viewer(self):
+        return self._thumbnail_viewer
+    
+    @property
+    def pdf_view_widget(self):
+        return self._pdf_view_widget
+    
+    @property
+    def pdf_load_widget(self):
+        return self._pdf_load_widget
+    
+    @property
+    def info_panel(self):
+        return self._info_panel
+    
+    @property
+    def todo_widget(self):
+        return self._todo_widget
+    
+    @property
+    def settings_dialog(self):
+        return self._settings_dialog
+    
+    @property
+    def main_splitter(self):
+        return self.ui_main_splitter
+    
+    @property
+    def statusBar(self):
+        return self.ui_status_bar
+    
+    @property
+    def test_button(self):
+        return self.ui_test_button
+    
+    @property
+    def pushButton_prev(self):
+        return self.ui_push_button_prev
+    
+    @property
+    def pushButton_next(self):
+        return self.ui_push_button_next
+    
+    @property
+    def label_page_nav(self):
+        return self.ui_label_page_nav
+    
+    @property
+    def pushButton_reset(self):
+        return self.ui_push_button_reset
+
     def _setup_global_shortcuts(self):
         """전역 단축키를 설정하고 액션에 연결한다."""
         # ToDo 리스트 토글 액션
         self.toggle_todo_action = QAction(self)
         self.addAction(self.toggle_todo_action)
-        self.toggle_todo_action.triggered.connect(self.todo_widget.toggle_overlay)
+        self.toggle_todo_action.triggered.connect(self._todo_widget.toggle_overlay)
         
         # 스탬프 오버레이 토글 액션
         self.toggle_stamp_overlay_action = QAction(self)
         self.addAction(self.toggle_stamp_overlay_action)
-        self.toggle_stamp_overlay_action.triggered.connect(self.pdf_view_widget.toggle_stamp_overlay)
+        self.toggle_stamp_overlay_action.triggered.connect(self._pdf_view_widget.toggle_stamp_overlay)
 
         self._apply_shortcuts()
 
     def _apply_shortcuts(self):
         """QSettings에서 단축키를 불러와 액션에 적용한다."""
-        settings = self.settings_dialog.settings
+        settings = self._settings_dialog.settings
         
         # TODO: settings.ui 위젯 이름이 확정되면 키 값을 맞춰야 함
         todo_shortcut = settings.value("shortcuts/toggle_todo", "grave") # '`' 키
@@ -216,7 +265,7 @@ class MainWindow(QMainWindow):
 
     def _open_settings_dialog(self):
         """설정 다이얼로그를 연다."""
-        if self.settings_dialog.exec():
+        if self._settings_dialog.exec():
             # 사용자가 OK를 누르면 변경된 단축키를 다시 적용
             self._apply_shortcuts()
 
@@ -226,28 +275,29 @@ class MainWindow(QMainWindow):
 
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
-        self.pdf_load_widget.pdf_selected.connect(self.load_document)
-        self.thumbnail_viewer.page_selected.connect(self.go_to_page)
-        self.thumbnail_viewer.page_change_requested.connect(self.change_page)
-        self.thumbnail_viewer.page_order_changed.connect(self._update_page_order)
-        self.pdf_view_widget.page_change_requested.connect(self.change_page)
-        self.thumbnail_viewer.undo_requested.connect(self._handle_undo_request)
-        self.pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
-        self.pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
-        self.pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
-        self.pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
+        self._pdf_load_widget.pdf_selected.connect(self.load_document)
+        self._thumbnail_viewer.page_selected.connect(self.go_to_page)
+        self._thumbnail_viewer.page_change_requested.connect(self.change_page)
+        self._thumbnail_viewer.page_order_changed.connect(self._update_page_order)
+        self._pdf_view_widget.page_change_requested.connect(self.change_page)
+        self._thumbnail_viewer.undo_requested.connect(self._handle_undo_request)
+        self._pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
+        self._pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
+        self._pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
+        self._pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
         
         # 정보 패널 업데이트 연결
-        self.pdf_view_widget.pdf_loaded.connect(self.info_panel.update_file_info)
-        self.pdf_view_widget.page_info_updated.connect(self.info_panel.update_page_info)
-        self.info_panel.text_stamp_requested.connect(self.pdf_view_widget.activate_text_stamp_mode)
+        self._pdf_view_widget.pdf_loaded.connect(self._info_panel.update_file_info)
+        self._pdf_view_widget.page_info_updated.connect(self._info_panel.update_page_info)
+        self._info_panel.text_stamp_requested.connect(self._pdf_view_widget.activate_text_stamp_mode)
 
         # 페이지 네비게이션 버튼 클릭 시그널 연결
-        self.pushButton_prev.clicked.connect(lambda: self.change_page(-1))
-        self.pushButton_next.clicked.connect(lambda: self.change_page(1))
+        self.ui_push_button_prev.clicked.connect(lambda: self.change_page(-1))
+        self.ui_push_button_next.clicked.connect(lambda: self.change_page(1))
+        self.ui_push_button_reset.clicked.connect(self.show_load_view)
         
         # 테스트 버튼 시그널 연결
-        self.test_button.clicked.connect(self.start_batch_test)
+        self.ui_test_button.clicked.connect(self.start_batch_test)
         
         # --- 전역 단축키 설정 ---
         # _setup_global_shortcuts() 메서드에서 처리하므로 기존 코드는 제거
@@ -291,7 +341,7 @@ class MainWindow(QMainWindow):
         
     def start_batch_test(self):
         """PDF 일괄 테스트를 시작한다 (test.py의 로직 사용)."""
-        self.statusBar.showMessage("PDF 일괄 테스트를 시작합니다...", 0)
+        self.ui_status_bar.showMessage("PDF 일괄 테스트를 시작합니다...", 0)
         
         # test.py의 batch_process_pdfs 함수를 백그라운드에서 실행
         import sys
@@ -313,9 +363,9 @@ class MainWindow(QMainWindow):
             def run_test():
                 try:
                     batch_process_pdfs(input_dir, output_dir)
-                    self.statusBar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
+                    self.ui_status_bar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
                 except Exception as e:
-                    self.statusBar.showMessage(f"테스트 중 오류 발생: {e}", 10000)
+                    self.ui_status_bar.showMessage(f"테스트 중 오류 발생: {e}", 10000)
             
             thread = threading.Thread(target=run_test, daemon=True)
             thread.start()
@@ -330,13 +380,13 @@ class MainWindow(QMainWindow):
         try:
             import random
             if self.renderer and self.renderer.get_page_count() > 0:
-                if self.pdf_view_widget.current_page != 0:
+                if self._pdf_view_widget.current_page != 0:
                     self.go_to_page(0)
                 if random.random() < 0.10:
-                    self.pdf_view_widget.rotate_current_page_by_90_sync()
+                    self._pdf_view_widget.rotate_current_page_by_90_sync()
         except Exception as e:
-            if not self.test_worker._is_stopped and self.pdf_view_widget.get_current_pdf_path():
-                filename = Path(self.pdf_view_widget.get_current_pdf_path()).name
+            if not self.test_worker._is_stopped and self._pdf_view_widget.get_current_pdf_path():
+                filename = Path(self._pdf_view_widget.get_current_pdf_path()).name
                 self.test_worker.signals.error.emit(filename, f"회전 처리 중 오류: {e}")
 
     def _focus_page2_maybe_for_test(self):
@@ -347,8 +397,8 @@ class MainWindow(QMainWindow):
                 if random.random() < 0.50:
                     self.go_to_page(1)
         except Exception as e:
-            if not self.test_worker._is_stopped and self.pdf_view_widget.get_current_pdf_path():
-                filename = Path(self.pdf_view_widget.get_current_pdf_path()).name
+            if not self.test_worker._is_stopped and self._pdf_view_widget.get_current_pdf_path():
+                filename = Path(self._pdf_view_widget.get_current_pdf_path()).name
                 self.test_worker.signals.error.emit(filename, f"포커스 이동 중 오류: {e}")
 
     def load_document_for_test(self, pdf_path: str):
@@ -364,7 +414,7 @@ class MainWindow(QMainWindow):
             return
 
         input_bytes = self.renderer.get_pdf_bytes()
-        rotations = self.pdf_view_widget.get_page_rotations()
+        rotations = self._pdf_view_widget.get_page_rotations()
 
         # 난수 기반 도장 데이터 구성: 현재 페이지(또는 2페이지)에 1개 삽입
         stamp_data: dict[int, list[dict]] = {}
@@ -375,9 +425,9 @@ class MainWindow(QMainWindow):
             pix = QPixmap(str(stamp_path))
             if not pix.isNull():
                 # 대상 페이지: 현재 페이지 기준 (1페이지 또는 2페이지)
-                target_page = self.pdf_view_widget.current_page if self.pdf_view_widget.current_page >= 0 else 0
+                target_page = self._pdf_view_widget.current_page if self._pdf_view_widget.current_page >= 0 else 0
                 # 페이지 픽셀 크기 확보 (뷰 캐시 또는 동기 렌더링)
-                page_pixmap = self.pdf_view_widget.page_cache.get(target_page)
+                page_pixmap = self._pdf_view_widget.page_cache.get(target_page)
                 if page_pixmap is None and self.renderer and input_bytes:
                     user_rotation = rotations.get(target_page, 0)
                     page_pixmap = PdfRender.render_page_thread_safe(
@@ -466,12 +516,12 @@ class MainWindow(QMainWindow):
         current_visual_page = self.current_page
         
         if total_pages > 0:
-            self.label_page_nav.setText(f"{current_visual_page + 1} / {total_pages}")
+            self.ui_label_page_nav.setText(f"{current_visual_page + 1} / {total_pages}")
         else:
-            self.label_page_nav.setText("N/A")
+            self.ui_label_page_nav.setText("N/A")
 
-        self.pushButton_prev.setEnabled(total_pages > 0 and current_visual_page > 0)
-        self.pushButton_next.setEnabled(total_pages > 0 and current_visual_page < total_pages - 1)
+        self.ui_push_button_prev.setEnabled(total_pages > 0 and current_visual_page > 0)
+        self.ui_push_button_next.setEnabled(total_pages > 0 and current_visual_page < total_pages - 1)
 
     def _on_batch_test_error(self, filename: str, error_msg: str):
         """일괄 테스트 중 오류 발생 시 호출될 슬롯"""
@@ -486,12 +536,12 @@ class MainWindow(QMainWindow):
             title = "테스트 설정 오류"
             message = f"테스트를 시작하는 중 오류가 발생했습니다.\n\n오류: {error_msg}"
         
-        self.statusBar.showMessage(f"오류로 테스트가 중단되었습니다: {error_msg}", 10000)
+        self.ui_status_bar.showMessage(f"오류로 테스트가 중단되었습니다: {error_msg}", 10000)
         QMessageBox.critical(self, title, message)
 
     def _on_batch_test_finished(self):
         """일괄 테스트 완료 시 호출될 슬롯"""
-        self.statusBar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
+        self.ui_status_bar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
         QMessageBox.information(self, "테스트 완료", "지정된 모든 PDF 파일의 열기/저장 테스트를 성공적으로 완료했습니다.")
 
     def adjust_viewer_layout(self, is_landscape: bool):
@@ -500,17 +550,17 @@ class MainWindow(QMainWindow):
 
     def _handle_undo_request(self):
         """썸네일에서 Undo 요청이 왔을 때 PDF 뷰어의 되돌리기를 실행한다."""
-        if self.pdf_view_widget and self.renderer:
-            self.pdf_view_widget.undo_last_action()
+        if self._pdf_view_widget and self.renderer:
+            self._pdf_view_widget.undo_last_action()
 
     def set_splitter_sizes(self, is_landscape: bool):
         """가로/세로 모드에 따라 QSplitter의 크기를 설정한다."""
         if is_landscape:
             # 가로 페이지: 뷰어 85%, 썸네일 15%
-            self.main_splitter.setSizes([int(self.width() * 0.15), int(self.width() * 0.85)])
+            self.ui_main_splitter.setSizes([int(self.width() * 0.15), int(self.width() * 0.85)])
         else:
             # 세로 페이지: 뷰어 75%, 썸네일 25% (기존과 유사)
-            self.main_splitter.setSizes([int(self.width() * 0.25), int(self.width() * 0.75)])
+            self.ui_main_splitter.setSizes([int(self.width() * 0.25), int(self.width() * 0.75)])
     
     def load_document(self, pdf_paths: list):
         """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
@@ -534,22 +584,22 @@ class MainWindow(QMainWindow):
         # 첫 번째 파일 이름을 기준으로 창 제목 설정
         self.setWindowTitle(f"PDF Viewer - {Path(pdf_paths[0]).name}")
         
-        self.thumbnail_viewer.set_renderer(self.renderer)
-        self.pdf_view_widget.set_renderer(self.renderer)
+        self._thumbnail_viewer.set_renderer(self.renderer)
+        self._pdf_view_widget.set_renderer(self.renderer)
 
         if self.renderer.get_page_count() > 0:
             self.go_to_page(0)
 
-        self.pdf_load_widget.hide()
-        self.pdf_view_widget.show()
-        self.thumbnail_viewer.show()
-        self.info_panel.show()
+        self._pdf_load_widget.hide()
+        self._pdf_view_widget.show()
+        self._thumbnail_viewer.show()
+        self._info_panel.show()
 
     def _save_document(self):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
         if self.renderer:
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
-            self.pdf_view_widget.save_pdf(page_order=self._page_order)
+            self._pdf_view_widget.save_pdf(page_order=self._page_order)
         
     def show_load_view(self):
         """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
@@ -560,15 +610,15 @@ class MainWindow(QMainWindow):
         self.renderer = None
         self.current_page = -1
 
-        self.pdf_load_widget.show()
+        self._pdf_load_widget.show()
         
         # 뷰어 관련 위젯들 숨기기 및 초기화
-        self.pdf_view_widget.hide()
-        self.pdf_view_widget.set_renderer(None) # 뷰어 내부 상태 초기화
-        self.thumbnail_viewer.hide()
-        self.thumbnail_viewer.clear_thumbnails()
-        self.info_panel.hide()
-        self.info_panel.clear_info()
+        self._pdf_view_widget.hide()
+        self._pdf_view_widget.set_renderer(None) # 뷰어 내부 상태 초기화
+        self._thumbnail_viewer.hide()
+        self._thumbnail_viewer.clear_thumbnails()
+        self._info_panel.hide()
+        self._info_panel.clear_info()
 
         self._update_page_navigation()
 
@@ -580,8 +630,8 @@ class MainWindow(QMainWindow):
             # '보이는' 순서를 '실제' 페이지 번호로 변환
             actual_page_num = self._page_order[visual_page_num]
             
-            self.pdf_view_widget.show_page(actual_page_num)
-            self.thumbnail_viewer.set_current_page(visual_page_num)
+            self._pdf_view_widget.show_page(actual_page_num)
+            self._thumbnail_viewer.set_current_page(visual_page_num)
             self._update_page_navigation()
     
     def change_page(self, delta: int):
