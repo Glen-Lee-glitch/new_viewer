@@ -632,15 +632,16 @@ class MainWindow(QMainWindow):
         self.load_document(pdf_paths)
 
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
-        # 디버그: 메일 content 출력
+        # 메일 content 조회
         thread_id = metadata.get('recent_thread_id')
+        mail_content = ""
         if thread_id:
             from core.sql_manager import get_mail_content_by_thread_id
-            content = get_mail_content_by_thread_id(thread_id)
+            mail_content = get_mail_content_by_thread_id(thread_id)
             print(f"\n{'='*80}")
             print(f"[메일 Content 조회 - thread_id: {thread_id}]")
             print(f"{'='*80}")  
-            print(content)
+            print(mail_content)
             print(f"{'='*80}\n")
         
         # 기존 로직
@@ -671,6 +672,10 @@ class MainWindow(QMainWindow):
 
         self._pending_basic_info = self._normalize_basic_info(metadata)
         self.load_document(pdf_paths)
+        
+        # PDF 로드 후 메일 content 표시
+        if mail_content:
+            self._pdf_view_widget.set_mail_content(mail_content)
 
     @staticmethod
     def _normalize_basic_info(metadata: dict | None) -> dict:

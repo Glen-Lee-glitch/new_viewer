@@ -18,6 +18,7 @@ from .floating_toolbar import FloatingToolbarWidget
 from .stamp_overlay_widget import StampOverlayWidget
 from .zoomable_graphics_view import ZoomableGraphicsView
 from .custom_item import MovableStampItem
+from .mail_content_overlay import MailContentOverlay
 
 class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     """PDF 뷰어 위젯"""
@@ -66,6 +67,9 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
 
         # --- 스탬프 오버레이 추가 ---
         self.stamp_overlay = StampOverlayWidget(self)
+
+        # --- 메일 컨텐츠 오버레이 추가 ---
+        self.mail_overlay = MailContentOverlay(self)
 
         # --- 툴바 시그널 연결 ---
         self.toolbar.stamp_menu_requested.connect(self._toggle_stamp_overlay)
@@ -466,7 +470,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             print(f"페이지 {self.current_page + 1}에 스탬프 추가 및 이동 가능: {stamp_item.pos()}")
 
     def resizeEvent(self, event):
-        """뷰어 크기가 변경될 때 툴바 위치를 재조정한다."""
+        """뷰어 크기가 변경될 때 툴바와 오버레이 위치를 재조정한다."""
         super().resizeEvent(event)
         # 툴바를 상단 중앙에 배치 (가로 중앙, 세로 상단에서 10px)
         x = (self.width() - self.toolbar.width()) // 2
@@ -474,6 +478,8 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self.toolbar.move(x, y)
         if self.stamp_overlay and self.stamp_overlay.isVisible():
             self.stamp_overlay.setGeometry(0, 0, self.width(), self.height())
+        if self.mail_overlay and self.mail_overlay.isVisible():
+            self.mail_overlay.show_overlay(self.size())
     
     def keyPressEvent(self, event):
         """키보드 'Q', 'E'를 눌러 페이지를 변경하고, Ctrl+Z로 되돌리기를 실행한다."""
@@ -607,6 +613,10 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self.current_page = -1 # 지금 보고 있는 페이지 없음 (존재하지 않는 페이지 번호로 -1로 설정)
         self.page_rotations = {} # 새 파일 로드 시 회전 정보 초기화
         self._overlay_items.clear() # 새 파일 로드 시 오버레이 아이템 초기화
+        
+        # 메일 오버레이 숨김
+        if hasattr(self, 'mail_overlay'):
+            self.mail_overlay.hide()
 
         # --- 파일 정보 시그널 발생 ---
         if self.renderer:
@@ -901,3 +911,11 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     def get_page_rotations(self) -> dict:
         """사용자가 적용한 페이지별 회전 정보를 반환한다."""
         return self.page_rotations
+
+    def set_mail_content(self, content: str):
+        """메일 content를 오버레이에 표시"""
+        if content:
+            self.mail_overlay.set_content(content)
+            self.mail_overlay.show_overlay(self.size())
+        else:
+            self.mail_overlay.hide()
