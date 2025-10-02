@@ -81,7 +81,8 @@ def fetch_recent_subsidy_applications():
             print('조회된 데이터가 없습니다.')
             return df
 
-        print(df)
+        # 간단한 한 줄 디버그 출력
+        print(f'새로고침 완료: {len(df)}개 데이터 조회됨')
         return df
 
     except Exception:  # pragma: no cover - 긴급 디버깅용
