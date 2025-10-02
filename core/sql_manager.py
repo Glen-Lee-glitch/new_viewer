@@ -66,15 +66,12 @@ def fetch_recent_subsidy_applications():
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = (
                 "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
-                "       CASE WHEN fp.original_filepath IS NULL OR fp.original_filepath = '' "
-                "            THEN '부' "
-                "            ELSE '여' "
-                "       END AS file_status, "
-                "       fp.original_filepath "
+                "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "
+                "       e.attached_file_path AS original_filepath "
                 "FROM subsidy_applications sa "
-                "LEFT JOIN filepath fp ON fp.RN = sa.RN "
-                "WHERE recent_received_date >= %s "
-                "ORDER BY recent_received_date DESC "
+                "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
+                "WHERE sa.recent_received_date >= %s "
+                "ORDER BY sa.recent_received_date DESC "
                 "LIMIT 10"
             )
             params = ('2025-09-30 09:00',)

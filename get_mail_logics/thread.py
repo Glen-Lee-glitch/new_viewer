@@ -295,13 +295,14 @@ def download_and_process_attachments(gmail_service, msg_id, payload, thread_id, 
     return ';'.join(unique_paths)
 
 def update_email_attachment_path(conn, thread_id, file_path):
-    """emails 테이블에 최종 첨부파일 경로 업데이트"""
+    """emails 테이블에 최종 첨부파일 경로 업데이트 및 attached_file = 1로 설정"""
     cursor = conn.cursor()
     try:
-        sql = "UPDATE emails SET attached_file_path = %s WHERE thread_id = %s"
+        # 다운로드 완료 시 attached_file도 1로 변경
+        sql = "UPDATE emails SET attached_file = 1, attached_file_path = %s WHERE thread_id = %s"
         cursor.execute(sql, (file_path, thread_id))
         conn.commit()
-        print(f"  ✅ (DB) 첨부파일 경로 업데이트: {thread_id}")
+        print(f"  ✅ (DB) 첨부파일 다운로드 완료: {thread_id}")
     except Error as e:
         print(f"  ❌ (DB) 첨부파일 경로 업데이트 실패: {e}")
         conn.rollback()
@@ -361,7 +362,7 @@ def db_mail_thread(poll_interval=20):
                         from_address = re.search(r'<(.+?)>', from_header).group(1) if re.search(r'<(.+?)>', from_header) else from_header
 
                         has_attach = has_attachment(payload)
-                        save_email_to_db(conn, thread_id, subject, content, from_address, received_dt, has_attach)
+                        save_email_to_db(conn, thread_id, subject, content, from_address, received_dt, False)  # 다운로드 완료 전까지 0
 
                         # 2. RN 정보 추출 및 subsidy_applications 저장
                         info = extract_info_from_subject(subject)

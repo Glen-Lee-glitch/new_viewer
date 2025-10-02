@@ -88,7 +88,7 @@ class PdfLoadWidget(QWidget):
             table.setItem(row_index, 2, worker_item)
 
             file_path = self._normalize_file_path(row.get('original_filepath'))
-            status_text = str(row.get('file_status', '부')) if file_path else '부'
+            status_text = str(row.get('file_status', '부'))
             status_item = QTableWidgetItem(status_text)
             status_item.setData(Qt.ItemDataRole.UserRole, file_path)
             table.setItem(row_index, 3, status_item)
@@ -158,6 +158,11 @@ class PdfLoadWidget(QWidget):
             path_str = path_str[1:-1]
         elif path_str.startswith("'") and path_str.endswith("'") and len(path_str) >= 2:
             path_str = path_str[1:-1]
+        
+        path_str = path_str.strip()
+
+        if path_str.upper().startswith('C:'):
+            path_str = r'\\DESKTOP-KMJ' + path_str[2:]
 
         return path_str.strip()
     
