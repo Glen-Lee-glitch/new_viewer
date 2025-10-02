@@ -68,6 +68,10 @@ def insert_new_application(conn, rn, received_date, thread_id, region, delivery_
         # delivery_date가 None이거나 빈 문자열일 경우 DB에 NULL로 들어가도록 처리
         if not delivery_date:
             delivery_date = None
+        
+        # region이 None이거나 빈 문자열일 경우 DB에 NULL로 들어가도록 처리
+        if not region:
+            region = None
 
         now_kst = datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
 
