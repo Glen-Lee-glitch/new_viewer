@@ -66,3 +66,7 @@ class MailContentOverlay(QWidget):
             Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextWordWrap,
             self._content
         )
+
+    def has_content(self) -> bool:
+        """content가 있는지 확인"""
+        return bool(self._content)

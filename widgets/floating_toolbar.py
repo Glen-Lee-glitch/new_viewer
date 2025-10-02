@@ -15,6 +15,7 @@ class FloatingToolbarWidget(QWidget):
     save_pdf_requested = pyqtSignal()
     crop_requested = pyqtSignal() # 자르기 신호 추가
     setting_requested = pyqtSignal()
+    toggle_mail_overlay_requested = pyqtSignal()  # 메일 오버레이 토글 시그널 추가
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -32,8 +33,8 @@ class FloatingToolbarWidget(QWidget):
         self._is_dragging = False
         self._drag_start_position = None
         
-        if hasattr(self, 'pushButton_2'): # 추후 사용 예정
-            pass            
+        if hasattr(self, 'pushButton_2'):
+            self.pushButton_2.clicked.connect(self.toggle_mail_overlay_requested.emit)          
         if hasattr(self, 'pushButton_stamp'):
             try:
                 self.pushButton_stamp.clicked.connect(self.stamp_menu_requested.emit)

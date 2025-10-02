@@ -77,6 +77,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self.toolbar.fit_to_page_requested.connect(self.set_fit_to_page)
         self.toolbar.rotate_90_requested.connect(self._rotate_current_page)
         self.toolbar.crop_requested.connect(self._open_crop_dialog) # 자르기 신호 연결
+        self.toolbar.toggle_mail_overlay_requested.connect(self._toggle_mail_overlay)
 
         # --- 스탬프 오버레이 시그널 연결 ---
         self.stamp_overlay.stamp_selected.connect(self._activate_stamp_mode)
@@ -351,6 +352,18 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         else:
             self.stamp_overlay.show_overlay(self.size())
     
+    def _toggle_mail_overlay(self):
+        """메일 오버레이를 토글한다."""
+        if self.mail_overlay.isVisible():
+            self.mail_overlay.hide()
+        else:
+            if self.mail_overlay._content:  # content가 있을 때만 표시
+                self.mail_overlay.show_overlay(self.size())
+    
+    def toggle_mail_overlay(self):
+        """(공개 메서드) 메일 오버레이를 토글한다."""
+        self._toggle_mail_overlay()
+
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
         ui_path = Path(__file__).parent.parent / "ui" / "pdf_view_widget.ui"
@@ -916,6 +929,6 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         """메일 content를 오버레이에 표시"""
         if content:
             self.mail_overlay.set_content(content)
-            self.mail_overlay.show_overlay(self.size())
+            self.mail_overlay.show_overlay(self.size())  # 처음에는 자동으로 보임
         else:
             self.mail_overlay.hide()
