@@ -59,6 +59,7 @@ def claim_subsidy_work(rn: str, worker: str) -> bool:
     except Exception:
         traceback.print_exc()
         return False
+
 def fetch_recent_subsidy_applications():
     """최근 접수된 지원금 신청 데이터를 조회하고 출력한다."""
     try:
@@ -126,7 +127,6 @@ def get_worker_names():
     except Exception:
         traceback.print_exc()
     return workers
-
 
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
