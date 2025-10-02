@@ -128,6 +128,7 @@ class MainWindow(QMainWindow):
         self.current_page = -1
         self.thread_pool = QThreadPool()
         self._initial_resize_done = False  # 초기 크기 조정 완료 플래그
+        self._auto_return_to_main_after_save = False
         
         # --- 위젯 인스턴스 생성 ---
         self._thumbnail_viewer = ThumbnailViewWidget()
@@ -296,7 +297,7 @@ class MainWindow(QMainWindow):
         self._thumbnail_viewer.undo_requested.connect(self._handle_undo_request)
         self._thumbnail_viewer.page_delete_requested.connect(self._handle_page_delete_request)
         self._pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
-        self._pdf_view_widget.save_completed.connect(self.show_load_view) # 저장 완료 시 로드 화면으로 전환
+        self._pdf_view_widget.save_completed.connect(self._handle_save_completed) # 저장 완료 시그널 연결
         self._pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
         self._pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
         self._pdf_view_widget.page_delete_requested.connect(self._handle_page_delete_request)
@@ -554,6 +555,14 @@ class MainWindow(QMainWindow):
         # 파일 정보 패널 업데이트
         self._info_panel.update_total_pages(new_total_pages)
 
+    def _handle_save_completed(self):
+        """PDF 저장이 완료되었을 때 호출된다."""
+        if hasattr(self, '_auto_return_to_main_after_save') and self._auto_return_to_main_after_save:
+            self._auto_return_to_main_after_save = False
+            self.show_load_view()
+            # 메인화면으로 돌아갈 때 데이터 새로고침
+            self._pdf_load_widget.refresh_data()
+
     def _update_page_order(self, new_order: list[int]):
         """페이지 순서가 변경되면 호출되는 슬롯"""
         self._page_order = new_order
@@ -596,8 +605,12 @@ class MainWindow(QMainWindow):
         
         if clicked_button == no_save_button:
             self.show_load_view()
+            # 메인화면으로 돌아갈 때 데이터 새로고침
+            self._pdf_load_widget.refresh_data()
         elif clicked_button == save_button:
             self._save_document()
+            # 저장 후 메인화면으로 돌아갈 때도 데이터 새로고침
+            self._pdf_load_widget.refresh_data()
         # 취소 버튼을 누르면 아무것도 하지 않고 대화상자만 닫힘
 
     def _on_batch_test_error(self, filename: str, error_msg: str):
@@ -692,6 +705,8 @@ class MainWindow(QMainWindow):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
         if self.renderer:
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
+            # 저장 완료 후 자동으로 메인화면으로 돌아가도록 플래그 설정
+            self._auto_return_to_main_after_save = True
             self._pdf_view_widget.save_pdf(page_order=self._page_order)
         
     def show_load_view(self):
