@@ -141,8 +141,9 @@ class PdfLoadWidget(QWidget):
         metadata['region'] = metadata.get('region') or self._safe_item_text(table.item(row, 1))
         metadata['worker'] = metadata.get('worker') or self._safe_item_text(table.item(row, 2))
 
+        # 원본 파일 경로를 그대로 전달 (pdf_render.py에서 분할 파일 감지 처리)
         self.work_started.emit([str(resolved_path)], metadata)
-
+    
     @staticmethod
     def _normalize_file_path(raw_path):
         if raw_path is None:
