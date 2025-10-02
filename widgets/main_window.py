@@ -735,11 +735,15 @@ class MainWindow(QMainWindow):
             return
 
         if not claim_subsidy_work(rn_value, worker_name):
-            QMessageBox.warning(
-                self,
-                "이미 작업 중",
-                "해당 신청 건은 다른 작업자가 진행 중입니다."
-            )
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("이미 작업 중")
+            msg_box.setText("해당 신청 건은 다른 작업자가 진행 중입니다.")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            
+            # 메시지박스가 닫힐 때 자동으로 데이터 새로고침 실행
+            msg_box.finished.connect(self._pdf_load_widget.refresh_data)
+            msg_box.exec()
             return
 
         self._pending_basic_info = self._normalize_basic_info(metadata)
