@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>mail_content_overlay</class>
+ <widget class="QWidget" name="mail_content_overlay">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QWidget#mail_content_overlay {
+    background-color: rgba(40, 44, 52, 240);
+    border: 2px solid #26A69A;
+    border-radius: 8px;
+}
+
+QTextBrowser {
+    background-color: rgba(30, 34, 42, 255);
+    color: #E0E0E0;
+    border: none;
+    font-size: 11pt;
+    font-family: &quot;Malgun Gothic&quot;, &quot;맑은 고딕&quot;;
+    padding: 12px;
+}</string>
+  </property>
+  <layout class="QHBoxLayout" name="horizontalLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QTextBrowser" name="textBrowser"/>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
