@@ -401,6 +401,7 @@ def db_mail_thread(poll_interval=20):
         finally:
             if conn.is_connected(): conn.close()
 
+        print(f"⏰ {poll_interval}초 후에 다시 실행합니다.")
         time.sleep(poll_interval)
 
 def download_worker_thread():
