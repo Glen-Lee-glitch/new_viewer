@@ -417,110 +417,6 @@ class MainWindow(QMainWindow):
                 filename = Path(self._pdf_view_widget.get_current_pdf_path()).name
                 self.test_worker.signals.error.emit(filename, f"포커스 이동 중 오류: {e}")
 
-    def load_document_for_test(self, pdf_path: str):
-        """테스트 목적으로 문서를 UI에 로드한다."""
-        if isinstance(pdf_path, str):
-            self.load_document([pdf_path])
-        else:
-            self.load_document(pdf_path)
-
-    def _save_document_for_test(self, save_path: str):
-        """테스트 목적으로 현재 문서를 저장한다. (랜덤 도장 삽입 포함)"""
-        if not self.renderer or not self.renderer.get_pdf_bytes():
-            return
-
-        input_bytes = self.renderer.get_pdf_bytes()
-        rotations = self._pdf_view_widget.get_page_rotations()
-
-        # 난수 기반 도장 데이터 구성: 현재 페이지(또는 2페이지)에 1개 삽입
-        stamp_data: dict[int, list[dict]] = {}
-        try:
-            from PyQt6.QtGui import QPixmap
-            import random
-            stamp_path = Path(__file__).resolve().parent.parent / "assets" / "도장1.png"
-            pix = QPixmap(str(stamp_path))
-            if not pix.isNull():
-                # 대상 페이지: 현재 페이지 기준 (1페이지 또는 2페이지)
-                target_page = self._pdf_view_widget.current_page if self._pdf_view_widget.current_page >= 0 else 0
-                # 페이지 픽셀 크기 확보 (뷰 캐시 또는 동기 렌더링)
-                page_pixmap = self._pdf_view_widget.page_cache.get(target_page)
-                if page_pixmap is None and self.renderer and input_bytes:
-                    user_rotation = rotations.get(target_page, 0)
-                    page_pixmap = PdfRender.render_page_thread_safe(
-                        input_bytes, target_page, zoom_factor=2.0, user_rotation=user_rotation
-                    )
-                if page_pixmap is None:
-                    raise RuntimeError("페이지 미리보기 픽스맵을 얻지 못했습니다.")
-
-                page_width = max(1, page_pixmap.width())
-                page_height = max(1, page_pixmap.height())
-
-                # 고정 픽셀 기준 크기(뷰 기본)와 동일하게: desired_width=110px
-                desired_width_px = 110
-                aspect = pix.height() / max(1, pix.width())
-                desired_height_px = int(desired_width_px * aspect)
-
-                # 비율로 변환 (저장 파이프라인은 비율을 사용)
-                w_ratio = desired_width_px / page_width
-                h_ratio = desired_height_px / page_height
-
-                # 안전한 범위에서 무작위 위치
-                max_x = max(0.0, 1.0 - w_ratio - 0.02)
-                max_y = max(0.0, 1.0 - h_ratio - 0.02)
-                x_ratio = random.uniform(0.02, max_x if max_x > 0.02 else 0.02)
-                y_ratio = random.uniform(0.02, max_y if max_y > 0.02 else 0.02)
-                entries = [{
-                    'pixmap': pix,
-                    'x_ratio': x_ratio,
-                    'y_ratio': y_ratio,
-                    'w_ratio': w_ratio,
-                    'h_ratio': h_ratio,
-                }]
-
-                # 추가: '원본대조필' 도장도 동일 페이지에 랜덤 위치로 삽입 (고정 폭 320px)
-                obc_path = Path(__file__).resolve().parent.parent / "assets" / "원본대조필.png"
-                obc_pix = QPixmap(str(obc_path))
-                if not obc_pix.isNull():
-                    desired_width_px2 = 320
-                    aspect2 = obc_pix.height() / max(1, obc_pix.width())
-                    desired_height_px2 = int(desired_width_px2 * aspect2)
-
-                    w_ratio2 = desired_width_px2 / page_width
-                    h_ratio2 = desired_height_px2 / page_height
-
-                    max_x2 = max(0.0, 1.0 - w_ratio2 - 0.02)
-                    max_y2 = max(0.0, 1.0 - h_ratio2 - 0.02)
-                    x_ratio2 = random.uniform(0.02, max_x2 if max_x2 > 0.02 else 0.02)
-                    y_ratio2 = random.uniform(0.02, max_y2 if max_y2 > 0.02 else 0.02)
-
-                    entries.append({
-                        'pixmap': obc_pix,
-                        'x_ratio': x_ratio2,
-                        'y_ratio': y_ratio2,
-                        'w_ratio': w_ratio2,
-                        'h_ratio': h_ratio2,
-                    })
-
-                stamp_data[target_page] = entries
-        except Exception:
-            pass
-
-        try:
-            compress_pdf_with_multiple_stages(
-                input_bytes=input_bytes,
-                output_path=save_path,
-                target_size_mb=3,
-                rotations=rotations,
-                stamp_data=stamp_data
-            )
-        except Exception as e:
-            if not self._is_stopped:
-                # 저장 중 오류가 발생하면 원본 파일명을 특정하기 어려우므로, 현재 열린 파일명을 기준으로 함
-                error_filename = "Unknown"
-                if self.renderer.pdf_path:
-                    error_filename = Path(self.renderer.pdf_path[0]).name
-                self.test_worker.signals.error.emit(error_filename, str(e))
-
     def _handle_page_delete_request(self, visual_page_num: int):
         """페이지 삭제 요청을 처리하는 중앙 슬롯"""
         if not self.renderer or not (0 <= visual_page_num < len(self._page_order)):
@@ -736,6 +632,18 @@ class MainWindow(QMainWindow):
         self.load_document(pdf_paths)
 
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
+        # 디버그: 메일 content 출력
+        thread_id = metadata.get('recent_thread_id')
+        if thread_id:
+            from core.sql_manager import get_mail_content_by_thread_id
+            content = get_mail_content_by_thread_id(thread_id)
+            print(f"\n{'='*80}")
+            print(f"[메일 Content 조회 - thread_id: {thread_id}]")
+            print(f"{'='*80}")  
+            print(content)
+            print(f"{'='*80}\n")
+        
+        # 기존 로직
         if not metadata:
             self._pending_basic_info = self._normalize_basic_info(metadata)
             self.load_document(pdf_paths)

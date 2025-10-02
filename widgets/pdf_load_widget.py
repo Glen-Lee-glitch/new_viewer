@@ -75,6 +75,7 @@ class PdfLoadWidget(QWidget):
                 'worker': self._sanitize_text(row.get('worker', '')),
                 'name': self._sanitize_text(row.get('name', '')),
                 'special_note': self._sanitize_text(row.get('special_note', '')),
+                'recent_thread_id': self._sanitize_text(row.get('recent_thread_id', '')),  # 추가
             }
 
             rn_item = QTableWidgetItem(row_data['rn'])
@@ -209,14 +210,15 @@ class PdfLoadWidget(QWidget):
 
     def _extract_row_metadata(self, rn_item: QTableWidgetItem | None) -> dict:
         if rn_item is None:
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': ""}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': ""}
         data = rn_item.data(Qt.ItemDataRole.UserRole)
         if not isinstance(data, dict):
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': ""}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': ""}
         return {
             'rn': data.get('rn', ""),
             'name': data.get('name', ""),
             'region': data.get('region', ""),
             'worker': data.get('worker', ""),
             'special_note': data.get('special_note', ""),
+            'recent_thread_id': data.get('recent_thread_id', ""),  # 추가
         }

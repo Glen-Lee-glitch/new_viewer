@@ -7,7 +7,7 @@ import traceback
 from contextlib import closing
 
 FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
-FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath']
+FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id']
 
 # MySQL 연결 정보
 DB_CONFIG = {
@@ -67,7 +67,8 @@ def fetch_recent_subsidy_applications():
             query = (
                 "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
                 "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "
-                "       e.attached_file_path AS original_filepath "
+                "       e.attached_file_path AS original_filepath, "
+                "       sa.recent_thread_id "  # 추가
                 "FROM subsidy_applications sa "
                 "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
                 "WHERE sa.recent_received_date >= %s "
@@ -126,7 +127,27 @@ def get_worker_names():
         traceback.print_exc()
     return workers
 
+def get_mail_content_by_thread_id(thread_id: str) -> str:
+    """
+    thread_id로 emails 테이블에서 content를 조회한다.
+    """
+    if not thread_id:
+        return ""
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT content FROM emails WHERE thread_id = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (thread_id,))
+                row = cursor.fetchone()
+                return row[0] if row else ""
+    except Exception:
+        traceback.print_exc()
+        return ""
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
     print(get_worker_names())
+    # get_mail_content()
+    
