@@ -1,7 +1,9 @@
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QVBoxLayout, QLabel, QWidget
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QMessageBox
 from PyQt6.QtCore import Qt
 from PyQt6 import uic
 from pathlib import Path
+import pandas as pd
+from datetime import datetime
 
 class WorkerProgressDialog(QDialog):
     """작업자 현황 다이얼로그"""
@@ -28,16 +30,83 @@ class WorkerProgressDialog(QDialog):
     
     def _load_worker_progress(self):
         """작업자 현황 데이터를 로드하고 차트를 생성한다."""
-        # 테스트 데이터
-        workers = ['테스트1', '테스트2', '테스트3']
-        counts = [10, 5, 8]
+        try:
+            # Excel 파일 경로
+            excel_path = Path(__file__).parent.parent / "10_13_1258_EV_merged.xlsx"
+            
+            # Excel 파일 읽기
+            df = pd.read_excel(excel_path)
+            
+            # 오늘 날짜 구하기
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            # '신청일자' 컬럼을 날짜 형식으로 변환 후 오늘 날짜 필터링
+            if '신청일자' in df.columns:
+                # 신청일자 컬럼을 날짜 형식으로 변환
+                df['신청일자'] = pd.to_datetime(df['신청일자']).dt.strftime('%Y-%m-%d')
+                
+                # 오늘 날짜만 필터링
+                today_data = df[df['신청일자'] == today]
+                
+                if len(today_data) > 0 and '작성자' in today_data.columns:
+                    # 작성자별 건수 계산
+                    author_counts = today_data['작성자'].value_counts()
+                    
+                    # 작성자 이름 변환 (WU CHANGSHI -> 오창실)
+                    workers = []
+                    counts = []
+                    
+                    for author, count in author_counts.items():
+                        if author == 'WU CHANGSHI':
+                            workers.append('오창실')
+                        else:
+                            workers.append(str(author))
+                        counts.append(int(count))
+                    
+                    # 총 건수 계산 및 표시
+                    total_count = sum(counts)
+                    self.title_label.setText(f"금일 총 신청 건수: {total_count}건")
+                    
+                    # 차트 생성
+                    if workers and counts:
+                        self._create_chart(workers, counts)
+                    else:
+                        self._show_no_data_message()
+                        
+                else:
+                    # 오늘 데이터가 없는 경우
+                    self.title_label.setText("금일 총 신청 건수: 0건")
+                    self._show_no_data_message()
+            else:
+                self._show_error_message("'신청일자' 컬럼을 찾을 수 없습니다.")
+                
+        except FileNotFoundError:
+            self._show_error_message("Excel 파일을 찾을 수 없습니다.")
+        except Exception as e:
+            self._show_error_message(f"데이터 로드 중 오류가 발생했습니다: {str(e)}")
+    
+    def _show_no_data_message(self):
+        """데이터가 없을 때 메시지를 표시한다."""
+        # 빈 차트 대신 메시지 표시
+        if self.chart_container.layout():
+            while self.chart_container.layout().count():
+                child = self.chart_container.layout().takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
         
-        # 총 건수 계산 및 표시
-        total_count = sum(counts)
-        self.title_label.setText(f"금일 총 신청 건수: {total_count}건")
+        layout = QVBoxLayout(self.chart_container)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # 차트 생성
-        self._create_chart(workers, counts)
+        message_label = QLabel("오늘 처리된 신청 건이 없습니다.")
+        message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        message_label.setStyleSheet("font-size: 16px; color: #ffffff; margin: 50px;")
+        layout.addWidget(message_label)
+    
+    def _show_error_message(self, message: str):
+        """오류 메시지를 표시한다."""
+        QMessageBox.critical(self, "데이터 로드 오류", message)
+        self.title_label.setText("데이터 로드 실패")
+        self._show_no_data_message()
     
     def _create_chart(self, workers: list[str], counts: list[int]):
         """간단한 수직 막대그래프를 생성한다."""
