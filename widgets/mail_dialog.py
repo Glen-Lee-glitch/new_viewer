@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QMessageBox
+from PyQt6.QtWidgets import QDialog, QMessageBox, QStyle
 
 from widgets.unqualified_document_dialog import UnqualifiedDocumentDialog
 
@@ -15,7 +15,17 @@ class MailDialog(QDialog):
         ui_path = Path(__file__).parent.parent / "ui" / "mail_dialog.ui"
         uic.loadUi(str(ui_path), self)
         
+        self._setup_help_button()
         self._setup_connections()
+    
+    def _setup_help_button(self):
+        """도움말 버튼 설정"""
+        if hasattr(self, 'helpButton'):
+            # 시스템 표준 도움말 아이콘 설정
+            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)
+            self.helpButton.setIcon(icon)
+            self.helpButton.setText("")  # 아이콘만 표시
+            self.helpButton.clicked.connect(self._show_help_dialog)
         
     def _setup_connections(self):
         """시그널-슬롯 연결을 설정한다."""
@@ -64,6 +74,45 @@ class MailDialog(QDialog):
         """기타 텍스트 삽입"""
         if hasattr(self, 'textEdit'):
             self.textEdit.append("기타 사항: ")
+    
+    def _show_help_dialog(self):
+        """이메일 형식 도움말 다이얼로그를 표시한다."""
+        help_text = """
+<h3>📧 이메일 형식 도움말</h3>
+
+<p><b>1. RN 번호:</b><br>
+작업 중인 신청서의 RN 번호가 자동으로 입력됩니다.</p>
+
+<p><b>2. 우선순위:</b><br>
+해당되는 우선순위를 선택하면 신청번호 뒤에 자동으로 추가됩니다.<br>
+예: #123 다자녀2 신청이 완료되었습니다.</p>
+
+<p><b>3. 신청번호:</b><br>
+이메일에 포함될 신청번호를 입력하세요. (숫자만 입력)</p>
+
+<p><b>4. 자동완성 버튼:</b></p>
+<ul>
+<li><b>신청완료:</b> 신청 완료 안내 메시지를 자동 생성</li>
+<li><b>서류미비:</b> 미비 서류 항목을 선택하여 안내 메시지 생성</li>
+<li><b>기타:</b> 기타 사항 입력 템플릿 추가</li>
+</ul>
+
+<p><b>5. 내용 입력:</b><br>
+자동완성 버튼으로 기본 템플릿을 추가한 후,<br>
+필요에 따라 내용을 수정하거나 추가할 수 있습니다.</p>
+
+<p><b>💡 팁:</b><br>
+여러 자동완성 버튼을 순차적으로 클릭하여<br>
+내용을 조합할 수 있습니다.</p>
+        """
+        
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.setWindowTitle("이메일 형식 도움말")
+        msg_box.setTextFormat(Qt.TextFormat.RichText)
+        msg_box.setText(help_text)
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
     
     def get_rn_value(self) -> str:
         """RN 값을 반환한다."""
