@@ -32,6 +32,10 @@ class WorkerProgressDialog(QDialog):
         workers = ['테스트1', '테스트2', '테스트3']
         counts = [10, 5, 8]
         
+        # 총 건수 계산 및 표시
+        total_count = sum(counts)
+        self.title_label.setText(f"금일 총 신청 건수: {total_count}건")
+        
         # 차트 생성
         self._create_chart(workers, counts)
     
@@ -65,7 +69,7 @@ class WorkerProgressDialog(QDialog):
             # 건수 라벨 (막대 위)
             count_label = QLabel(str(count))
             count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            count_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
+            count_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffffff;")
             
             # 막대 (QWidget으로 구현)
             bar = QWidget()
@@ -83,7 +87,7 @@ class WorkerProgressDialog(QDialog):
             # 작업자 이름 라벨 (막대 아래)
             worker_label = QLabel(worker)
             worker_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            worker_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #2c3e50;")
+            worker_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #ffffff;")
             
             # 빈 공간 (막대를 아래쪽에 정렬하기 위함)
             spacer_height = chart_height - bar_height
