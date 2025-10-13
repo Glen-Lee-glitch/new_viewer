@@ -33,7 +33,7 @@ class MailDialog(QDialog):
         
         apply_number = self._get_apply_number()
         if hasattr(self, 'textEdit'):
-            completion_text = f"안녕하세요.\n{apply_number} 신청이 완료되었습니다."
+            completion_text = f"안녕하세요.\n#{apply_number} 신청이 완료되었습니다.\n감사합니다."
             self.textEdit.append(completion_text)
     
     def _insert_unqualified_text(self):
