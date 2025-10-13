@@ -169,6 +169,11 @@ class MainWindow(QMainWindow):
         self._login_dialog = LoginDialog(self)
         self._worker_name = ""  # 작업자 이름 저장용
         self._current_rn = ""  # 현재 작업 중인 RN 번호 저장용
+        
+        # 초기 상태에서 작업자 현황 버튼 숨김
+        if hasattr(self, 'pushButton_worker_progress'):
+            self.pushButton_worker_progress.hide()
+        
         # 앱 시작 시 로그인 다이얼로그 표시
         self._show_login_dialog()
 
@@ -757,11 +762,20 @@ class MainWindow(QMainWindow):
             self.close()
 
     def _update_worker_label(self):
-        """worker_label_2에 작업자 이름을 표시한다."""
-        if hasattr(self, 'ui_worker_label_2') and self._worker_name:
-            self.ui_worker_label_2.setText(f"작업자: {self._worker_name}")
-        elif hasattr(self, 'ui_worker_label_2'):
-            self.ui_worker_label_2.setText("작업자: 미로그인")
+        """worker_label_2에 작업자 이름을 표시하고, 관리자 권한에 따라 버튼 가시성을 설정한다."""
+        # 관리자 작업자 목록
+        admin_workers = ['이경구', '이호형', '백주현']
+        
+        # 작업자 현황 버튼 가시성 설정
+        if hasattr(self, 'pushButton_worker_progress'):
+            self.pushButton_worker_progress.setVisible(self._worker_name in admin_workers)
+        
+        # 작업자 라벨 업데이트
+        if hasattr(self, 'worker_label_2'):
+            if self._worker_name:
+                self.worker_label_2.setText(f"작업자: {self._worker_name}")
+            else:
+                self.worker_label_2.setText("작업자: 미로그인")
 
 def create_app():
     """QApplication을 생성하고 메인 윈도우를 반환한다."""

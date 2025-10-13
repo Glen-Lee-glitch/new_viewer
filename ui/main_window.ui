@@ -110,6 +110,13 @@
       </spacer>
      </item>
      <item>
+      <widget class="QPushButton" name="pushButton_worker_progress">
+       <property name="text">
+        <string>작업자 현황</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="ui_push_button_reset">
        <property name="text">
         <string>메인화면</string>
