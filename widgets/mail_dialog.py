@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QMessageBox, QStyle
 
 from widgets.unqualified_document_dialog import UnqualifiedDocumentDialog
+from core.mail_utils import copy_to_clipboard
 
 
 class MailDialog(QDialog):
@@ -36,6 +37,11 @@ class MailDialog(QDialog):
             self.pushButton_unqualified.clicked.connect(self._insert_unqualified_text)
         if hasattr(self, 'pushButton_etc'):
             self.pushButton_etc.clicked.connect(self._insert_etc_text)
+        
+        # buttonBox OK 버튼 클릭 시 클립보드 복사
+        if hasattr(self, 'buttonBox'):
+            self.buttonBox.accepted.disconnect()  # 기본 연결 해제
+            self.buttonBox.accepted.connect(self._on_accepted)  # 커스텀 핸들러 연결
     
     def _insert_completion_text(self):
         """신청완료 텍스트 삽입 (apply_number 검증 후)"""
@@ -64,7 +70,7 @@ class MailDialog(QDialog):
             if hasattr(self, 'textEdit'):
                 if selected_items:
                     items_text = ", ".join(selected_items)
-                    text = f"다음 서류가 미비하여 추가 제출이 필요합니다.\n {items_text}"
+                    text = f"다음 서류가 미비하여 추가 제출이 필요합니다.\n{items_text}"
                 else:
                     text = "서류가 미비하여 추가 제출이 필요합니다."
                 
@@ -74,6 +80,18 @@ class MailDialog(QDialog):
         """기타 텍스트 삽입"""
         if hasattr(self, 'textEdit'):
             self.textEdit.append("기타 사항: ")
+    
+    def _on_accepted(self):
+        """OK 버튼 클릭 시 신청번호와 우선순위를 클립보드에 복사한다."""
+        apply_number = self._get_apply_number()
+        priority_text = self._get_priority_text()
+        
+        if apply_number:
+            copied_text = copy_to_clipboard(apply_number, priority_text)
+            print(f"클립보드에 복사됨: {copied_text}")
+        
+        # 다이얼로그 닫기
+        self.accept()
     
     def _show_help_dialog(self):
         """이메일 형식 도움말 다이얼로그를 표시한다."""
