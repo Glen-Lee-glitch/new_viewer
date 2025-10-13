@@ -22,6 +22,7 @@ from widgets.todo_widget import ToDoWidget
 from widgets.settings_dialog import SettingsDialog
 from widgets.login_dialog import LoginDialog
 from widgets.mail_dialog import MailDialog
+from widgets.worker_progress_dialog import WorkerProgressDialog
 
 
 class BatchTestSignals(QObject):
@@ -302,6 +303,11 @@ class MainWindow(QMainWindow):
             print(f"메일 전송 요청 - RN: {rn_value}, 내용: {content}")
             # TODO: 실제 메일 전송 로직 구현
 
+    def _open_worker_progress_dialog(self):
+        """작업자 현황 다이얼로그를 연다."""
+        worker_progress_dialog = WorkerProgressDialog(self)
+        worker_progress_dialog.exec()
+
     def _setup_menus(self):
         """메뉴바를 설정합니다."""
         pass # 메뉴바 설정 로직 추가
@@ -335,6 +341,9 @@ class MainWindow(QMainWindow):
         
         # 테스트 버튼 시그널 연결
         self.ui_test_button.clicked.connect(self.start_batch_test)
+        
+        # 작업자 현황 버튼 시그널 연결
+        self.pushButton_worker_progress.clicked.connect(self._open_worker_progress_dialog)
         
         # --- 전역 단축키 설정 ---
         # _setup_global_shortcuts() 메서드에서 처리하므로 기존 코드는 제거
