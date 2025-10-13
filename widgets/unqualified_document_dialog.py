@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, 
     QHBoxLayout,
     QGroupBox, 
-    QRadioButton,
+    QCheckBox,
     QPushButton,
     QDialogButtonBox
 )
@@ -30,28 +30,28 @@ class UnqualifiedDocumentDialog(QDialog):
         # 그룹박스 1
         group1 = QGroupBox("그룹 1")
         group1_layout = QVBoxLayout()
-        self.radio1_1 = QRadioButton("임시1")
-        self.radio1_2 = QRadioButton("임시2")
-        group1_layout.addWidget(self.radio1_1)
-        group1_layout.addWidget(self.radio1_2)
+        self.check1_1 = QCheckBox("임시1")
+        self.check1_2 = QCheckBox("임시2")
+        group1_layout.addWidget(self.check1_1)
+        group1_layout.addWidget(self.check1_2)
         group1.setLayout(group1_layout)
         
         # 그룹박스 2
         group2 = QGroupBox("그룹 2")
         group2_layout = QVBoxLayout()
-        self.radio2_1 = QRadioButton("임시3")
-        self.radio2_2 = QRadioButton("임시4")
-        group2_layout.addWidget(self.radio2_1)
-        group2_layout.addWidget(self.radio2_2)
+        self.check2_1 = QCheckBox("임시3")
+        self.check2_2 = QCheckBox("임시4")
+        group2_layout.addWidget(self.check2_1)
+        group2_layout.addWidget(self.check2_2)
         group2.setLayout(group2_layout)
         
         # 그룹박스 3
         group3 = QGroupBox("그룹 3")
         group3_layout = QVBoxLayout()
-        self.radio3_1 = QRadioButton("임시5")
-        self.radio3_2 = QRadioButton("임시6")
-        group3_layout.addWidget(self.radio3_1)
-        group3_layout.addWidget(self.radio3_2)
+        self.check3_1 = QCheckBox("임시5")
+        self.check3_2 = QCheckBox("임시6")
+        group3_layout.addWidget(self.check3_1)
+        group3_layout.addWidget(self.check3_2)
         group3.setLayout(group3_layout)
         
         # 그룹박스들을 메인 레이아웃에 추가
@@ -73,22 +73,22 @@ class UnqualifiedDocumentDialog(QDialog):
         self.setMinimumWidth(300)
     
     def get_selected_items(self) -> list[str]:
-        """선택된 라디오버튼 항목들을 반환한다."""
+        """선택된 체크박스 항목들을 반환한다."""
         selected = []
         
-        if self.radio1_1.isChecked():
+        if self.check1_1.isChecked():
             selected.append("임시1")
-        elif self.radio1_2.isChecked():
+        if self.check1_2.isChecked():
             selected.append("임시2")
             
-        if self.radio2_1.isChecked():
+        if self.check2_1.isChecked():
             selected.append("임시3")
-        elif self.radio2_2.isChecked():
+        if self.check2_2.isChecked():
             selected.append("임시4")
             
-        if self.radio3_1.isChecked():
+        if self.check3_1.isChecked():
             selected.append("임시5")
-        elif self.radio3_2.isChecked():
+        if self.check3_2.isChecked():
             selected.append("임시6")
         
         return selected
