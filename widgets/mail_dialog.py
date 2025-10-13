@@ -64,7 +64,7 @@ class MailDialog(QDialog):
             if hasattr(self, 'textEdit'):
                 if selected_items:
                     items_text = ", ".join(selected_items)
-                    text = f"서류가 미비하여 추가 제출이 필요합니다.\n선택된 항목: {items_text}"
+                    text = f"다음 서류가 미비하여 추가 제출이 필요합니다.\n {items_text}"
                 else:
                     text = "서류가 미비하여 추가 제출이 필요합니다."
                 

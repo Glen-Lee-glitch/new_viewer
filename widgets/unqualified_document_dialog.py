@@ -28,28 +28,30 @@ class UnqualifiedDocumentDialog(QDialog):
         main_layout = QVBoxLayout(self)
         
         # 그룹박스 1
-        group1 = QGroupBox("그룹 1")
+        group1 = QGroupBox("중요서류")
         group1_layout = QVBoxLayout()
-        self.check1_1 = QCheckBox("임시1")
-        self.check1_2 = QCheckBox("임시2")
+        self.check1_1 = QCheckBox("등초본")
+        self.check1_2 = QCheckBox("구매계약서")
+        self.check1_3 = QCheckBox("지원신청서")
         group1_layout.addWidget(self.check1_1)
         group1_layout.addWidget(self.check1_2)
+        group1_layout.addWidget(self.check1_3)
         group1.setLayout(group1_layout)
         
         # 그룹박스 2
-        group2 = QGroupBox("그룹 2")
+        group2 = QGroupBox("보완서류")
         group2_layout = QVBoxLayout()
-        self.check2_1 = QCheckBox("임시3")
-        self.check2_2 = QCheckBox("임시4")
+        self.check2_1 = QCheckBox("과세증명서(청년생애 서류)")
+        self.check2_2 = QCheckBox("공동명의자 서류")
         group2_layout.addWidget(self.check2_1)
         group2_layout.addWidget(self.check2_2)
         group2.setLayout(group2_layout)
         
         # 그룹박스 3
-        group3 = QGroupBox("그룹 3")
+        group3 = QGroupBox("기타")
         group3_layout = QVBoxLayout()
-        self.check3_1 = QCheckBox("임시5")
-        self.check3_2 = QCheckBox("임시6")
+        self.check3_1 = QCheckBox("거주요건")
+        self.check3_2 = QCheckBox("중복")
         group3_layout.addWidget(self.check3_1)
         group3_layout.addWidget(self.check3_2)
         group3.setLayout(group3_layout)
@@ -77,19 +79,21 @@ class UnqualifiedDocumentDialog(QDialog):
         selected = []
         
         if self.check1_1.isChecked():
-            selected.append("임시1")
+            selected.append("등초본")
         if self.check1_2.isChecked():
-            selected.append("임시2")
+            selected.append("구매계약서")
+        if self.check1_3.isChecked():
+            selected.append("지원신청서")
             
         if self.check2_1.isChecked():
-            selected.append("임시3")
+            selected.append("과세증명서(청년생애 서류)")
         if self.check2_2.isChecked():
-            selected.append("임시4")
+            selected.append("공동명의자 서류")
             
         if self.check3_1.isChecked():
-            selected.append("임시5")
+            selected.append("거주요건")
         if self.check3_2.isChecked():
-            selected.append("임시6")
+            selected.append("중복")
         
         return selected
 
