@@ -4,6 +4,8 @@ from PyQt6 import uic
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
+from widgets.unqualified_document_dialog import UnqualifiedDocumentDialog
+
 
 class MailDialog(QDialog):
     """이메일 전송 다이얼로그"""
@@ -43,9 +45,20 @@ class MailDialog(QDialog):
             self.textEdit.append(completion_text)
     
     def _insert_unqualified_text(self):
-        """서류미비 텍스트 삽입"""
-        if hasattr(self, 'textEdit'):
-            self.textEdit.append("서류가 미비하여 추가 제출이 필요합니다.")
+        """서류미비 텍스트 삽입 (다이얼로그에서 항목 선택)"""
+        dialog = UnqualifiedDocumentDialog(self)
+        
+        if dialog.exec():
+            selected_items = dialog.get_selected_items()
+            
+            if hasattr(self, 'textEdit'):
+                if selected_items:
+                    items_text = ", ".join(selected_items)
+                    text = f"서류가 미비하여 추가 제출이 필요합니다.\n선택된 항목: {items_text}"
+                else:
+                    text = "서류가 미비하여 추가 제출이 필요합니다."
+                
+                self.textEdit.append(text)
     
     def _insert_etc_text(self):
         """기타 텍스트 삽입"""
