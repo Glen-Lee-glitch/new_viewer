@@ -168,6 +168,7 @@ class MainWindow(QMainWindow):
         # 로그인 다이얼로그 초기화
         self._login_dialog = LoginDialog(self)
         self._worker_name = ""  # 작업자 이름 저장용
+        self._current_rn = ""  # 현재 작업 중인 RN 번호 저장용
         # 앱 시작 시 로그인 다이얼로그 표시
         self._show_login_dialog()
 
@@ -286,10 +287,9 @@ class MainWindow(QMainWindow):
     
     def _open_mail_dialog(self):
         """메일 다이얼로그를 연다."""
-        # 현재 작업 중인 RN 값이 있다면 미리 설정
-        if self._pending_basic_info:
-            # 여기에 RN 값을 설정하는 로직을 추가할 수 있음
-            pass
+        # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
+        if self._current_rn:
+            self._mail_dialog.set_rn_value(self._current_rn)
         
         if self._mail_dialog.exec():
             rn_value = self._mail_dialog.get_rn_value()
@@ -629,6 +629,7 @@ class MainWindow(QMainWindow):
         
         self.renderer = None
         self.current_page = -1
+        self._current_rn = ""  # 현재 RN 초기화
 
         self._pdf_load_widget.show()
         
@@ -644,6 +645,7 @@ class MainWindow(QMainWindow):
 
     def _handle_pdf_selected(self, pdf_paths: list):
         self._pending_basic_info = None
+        self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
         self._info_panel.update_basic_info("", "", "")
         self.load_document(pdf_paths)
 
@@ -662,12 +664,16 @@ class MainWindow(QMainWindow):
         
         # 기존 로직
         if not metadata:
+            self._current_rn = ""  # metadata가 없는 경우 RN 초기화
             self._pending_basic_info = self._normalize_basic_info(metadata)
             self.load_document(pdf_paths)
             return
 
         worker_name = self._worker_name or metadata.get('worker', '')
         rn_value = metadata.get('rn')
+        
+        # 현재 작업 중인 RN 저장
+        self._current_rn = rn_value or ""
 
         if not worker_name or not rn_value:
             self._pending_basic_info = self._normalize_basic_info(metadata)

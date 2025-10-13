@@ -30,7 +30,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="lineEdit"/>
+         <widget class="QLineEdit" name="RN_lineEdit"/>
         </item>
         <item>
          <widget class="QComboBox" name="comboBox">
@@ -117,21 +117,21 @@
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton">
+           <widget class="QPushButton" name="pushButton_complement">
             <property name="text">
              <string>신청완료</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton_2">
+           <widget class="QPushButton" name="pushButton_unqualified">
             <property name="text">
              <string>서류미비</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton_3">
+           <widget class="QPushButton" name="pushButton_etc">
             <property name="text">
              <string>기타</string>
             </property>

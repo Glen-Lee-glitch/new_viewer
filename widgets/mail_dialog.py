@@ -42,8 +42,8 @@ class MailDialog(QDialog):
     
     def get_rn_value(self) -> str:
         """RN 값을 반환한다."""
-        if hasattr(self, 'lineEdit'):
-            return self.lineEdit.text().strip()
+        if hasattr(self, 'RN_lineEdit'):
+            return self.RN_lineEdit.text().strip()
         return ""
     
     def get_content(self) -> str:
@@ -54,8 +54,8 @@ class MailDialog(QDialog):
     
     def set_rn_value(self, rn_value: str):
         """RN 값을 설정한다."""
-        if hasattr(self, 'lineEdit'):
-            self.lineEdit.setText(rn_value)
+        if hasattr(self, 'RN_lineEdit'):
+            self.RN_lineEdit.setText(rn_value)
     
     def set_content(self, content: str):
         """내용을 설정한다."""
