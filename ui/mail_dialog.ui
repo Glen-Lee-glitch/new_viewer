@@ -33,7 +33,12 @@
          <widget class="QLineEdit" name="RN_lineEdit"/>
         </item>
         <item>
-         <widget class="QComboBox" name="comboBox">
+         <widget class="QComboBox" name="priority_comboBox">
+          <item>
+           <property name="text">
+            <string>우선순위 없음</string>
+           </property>
+          </item>
           <item>
            <property name="text">
             <string>다자녀2</string>

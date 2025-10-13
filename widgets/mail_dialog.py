@@ -32,8 +32,14 @@ class MailDialog(QDialog):
             return
         
         apply_number = self._get_apply_number()
+        priority_text = self._get_priority_text()
+        
         if hasattr(self, 'textEdit'):
-            completion_text = f"안녕하세요.\n#{apply_number} 신청이 완료되었습니다.\n감사합니다."
+            # 우선순위가 있으면 신청번호 뒤에 추가
+            if priority_text:
+                completion_text = f"안녕하세요.\n#{apply_number} {priority_text} 신청이 완료되었습니다.\n감사합니다."
+            else:
+                completion_text = f"안녕하세요.\n#{apply_number} 신청이 완료되었습니다.\n감사합니다."
             self.textEdit.append(completion_text)
     
     def _insert_unqualified_text(self):
@@ -94,3 +100,16 @@ class MailDialog(QDialog):
         if hasattr(self, 'apply_number'):
             return self.apply_number.text().strip()
         return ""
+    
+    def _get_priority_text(self) -> str:
+        """priority_comboBox에서 선택된 우선순위 텍스트를 반환한다. '우선순위 없음'이면 빈 문자열 반환."""
+        if not hasattr(self, 'priority_comboBox'):
+            return ""
+        
+        current_text = self.priority_comboBox.currentText().strip()
+        
+        # '우선순위 없음'이면 빈 문자열 반환
+        if current_text == "우선순위 없음":
+            return ""
+        
+        return current_text
