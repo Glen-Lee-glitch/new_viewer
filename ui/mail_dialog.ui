@@ -32,6 +32,70 @@
         <item>
          <widget class="QLineEdit" name="lineEdit"/>
         </item>
+        <item>
+         <widget class="QComboBox" name="comboBox">
+          <item>
+           <property name="text">
+            <string>다자녀2</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>공동명의</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>청년생애</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>개인사업자</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>법인</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>리스</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>공동명의/청년생애</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>제주청년</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>장애인</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>다자녀3</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>다자녀4+</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>다자녀+청년생애</string>
+           </property>
+          </item>
+         </widget>
+        </item>
        </layout>
       </item>
       <item>

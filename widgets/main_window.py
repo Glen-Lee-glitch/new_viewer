@@ -21,6 +21,7 @@ from widgets.info_panel_widget import InfoPanelWidget
 from widgets.todo_widget import ToDoWidget
 from widgets.settings_dialog import SettingsDialog
 from widgets.login_dialog import LoginDialog
+from widgets.mail_dialog import MailDialog
 
 
 class BatchTestSignals(QObject):
@@ -137,6 +138,7 @@ class MainWindow(QMainWindow):
         self._info_panel = InfoPanelWidget()
         self._todo_widget = ToDoWidget(self)
         self._settings_dialog = SettingsDialog(self)
+        self._mail_dialog = MailDialog(self)
         self._pending_basic_info: dict | None = None
 
         # --- 페이지 순서 관리 ---
@@ -281,6 +283,19 @@ class MainWindow(QMainWindow):
         if self._settings_dialog.exec():
             # 사용자가 OK를 누르면 변경된 단축키를 다시 적용
             self._apply_shortcuts()
+    
+    def _open_mail_dialog(self):
+        """메일 다이얼로그를 연다."""
+        # 현재 작업 중인 RN 값이 있다면 미리 설정
+        if self._pending_basic_info:
+            # 여기에 RN 값을 설정하는 로직을 추가할 수 있음
+            pass
+        
+        if self._mail_dialog.exec():
+            rn_value = self._mail_dialog.get_rn_value()
+            content = self._mail_dialog.get_content()
+            print(f"메일 전송 요청 - RN: {rn_value}, 내용: {content}")
+            # TODO: 실제 메일 전송 로직 구현
 
     def _setup_menus(self):
         """메뉴바를 설정합니다."""
@@ -300,6 +315,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.save_completed.connect(self._handle_save_completed) # 저장 완료 시그널 연결
         self._pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
         self._pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
+        self._pdf_view_widget.toolbar.email_requested.connect(self._open_mail_dialog)
         self._pdf_view_widget.page_delete_requested.connect(self._handle_page_delete_request)
         
         # 정보 패널 업데이트 연결

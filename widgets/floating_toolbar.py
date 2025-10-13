@@ -16,6 +16,7 @@ class FloatingToolbarWidget(QWidget):
     crop_requested = pyqtSignal() # 자르기 신호 추가
     setting_requested = pyqtSignal()
     toggle_mail_overlay_requested = pyqtSignal()  # 메일 오버레이 토글 시그널 추가
+    email_requested = pyqtSignal()  # 이메일 다이얼로그 시그널 추가
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -61,6 +62,9 @@ class FloatingToolbarWidget(QWidget):
 
         if hasattr(self, 'pushButton_setting'):
             self.pushButton_setting.clicked.connect(self.setting_requested.emit)
+
+        if hasattr(self, 'pushButton_email'):
+            self.pushButton_email.clicked.connect(self.email_requested.emit)
 
     def _add_shadow_effect(self):
         """툴바에 그림자 효과를 추가한다."""
