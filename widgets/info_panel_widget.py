@@ -17,9 +17,6 @@ class InfoPanelWidget(QWidget):
 
     def clear_info(self):
         """모든 정보 라벨을 'N/A'로 초기화한다."""
-        self.label_file_path.setText("N/A")
-        self.label_file_size.setText("N/A")
-        self.label_total_pages_val.setText("N/A")
         self.label_current_page.setText("N/A")
         self.label_page_dims.setText("N/A")
         self.label_page_rotation.setText("N/A")
@@ -28,14 +25,12 @@ class InfoPanelWidget(QWidget):
         self.lineEdit_special.clear()
 
     def update_file_info(self, file_path: str, file_size_mb: float, total_pages: int):
-        """파일 관련 정보를 업데이트한다."""
-        self.label_file_path.setText(file_path)
-        self.label_file_size.setText(f"{file_size_mb:.2f} MB")
-        self.label_total_pages_val.setText(str(total_pages))
+        """파일 관련 정보를 업데이트한다. (UI에서 파일 정보 그룹박스가 제거되어 비활성화됨)"""
+        pass
 
     def update_total_pages(self, total_pages: int):
-        """총 페이지 수 정보만 업데이트한다."""
-        self.label_total_pages_val.setText(str(total_pages))
+        """총 페이지 수 정보만 업데이트한다. (UI에서 파일 정보 그룹박스가 제거되어 비활성화됨)"""
+        pass
 
     def update_page_info(self, page_num: int, width: float, height: float, rotation: int):
         """현재 페이지 관련 정보를 업데이트한다."""

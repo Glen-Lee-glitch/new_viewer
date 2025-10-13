@@ -32,7 +32,7 @@ class WorkerProgressDialog(QDialog):
         """작업자 현황 데이터를 로드하고 차트를 생성한다."""
         try:
             # Excel 파일 경로
-            excel_path = Path(__file__).parent.parent / "10_13_1258_EV_merged.xlsx"
+            excel_path = Path(__file__).parent.parent / "10_13_1658_EV_merged.xlsx"
             
             # Excel 파일 읽기
             df = pd.read_excel(excel_path)
