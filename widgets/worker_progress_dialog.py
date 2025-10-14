@@ -4,6 +4,7 @@ from PyQt6 import uic
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
+from core.sql_manager import get_daily_worker_progress
 
 class WorkerProgressDialog(QDialog):
     """작업자 현황 다이얼로그"""
@@ -31,57 +32,28 @@ class WorkerProgressDialog(QDialog):
     def _load_worker_progress(self):
         """작업자 현황 데이터를 로드하고 차트를 생성한다."""
         try:
-            # Excel 파일 경로
-            excel_path = Path(__file__).parent.parent / "10_13_1658_EV_merged.xlsx"
+            # 데이터베이스에서 작업자별 현황 조회
+            df = get_daily_worker_progress()
             
-            # Excel 파일 읽기
-            df = pd.read_excel(excel_path)
-            
-            # 오늘 날짜 구하기
-            today = datetime.now().strftime('%Y-%m-%d')
-            
-            # '신청일자' 컬럼을 날짜 형식으로 변환 후 오늘 날짜 필터링
-            if '신청일자' in df.columns:
-                # 신청일자 컬럼을 날짜 형식으로 변환
-                df['신청일자'] = pd.to_datetime(df['신청일자']).dt.strftime('%Y-%m-%d')
+            if not df.empty:
+                # 데이터프레임에서 작업자와 건수 추출
+                workers = df['worker'].tolist()
+                counts = df['count'].tolist()
                 
-                # 오늘 날짜만 필터링
-                today_data = df[df['신청일자'] == today]
+                # 총 건수 계산 및 표시
+                total_count = sum(counts)
+                self.title_label.setText(f"금일 총 신청 건수: {total_count}건")
                 
-                if len(today_data) > 0 and '작성자' in today_data.columns:
-                    # 작성자별 건수 계산
-                    author_counts = today_data['작성자'].value_counts()
-                    
-                    # 작성자 이름 변환 (WU CHANGSHI -> 오창실)
-                    workers = []
-                    counts = []
-                    
-                    for author, count in author_counts.items():
-                        if author == 'WU CHANGSHI':
-                            workers.append('오창실')
-                        else:
-                            workers.append(str(author))
-                        counts.append(int(count))
-                    
-                    # 총 건수 계산 및 표시
-                    total_count = sum(counts)
-                    self.title_label.setText(f"금일 총 신청 건수: {total_count}건")
-                    
-                    # 차트 생성
-                    if workers and counts:
-                        self._create_chart(workers, counts)
-                    else:
-                        self._show_no_data_message()
-                        
+                # 차트 생성
+                if workers and counts:
+                    self._create_chart(workers, counts)
                 else:
-                    # 오늘 데이터가 없는 경우
-                    self.title_label.setText("금일 총 신청 건수: 0건")
                     self._show_no_data_message()
             else:
-                self._show_error_message("'신청일자' 컬럼을 찾을 수 없습니다.")
+                # 데이터가 없는 경우
+                self.title_label.setText("금일 총 신청 건수: 0건")
+                self._show_no_data_message()
                 
-        except FileNotFoundError:
-            self._show_error_message("Excel 파일을 찾을 수 없습니다.")
         except Exception as e:
             self._show_error_message(f"데이터 로드 중 오류가 발생했습니다: {str(e)}")
     

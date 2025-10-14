@@ -145,6 +145,25 @@ def get_mail_content_by_thread_id(thread_id: str) -> str:
         traceback.print_exc()
         return ""
 
+def get_daily_worker_progress():
+    """
+    daily_application 테이블에서 type이 '지원'인 것 중 작업자별 건수를 조회한다.
+    """
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT worker, COUNT(*) as count 
+                FROM daily_application 
+                WHERE type = '지원' AND worker IS NOT NULL
+                GROUP BY worker 
+                ORDER BY count DESC
+            """
+            df = pd.read_sql(query, connection)
+            return df
+    except Exception:
+        traceback.print_exc()
+        return pd.DataFrame()
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
