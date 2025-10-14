@@ -34,6 +34,11 @@ ATTACHMENT_SAVE_DIR = "C:\\Users\\HP\\Desktop\\greet_db\\files\\new"
 
 # 스레드 간 통신을 위한 공유 큐
 download_queue = Queue()
+preprocess_queue = Queue()  # 전처리 큐 추가
+
+# 전처리 임계값 설정
+PREPROCESS_THRESHOLD_MB = 3.0  # 3MB 초과 시에만 전처리
+PROCESSED_DIR = "C:\\Users\\HP\\Desktop\\greet_db\\files\\processed"
 
 # --- DB 및 Gmail API 연결 ---
 
@@ -294,15 +299,18 @@ def download_and_process_attachments(gmail_service, msg_id, payload, thread_id, 
     # 현재는 파일 경로를 세미콜론으로 연결하여 반환
     return ';'.join(unique_paths)
 
-def update_email_attachment_path(conn, thread_id, file_path):
-    """emails 테이블에 최종 첨부파일 경로 업데이트 및 attached_file = 1로 설정"""
+def update_email_attachment_path(conn, thread_id, file_path, file_rendered=0):
+    """emails 테이블에 최종 첨부파일 경로 업데이트 및 file_rendered 설정"""
     cursor = conn.cursor()
     try:
-        # 다운로드 완료 시 attached_file도 1로 변경
-        sql = "UPDATE emails SET attached_file = 1, attached_file_path = %s WHERE thread_id = %s"
-        cursor.execute(sql, (file_path, thread_id))
+        sql = """UPDATE emails 
+                 SET attached_file = 1, 
+                     attached_file_path = %s,
+                     file_rendered = %s
+                 WHERE thread_id = %s"""
+        cursor.execute(sql, (file_path, file_rendered, thread_id))
         conn.commit()
-        print(f"  ✅ (DB) 첨부파일 다운로드 완료: {thread_id}")
+        print(f"  ✅ (DB) 첨부파일 정보 저장: {thread_id} (file_rendered={file_rendered})")
     except Error as e:
         print(f"  ❌ (DB) 첨부파일 경로 업데이트 실패: {e}")
         conn.rollback()
@@ -406,7 +414,7 @@ def db_mail_thread(poll_interval=20):
         time.sleep(poll_interval)
 
 def download_worker_thread():
-    """다운로드 큐를 감시하고 첨부파일을 다운로드"""
+    """다운로드 큐를 감시하고 첨부파일을 다운로드 (전처리는 별도 스레드에서)"""
     print("🚀 다운로드 워커 스레드 시작")
     gmail_service = get_service(CREDENTIALS_FILE, TOKEN_FILE)
     if not gmail_service: return
@@ -435,20 +443,38 @@ def download_worker_thread():
                 headers = payload.get('headers', [])
                 subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), '')
                 
-                # 다운로드 및 (필요시) 병합
+                # 다운로드 수행
                 final_path = download_and_process_attachments(
                     gmail_service, msg_id, payload, thread_id, ATTACHMENT_SAVE_DIR, subject
                 )
                 
-                # DB에 최종 경로 업데이트
                 if final_path != 'N':
-                    update_email_attachment_path(conn, thread_id, final_path)
+                    # 파일 크기 확인
+                    file_size_mb = os.path.getsize(final_path) / (1024 * 1024)
+                    needs_preprocess = False
+                    
+                    # ✨ PDF이고 3MB 초과 시에만 전처리 필요
+                    if final_path.lower().endswith('.pdf') and file_size_mb > PREPROCESS_THRESHOLD_MB:
+                        needs_preprocess = True
+                        print(f"  📏 파일 크기: {file_size_mb:.2f} MB → 전처리 필요")
+                    else:
+                        print(f"  📏 파일 크기: {file_size_mb:.2f} MB → 전처리 불필요")
+                    
+                    # DB 업데이트: file_rendered = 0 (아직 전처리 안됨)
+                    update_email_attachment_path(conn, thread_id, final_path, file_rendered=0)
+                    
+                    # 전처리가 필요한 경우만 큐에 추가
+                    if needs_preprocess:
+                        preprocess_queue.put({
+                            'thread_id': thread_id,
+                            'original_path': final_path
+                        })
+                        print(f"  📋 전처리 큐에 추가: {thread_id}")
                 
                 print(f"✅ 다운로드 완료: {thread_id}")
 
             except Exception as e:
                 print(f"❌ 다운로드 처리 중 예외 발생: {thread_id}, {e}")
-                # 실패 시 DB에 에러 로그를 남기는 로직 추가 가능
             finally:
                 if conn.is_connected(): conn.close()
                 download_queue.task_done()
@@ -459,23 +485,157 @@ def download_worker_thread():
             time.sleep(5)
 
 
+def preprocess_worker_thread():
+    """✨ 전처리 큐를 감시하고 대용량 PDF 최적화 수행"""
+    print("🚀 전처리 워커 스레드 시작")
+    
+    # 전처리 디렉토리 생성
+    if not os.path.exists(PROCESSED_DIR):
+        os.makedirs(PROCESSED_DIR)
+
+    while True:
+        try:
+            task = preprocess_queue.get()
+            thread_id = task['thread_id']
+            original_path = task['original_path']
+            
+            # 파일 크기 재확인 (안전장치)
+            file_size_mb = os.path.getsize(original_path) / (1024 * 1024)
+            print(f"🔧 전처리 시작: {thread_id} ({file_size_mb:.2f} MB)")
+            
+            try:
+                # 전처리 수행
+                processed_path = preprocess_pdf_for_rendering(original_path, PROCESSED_DIR)
+                
+                if processed_path:
+                    # ✨ DB 업데이트: attached_file_path를 전처리된 경로로 변경, file_rendered = 1
+                    conn = get_database_connection()
+                    if conn:
+                        try:
+                            cursor = conn.cursor()
+                            
+                            # 전처리된 파일 크기
+                            processed_size_mb = os.path.getsize(processed_path) / (1024 * 1024)
+                            
+                            sql = """UPDATE emails 
+                                     SET attached_file_path = %s,
+                                         file_rendered = 1
+                                     WHERE thread_id = %s"""
+                            cursor.execute(sql, (processed_path, thread_id))
+                            conn.commit()
+                            
+                            print(f"  ✅ 전처리 완료: {thread_id}")
+                            print(f"     원본: {file_size_mb:.2f} MB → 전처리: {processed_size_mb:.2f} MB")
+                            
+                        except Error as e:
+                            print(f"  ⚠️ DB 업데이트 실패: {e}")
+                            conn.rollback()
+                        finally:
+                            if conn.is_connected():
+                                conn.close()
+                else:
+                    print(f"  ⚠️ 전처리 실패: {thread_id} (원본 파일 사용)")
+                
+            except Exception as e:
+                print(f"  ❌ 전처리 중 예외 발생: {thread_id}, {e}")
+            finally:
+                preprocess_queue.task_done()
+                
+        except Exception as e:
+            print(f"❌ 전처리 워커 오류: {e}")
+            time.sleep(5)
+
+
+def preprocess_pdf_for_rendering(original_path: str, processed_dir: str) -> str | None:
+    """PDF를 렌더링에 최적화된 형태로 전처리 (3MB 초과 파일용)"""
+    try:
+        from pathlib import Path
+        import pymupdf
+        
+        # 파일명 생성
+        base_name = Path(original_path).stem
+        processed_filename = f"{base_name}_processed.pdf"
+        processed_path = os.path.join(processed_dir, processed_filename)
+        
+        # 이미 처리된 파일이 있고 최신이면 스킵
+        if os.path.exists(processed_path):
+            if os.path.getmtime(processed_path) >= os.path.getmtime(original_path):
+                print(f"  ⚡ 이미 전처리됨: {processed_filename}")
+                return processed_path
+        
+        print(f"  🔧 A4 변환 및 최적화 중: {base_name}")
+        
+        # A4 변환 및 최적화
+        with pymupdf.open(original_path) as source_doc:
+            new_doc = pymupdf.open()
+            TARGET_DPI = 200
+            
+            for page in source_doc:
+                bounds = page.bound()
+                is_landscape = bounds.width > bounds.height
+                
+                if is_landscape:
+                    a4_rect = pymupdf.paper_rect("a4-l")
+                else:
+                    a4_rect = pymupdf.paper_rect("a4")
+                
+                target_pixel_width = a4_rect.width / 72 * TARGET_DPI
+                target_pixel_height = a4_rect.height / 72 * TARGET_DPI
+                
+                zoom_x = target_pixel_width / bounds.width if bounds.width > 0 else 0
+                zoom_y = target_pixel_height / bounds.height if bounds.height > 0 else 0
+                zoom = min(zoom_x, zoom_y)
+                
+                matrix = pymupdf.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=matrix, alpha=False, annots=True)
+                
+                new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+                
+                margin = 0.98
+                page_rect = new_page.rect
+                margin_x = page_rect.width * (1 - margin) / 2
+                margin_y = page_rect.height * (1 - margin) / 2
+                target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
+                
+                new_page.insert_image(target_rect, pixmap=pix)
+            
+            # 최적화하여 저장
+            new_doc.save(processed_path, garbage=4, deflate=True, clean=True)
+            new_doc.close()
+        
+        return processed_path
+        
+    except Exception as e:
+        print(f"  ⚠️ 전처리 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 if __name__ == "__main__":
     print("="*50)
     print(" 메일 수집 및 첨부파일 다운로드 서비스 시작")
+    print(f" 전처리 임계값: {PREPROCESS_THRESHOLD_MB} MB 초과")
     print("="*50)
 
-    # 1. 메일 수집 스레드 생성 및 시작
+    # 1. 메일 수집 스레드 (20초 주기)
     mail_collector = threading.Thread(target=db_mail_thread, daemon=True)
     mail_collector.start()
 
-    # 2. 다운로드 워커 스레드 생성 및 시작
+    # 2. 다운로드 워커 스레드
     attachment_downloader = threading.Thread(target=download_worker_thread, daemon=True)
     attachment_downloader.start()
+
+    # 3. 전처리 워커 스레드 (새로 추가!)
+    pdf_preprocessor = threading.Thread(target=preprocess_worker_thread, daemon=True)
+    pdf_preprocessor.start()
 
     # 메인 스레드는 데몬 스레드가 종료되지 않도록 유지
     try:
         # 스레드가 살아있는지 주기적으로 확인
-        while mail_collector.is_alive() and attachment_downloader.is_alive():
+        while (mail_collector.is_alive() and 
+               attachment_downloader.is_alive() and 
+               pdf_preprocessor.is_alive()):
             time.sleep(1)
     except KeyboardInterrupt:
         print("\n🚫 서비스를 종료합니다.")
