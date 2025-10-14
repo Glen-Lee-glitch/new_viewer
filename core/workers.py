@@ -1,5 +1,7 @@
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal
 from PyQt6.QtGui import QPixmap
+import time
+from pathlib import Path
 
 from core.pdf_render import PdfRender
 from core.pdf_saved import compress_pdf_with_multiple_stages
@@ -80,3 +82,95 @@ class PdfSaveWorker(QRunnable):
             self.signals.save_finished.emit(self.output_path, success)
         except Exception as e:
             self.signals.save_error.emit(str(e))
+
+
+class BatchTestSignals(QObject):
+    """PDF 일괄 테스트 Worker의 시그널 정의"""
+    progress = pyqtSignal(str)
+    error = pyqtSignal(str, str) # file_name, error_message
+    finished = pyqtSignal()
+    load_pdf = pyqtSignal(str) # UI에 PDF 로드를 요청하는 시그널
+    # 도장 삽입 시나리오용 신호
+    rotate_90_maybe = pyqtSignal()  # 10% 확률 회전은 슬롯에서 판단
+    focus_page2_maybe = pyqtSignal()  # 50% 확률 2페이지 포커스는 슬롯에서 판단
+    save_pdf = pyqtSignal(str)   # UI에 PDF 저장을 요청하는 시그널 (저장 경로 전달)
+
+class PdfBatchTestWorker(QRunnable):
+    """PDF 일괄 열기/저장 테스트를 수행하는 Worker"""
+    def __init__(self):
+        super().__init__()
+        self.signals = BatchTestSignals()
+        self.input_dir = r'C:\Users\HP\Desktop\files\테스트PDF'
+        self.output_dir = r'C:\Users\HP\Desktop\files\결과'
+        self._is_stopped = False
+
+    def stop(self):
+        """Worker를 중지시킨다."""
+        self._is_stopped = True
+
+    def run(self):
+        input_path = Path(self.input_dir)
+        output_path = Path(self.output_dir)
+
+        if not input_path.is_dir():
+            self.signals.error.emit("", f"입력 폴더를 찾을 수 없습니다: {self.input_dir}")
+            return
+
+        if not output_path.exists():
+            try:
+                output_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                self.signals.error.emit("", f"출력 폴더를 생성하는 데 실패했습니다: {e}")
+                return
+
+        pdf_files = sorted(list(input_path.glob("*.pdf")))
+        if not pdf_files:
+            self.signals.error.emit("", f"테스트할 PDF 파일이 없습니다: {self.input_dir}")
+            return
+        
+        # 파일 경로를 (원본, 저장될 경로) 튜플로 관리
+        file_paths_to_process = [
+            (str(p), str(output_path / f"{p.stem}_tested.pdf")) for p in pdf_files
+        ]
+
+        self.signals.progress.emit(f"총 {len(file_paths_to_process)}개의 PDF 파일 테스트 시작...")
+        time.sleep(1)
+
+        for input_file, output_file in file_paths_to_process:
+            if self._is_stopped: return
+
+            try:
+                # 1. UI에 PDF 로드 요청
+                self.signals.progress.emit(f"'{Path(input_file).name}' 로드 중...")
+                self.signals.load_pdf.emit(input_file)
+                
+                # 2. 2초 대기
+                time.sleep(2)
+                if self._is_stopped: return
+
+                # 3. 10% 확률 회전 요청 (실제 확률 판단은 슬롯에서 수행)
+                self.signals.progress.emit("10% 확률로 첫 페이지 90도 회전 시도")
+                self.signals.rotate_90_maybe.emit()
+                time.sleep(2)
+                if self._is_stopped: return
+
+                # 4. 50% 확률로 2페이지 포커스 이동 (없으면 유지)
+                self.signals.progress.emit("50% 확률로 2페이지 포커스 이동 시도")
+                self.signals.focus_page2_maybe.emit()
+                time.sleep(1)
+                if self._is_stopped: return
+
+                # 5. UI에 PDF 저장 요청 (저장 경로 전달)
+                self.signals.progress.emit(f"'{Path(output_file).name}' 저장 요청...")
+                self.signals.save_pdf.emit(output_file)
+                
+                # 6. 3초 대기
+                time.sleep(3)
+
+            except Exception as e:
+                if not self._is_stopped:
+                    self.signals.error.emit(Path(input_file).name, str(e))
+                return # 오류 발생 시 즉시 중단
+        
+        if not self._is_stopped:
+            self.signals.finished.emit()
