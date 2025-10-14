@@ -275,6 +275,11 @@ class MainWindow(QMainWindow):
         self.toggle_mail_overlay_action = QAction(self)
         self.addAction(self.toggle_mail_overlay_action)
         self.toggle_mail_overlay_action.triggered.connect(self._pdf_view_widget.toggle_mail_overlay)
+        
+        # 자르기 액션
+        self.crop_action = QAction(self)
+        self.addAction(self.crop_action)
+        self.crop_action.triggered.connect(self._pdf_view_widget._open_crop_dialog)
 
         self._apply_shortcuts()
 
@@ -293,6 +298,10 @@ class MainWindow(QMainWindow):
         # 메일 오버레이 단축키 적용
         mail_overlay_shortcut = settings.value("shortcuts/toggle_mail_overlay", "M")
         self.toggle_mail_overlay_action.setShortcut(QKeySequence.fromString(mail_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
+        
+        # 자르기 단축키 적용
+        crop_shortcut = settings.value("shortcuts/crop", "Y")
+        self.crop_action.setShortcut(QKeySequence.fromString(crop_shortcut, QKeySequence.SequenceFormat.PortableText))
 
     def _open_settings_dialog(self):
         """설정 다이얼로그를 연다."""

@@ -65,6 +65,20 @@
          </layout>
         </item>
         <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_11">
+          <item>
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>자르기</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QKeySequenceEdit" name="keySequenceEdit_crop"/>
+          </item>
+         </layout>
+        </item>
+        <item>
          <layout class="QHBoxLayout" name="horizontalLayout_5">
           <item>
            <widget class="QLabel" name="label_4">

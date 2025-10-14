@@ -23,10 +23,12 @@ class SettingsDialog(QDialog):
         shortcut_toggle_todo = self.settings.value("shortcuts/toggle_todo", "`")
         stamp_overlay_shortcut = self.settings.value("shortcuts/toggle_stamp_overlay", "T")
         mail_overlay_shortcut = self.settings.value("shortcuts/toggle_mail_overlay", "M")
+        crop_shortcut = self.settings.value("shortcuts/crop", "Y")
 
         self.keySequenceEdit_to_do.setKeySequence(QKeySequence.fromString(shortcut_toggle_todo, QKeySequence.SequenceFormat.PortableText))
         self.keySequenceEdit_toggleStampOverlay.setKeySequence(QKeySequence.fromString(stamp_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
         self.keySequenceEdit_toggleMailOverlay.setKeySequence(QKeySequence.fromString(mail_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
+        self.keySequenceEdit_crop.setKeySequence(QKeySequence.fromString(crop_shortcut, QKeySequence.SequenceFormat.PortableText))
 
         # 나머지 단축키 설정 로드 (임시)
         self.keySequenceEdit_insert_2.setKeySequence(QKeySequence(self.settings.value("shortcuts/unused_1", "")))
@@ -43,6 +45,7 @@ class SettingsDialog(QDialog):
         self.settings.setValue("shortcuts/toggle_todo", self.keySequenceEdit_to_do.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
         self.settings.setValue("shortcuts/toggle_stamp_overlay", self.keySequenceEdit_toggleStampOverlay.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
         self.settings.setValue("shortcuts/toggle_mail_overlay", self.keySequenceEdit_toggleMailOverlay.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
+        self.settings.setValue("shortcuts/crop", self.keySequenceEdit_crop.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
 
 
         # 나머지 설정들도 동일하게 저장 (임시)
