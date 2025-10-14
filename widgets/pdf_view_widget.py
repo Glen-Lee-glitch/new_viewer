@@ -552,7 +552,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         except Exception as e:
             QMessageBox.critical(self, "오류", f"페이지를 삭제하는 중 오류가 발생했습니다:\n{e}")
 
-    def save_pdf(self, page_order: list[int] | None = None):
+    def save_pdf(self, page_order: list[int] | None = None, worker_name: str = ""):
         """PDF 저장 프로세스를 시작한다."""
         try:
             if not self.renderer or not self.renderer.get_pdf_bytes():
@@ -563,15 +563,35 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             if page_order is None:
                 page_order = list(range(self.renderer.get_page_count()))
 
+            # 자동 경로 생성
+            from datetime import datetime
+            from pathlib import Path as PathLib
+            
+            base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\finished'
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            # 작업자 이름이 없으면 "미지정" 폴더 사용
+            worker_folder = worker_name if worker_name else "미지정"
+            
+            # 최종 저장 경로 구성
+            save_dir = PathLib(base_dir) / worker_folder / today
+            save_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 원본 파일명 가져오기
             default_path = self.get_current_pdf_path() or "untitled.pdf"
-            output_path, _ = QFileDialog.getSaveFileName(
-                self, "PDF로 저장", default_path, "PDF Files (*.pdf)"
-            )
-
-            if not output_path:
-                # 사용자가 저장 다이얼로그에서 취소한 경우에도 정리 작업 수행
-                self.save_completed.emit()
-                return
+            original_filename = PathLib(default_path).name
+            
+            # 최종 저장 경로
+            output_path = str(save_dir / original_filename)
+            
+            # 파일이 이미 존재하는 경우 타임스탬프 추가
+            if PathLib(output_path).exists():
+                timestamp = datetime.now().strftime('%H%M%S')
+                stem = PathLib(original_filename).stem
+                suffix = PathLib(original_filename).suffix
+                output_path = str(save_dir / f"{stem}_{timestamp}{suffix}")
+            
+            print(f"자동 저장 경로: {output_path}")
 
             input_bytes = self.renderer.get_pdf_bytes()
             rotations = self.get_page_rotations()  # <--- 파라미터 없이 원본 데이터 전달
