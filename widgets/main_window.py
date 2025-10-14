@@ -170,6 +170,7 @@ class MainWindow(QMainWindow):
         self._login_dialog = LoginDialog(self)
         self._worker_name = ""  # 작업자 이름 저장용
         self._current_rn = ""  # 현재 작업 중인 RN 번호 저장용
+        self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 여부
         
         # 초기 상태에서 작업자 현황 버튼 숨김
         if hasattr(self, 'pushButton_worker_progress'):
@@ -320,6 +321,26 @@ class MainWindow(QMainWindow):
             content = self._mail_dialog.get_content()
             print(f"메일 전송 요청 - RN: {rn_value}, 내용: {content}")
             # TODO: 실제 메일 전송 로직 구현
+
+    def _open_mail_dialog_then_return_to_main(self):
+        """이메일 다이얼로그를 열고, 완료 후 메인화면으로 돌아간다."""
+        # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
+        if self._current_rn:
+            self._mail_dialog.set_rn_value(self._current_rn)
+        
+        # 이메일 다이얼로그를 모달로 실행
+        dialog_result = self._mail_dialog.exec()
+        
+        if dialog_result:
+            rn_value = self._mail_dialog.get_rn_value()
+            content = self._mail_dialog.get_content()
+            print(f"[컨텍스트 메뉴 작업 완료 후 메일 전송] RN: {rn_value}, 내용: {content}")
+            # TODO: 실제 메일 전송 로직 구현
+        
+        # 이메일 창이 닫힌 후 메인화면으로 돌아가기
+        self.show_load_view()
+        # 메인화면으로 돌아갈 때 데이터 새로고침
+        self._pdf_load_widget.refresh_data()
 
     def _open_worker_progress_dialog(self):
         """작업자 현황 다이얼로그를 연다."""
@@ -503,9 +524,16 @@ class MainWindow(QMainWindow):
         """PDF 저장이 완료되었을 때 호출된다."""
         if hasattr(self, '_auto_return_to_main_after_save') and self._auto_return_to_main_after_save:
             self._auto_return_to_main_after_save = False
-            self.show_load_view()
-            # 메인화면으로 돌아갈 때 데이터 새로고침
-            self._pdf_load_widget.refresh_data()
+            
+            # 컨텍스트 메뉴를 통한 작업이었다면 이메일 창을 먼저 열기
+            if self._is_context_menu_work:
+                self._is_context_menu_work = False  # 플래그 리셋
+                self._open_mail_dialog_then_return_to_main()
+            else:
+                # 일반적인 경우 바로 메인화면으로 돌아가기
+                self.show_load_view()
+                # 메인화면으로 돌아갈 때 데이터 새로고침
+                self._pdf_load_widget.refresh_data()
 
     def _update_page_order(self, new_order: list[int]):
         """페이지 순서가 변경되면 호출되는 슬롯"""
@@ -662,6 +690,7 @@ class MainWindow(QMainWindow):
         self.renderer = None
         self.current_page = -1
         self._current_rn = ""  # 현재 RN 초기화
+        self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
 
         self._pdf_load_widget.show()
         
@@ -678,13 +707,14 @@ class MainWindow(QMainWindow):
     def _handle_pdf_selected(self, pdf_paths: list):
         self._pending_basic_info = None
         self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
+        self._is_context_menu_work = False  # 로컬 파일 열기 시 컨텍스트 메뉴 작업 플래그 리셋
         self._info_panel.update_basic_info("", "", "")
         self.load_document(pdf_paths)
 
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
-        # 컨텍스트 메뉴를 통한 작업 시작 여부 확인
-        is_context_menu_work = metadata.get('is_context_menu_work', False)
-        if is_context_menu_work:
+        # 컨텍스트 메뉴를 통한 작업 시작 여부 확인 및 저장
+        self._is_context_menu_work = metadata.get('is_context_menu_work', False)
+        if self._is_context_menu_work:
             print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
         
         # 메일 content 조회
