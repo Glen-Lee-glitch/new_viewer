@@ -353,7 +353,43 @@ class MainWindow(QMainWindow):
 
     def _setup_menus(self):
         """메뉴바를 설정합니다."""
-        pass # 메뉴바 설정 로직 추가
+        # 파일 메뉴
+        open_action = QAction("PDF 열기", self)
+        open_action.setShortcut(QKeySequence.StandardKey.Open)
+        open_action.triggered.connect(self._pdf_load_widget.open_pdf_file)
+        self.menu_file.addAction(open_action)
+        
+        self.menu_file.addSeparator()
+        
+        save_action = QAction("저장", self)
+        save_action.setShortcut(QKeySequence.StandardKey.Save)
+        save_action.triggered.connect(self._save_document)
+        self.menu_file.addAction(save_action)
+        
+        self.menu_file.addSeparator()
+        
+        exit_action = QAction("종료", self)
+        exit_action.setShortcut(QKeySequence.StandardKey.Quit)
+        exit_action.triggered.connect(self.close)
+        self.menu_file.addAction(exit_action)
+        
+        # 편집 메뉴
+        undo_action = QAction("실행 취소", self)
+        undo_action.setShortcut(QKeySequence.StandardKey.Undo)
+        undo_action.triggered.connect(self._pdf_view_widget.undo_last_action)
+        self.menu_edit.addAction(undo_action)
+        
+        self.menu_edit.addSeparator()
+        
+        settings_action = QAction("설정", self)
+        settings_action.triggered.connect(self._open_settings_dialog)
+        self.menu_edit.addAction(settings_action)
+        
+        # 보기 메뉴
+        todo_action = QAction("할일 목록", self)
+        todo_action.setCheckable(True)
+        todo_action.triggered.connect(self._todo_widget.toggle_overlay)
+        self.menu_view.addAction(todo_action)
 
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
