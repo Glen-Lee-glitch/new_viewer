@@ -547,7 +547,10 @@ def preprocess_worker_thread():
 
 
 def preprocess_pdf_for_rendering(original_path: str, processed_dir: str) -> str | None:
-    """PDF를 렌더링에 최적화된 형태로 전처리 (3MB 초과 파일용)"""
+    """PDF를 렌더링에 최적화된 형태로 전처리 (3MB 초과 파일용)
+    
+    전략: 벡터 기반 페이지는 그대로 복사, 이미지가 많은 페이지만 최적화
+    """
     try:
         from pathlib import Path
         import pymupdf
@@ -563,14 +566,16 @@ def preprocess_pdf_for_rendering(original_path: str, processed_dir: str) -> str 
                 print(f"  ⚡ 이미 전처리됨: {processed_filename}")
                 return processed_path
         
-        print(f"  🔧 A4 변환 및 최적화 중: {base_name}")
+        print(f"  🔧 PDF 최적화 중: {base_name}")
         
-        # A4 변환 및 최적화
+        # 단순 최적화: garbage collection + deflate + clean
+        # 벡터 데이터는 유지하면서 불필요한 객체만 제거
         with pymupdf.open(original_path) as source_doc:
+            # A4 규격으로 변환하되, 벡터 데이터를 유지하는 방식
             new_doc = pymupdf.open()
-            TARGET_DPI = 200
             
-            for page in source_doc:
+            for page_num in range(len(source_doc)):
+                page = source_doc[page_num]
                 bounds = page.bound()
                 is_landscape = bounds.width > bounds.height
                 
@@ -579,28 +584,21 @@ def preprocess_pdf_for_rendering(original_path: str, processed_dir: str) -> str 
                 else:
                     a4_rect = pymupdf.paper_rect("a4")
                 
-                target_pixel_width = a4_rect.width / 72 * TARGET_DPI
-                target_pixel_height = a4_rect.height / 72 * TARGET_DPI
-                
-                zoom_x = target_pixel_width / bounds.width if bounds.width > 0 else 0
-                zoom_y = target_pixel_height / bounds.height if bounds.height > 0 else 0
-                zoom = min(zoom_x, zoom_y)
-                
-                matrix = pymupdf.Matrix(zoom, zoom)
-                pix = page.get_pixmap(matrix=matrix, alpha=False, annots=True)
-                
+                # 새 A4 페이지 생성
                 new_page = new_doc.new_page(width=a4_rect.width, height=a4_rect.height)
                 
-                margin = 0.98
-                page_rect = new_page.rect
-                margin_x = page_rect.width * (1 - margin) / 2
-                margin_y = page_rect.height * (1 - margin) / 2
-                target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
-                
-                new_page.insert_image(target_rect, pixmap=pix)
+                # show_pdf_page: 벡터 기반으로 페이지를 복사 (이미지로 변환하지 않음)
+                new_page.show_pdf_page(new_page.rect, source_doc, page_num)
             
-            # 최적화하여 저장
-            new_doc.save(processed_path, garbage=4, deflate=True, clean=True)
+            # 강력한 최적화 옵션으로 저장
+            new_doc.save(
+                processed_path,
+                garbage=4,          # 최대 garbage collection
+                deflate=True,       # 압축 활성화
+                clean=True,         # 불필요한 객체 제거
+                pretty=False,       # 가독성 제거 (크기 감소)
+                linear=False,       # 선형화 비활성화 (웹 최적화 불필요)
+            )
             new_doc.close()
         
         return processed_path
