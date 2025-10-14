@@ -393,9 +393,9 @@ class MainWindow(QMainWindow):
         
         self.menu_view.addSeparator()
         
-        worker_progress_action = QAction("작업자 현황", self)
-        worker_progress_action.triggered.connect(self._open_worker_progress_dialog)
-        self.menu_view.addAction(worker_progress_action)
+        self.worker_progress_action = QAction("작업자 현황", self)
+        self.worker_progress_action.triggered.connect(self._open_worker_progress_dialog)
+        self.menu_view.addAction(self.worker_progress_action)
 
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
@@ -884,10 +884,15 @@ class MainWindow(QMainWindow):
         """worker_label_2에 작업자 이름을 표시하고, 관리자 권한에 따라 버튼 가시성을 설정한다."""
         # 관리자 작업자 목록
         admin_workers = ['이경구', '이호형', '백주현']
+        is_admin = self._worker_name in admin_workers
         
         # 작업자 현황 버튼 가시성 설정
         if hasattr(self, 'pushButton_worker_progress'):
-            self.pushButton_worker_progress.setVisible(self._worker_name in admin_workers)
+            self.pushButton_worker_progress.setVisible(is_admin)
+        
+        # 작업자 현황 메뉴 항목 가시성 설정
+        if hasattr(self, 'worker_progress_action'):
+            self.worker_progress_action.setVisible(is_admin)
         
         # 작업자 라벨 업데이트
         if hasattr(self, 'worker_label_2'):
