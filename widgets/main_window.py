@@ -337,6 +337,10 @@ class MainWindow(QMainWindow):
             print(f"[컨텍스트 메뉴 작업 완료 후 메일 전송] RN: {rn_value}, 내용: {content}")
             # TODO: 실제 메일 전송 로직 구현
         
+        # 이메일 창 완료 후 즉시 컨텍스트 메뉴 작업 플래그 리셋
+        self._is_context_menu_work = False
+        print("[컨텍스트 메뉴 작업 플래그] 이메일 창 완료 후 False로 리셋됨")
+        
         # 이메일 창이 닫힌 후 메인화면으로 돌아가기
         self.show_load_view()
         # 메인화면으로 돌아갈 때 데이터 새로고침
