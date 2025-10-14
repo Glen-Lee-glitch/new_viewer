@@ -4,8 +4,7 @@ from PyQt6 import uic
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
-import random
-from core.sql_manager import get_daily_worker_progress
+from core.sql_manager import get_daily_worker_progress, get_daily_worker_payment_progress
 
 class WorkerProgressDialog(QDialog):
     """작업자 현황 다이얼로그"""
@@ -33,25 +32,46 @@ class WorkerProgressDialog(QDialog):
     def _load_worker_progress(self):
         """작업자 현황 데이터를 로드하고 차트를 생성한다."""
         try:
-            # 데이터베이스에서 작업자별 현황 조회
-            df = get_daily_worker_progress()
+            # 데이터베이스에서 지원 및 지급 데이터 조회
+            support_df = get_daily_worker_progress()
+            payment_df = get_daily_worker_payment_progress()
             
-            if not df.empty:
-                # 데이터프레임에서 작업자와 건수 추출
-                workers = df['worker'].tolist()
-                existing_counts = df['count'].tolist()
+            if not support_df.empty:
+                # 지원 데이터에서 작업자와 건수 추출
+                support_workers = support_df['worker'].tolist()
+                support_counts = support_df['count'].tolist()
                 
-                # 각 작업자마다 새로운 데이터(테스트용 랜덤 값) 생성
-                new_counts = [random.randint(0, 5) for _ in workers]
+                # 지급 데이터를 딕셔너리로 변환 (작업자별 건수 매핑)
+                payment_dict = {}
+                if not payment_df.empty:
+                    for _, row in payment_df.iterrows():
+                        payment_dict[row['worker']] = row['count']
                 
-                # 총 건수 계산 및 표시 (지원 + 지급)
-                total_existing = sum(existing_counts)
-                total_new = sum(new_counts)
-                self.title_label.setText(f"금일 총 신청 건수: {total_existing}건 (지원) + {total_new}건 (지급)")
+                # 모든 작업자 목록 생성 (지원 + 지급)
+                all_workers = list(set(support_workers + payment_dict.keys()))
+                all_workers.sort()  # 정렬
+                
+                # 각 작업자별 지원/지급 건수 매핑
+                final_support_counts = []
+                final_payment_counts = []
+                
+                for worker in all_workers:
+                    # 지원 건수 (없으면 0)
+                    support_count = support_counts[support_workers.index(worker)] if worker in support_workers else 0
+                    final_support_counts.append(support_count)
+                    
+                    # 지급 건수 (없으면 0)
+                    payment_count = payment_dict.get(worker, 0)
+                    final_payment_counts.append(payment_count)
+                
+                # 총 건수 계산 및 표시
+                total_support = sum(final_support_counts)
+                total_payment = sum(final_payment_counts)
+                self.title_label.setText(f"금일 총 신청 건수: {total_support}건 (지원) + {total_payment}건 (지급)")
                 
                 # 이중 막대 차트 생성
-                if workers and existing_counts:
-                    self._create_dual_chart(workers, existing_counts, new_counts)
+                if all_workers and (final_support_counts or final_payment_counts):
+                    self._create_dual_chart(all_workers, final_support_counts, final_payment_counts)
                 else:
                     self._show_no_data_message()
             else:
