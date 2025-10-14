@@ -51,6 +51,20 @@
          </layout>
         </item>
         <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_10">
+          <item>
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>메일 오버레이</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QKeySequenceEdit" name="keySequenceEdit_toggleMailOverlay"/>
+          </item>
+         </layout>
+        </item>
+        <item>
          <layout class="QHBoxLayout" name="horizontalLayout_5">
           <item>
            <widget class="QLabel" name="label_4">

@@ -22,9 +22,11 @@ class SettingsDialog(QDialog):
         # TODO: settings.ui의 위젯 이름들이 명확해지면 키 값도 그에 맞게 수정해야 합니다.
         shortcut_toggle_todo = self.settings.value("shortcuts/toggle_todo", "`")
         stamp_overlay_shortcut = self.settings.value("shortcuts/toggle_stamp_overlay", "T")
+        mail_overlay_shortcut = self.settings.value("shortcuts/toggle_mail_overlay", "M")
 
         self.keySequenceEdit_to_do.setKeySequence(QKeySequence.fromString(shortcut_toggle_todo, QKeySequence.SequenceFormat.PortableText))
         self.keySequenceEdit_toggleStampOverlay.setKeySequence(QKeySequence.fromString(stamp_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
+        self.keySequenceEdit_toggleMailOverlay.setKeySequence(QKeySequence.fromString(mail_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
 
         # 나머지 단축키 설정 로드 (임시)
         self.keySequenceEdit_insert_2.setKeySequence(QKeySequence(self.settings.value("shortcuts/unused_1", "")))
@@ -40,6 +42,7 @@ class SettingsDialog(QDialog):
         """UI에 설정된 단축키를 저장합니다."""
         self.settings.setValue("shortcuts/toggle_todo", self.keySequenceEdit_to_do.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
         self.settings.setValue("shortcuts/toggle_stamp_overlay", self.keySequenceEdit_toggleStampOverlay.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
+        self.settings.setValue("shortcuts/toggle_mail_overlay", self.keySequenceEdit_toggleMailOverlay.keySequence().toString(QKeySequence.SequenceFormat.PortableText))
 
 
         # 나머지 설정들도 동일하게 저장 (임시)

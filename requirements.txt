@@ -31,3 +31,8 @@ pytz
 
 # 기타 유틸리티
 pathlib2
+filelock
+
+# PDF 처리 추가 (압축 등)
+reportlab
+PyPDF2

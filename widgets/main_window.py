@@ -270,6 +270,11 @@ class MainWindow(QMainWindow):
         self.toggle_stamp_overlay_action = QAction(self)
         self.addAction(self.toggle_stamp_overlay_action)
         self.toggle_stamp_overlay_action.triggered.connect(self._pdf_view_widget.toggle_stamp_overlay)
+        
+        # 메일 오버레이 토글 액션
+        self.toggle_mail_overlay_action = QAction(self)
+        self.addAction(self.toggle_mail_overlay_action)
+        self.toggle_mail_overlay_action.triggered.connect(self._pdf_view_widget.toggle_mail_overlay)
 
         self._apply_shortcuts()
 
@@ -284,6 +289,10 @@ class MainWindow(QMainWindow):
         # 스탬프 오버레이 단축키 적용
         stamp_overlay_shortcut = settings.value("shortcuts/toggle_stamp_overlay", "Ctrl+T")
         self.toggle_stamp_overlay_action.setShortcut(QKeySequence.fromString(stamp_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
+        
+        # 메일 오버레이 단축키 적용
+        mail_overlay_shortcut = settings.value("shortcuts/toggle_mail_overlay", "M")
+        self.toggle_mail_overlay_action.setShortcut(QKeySequence.fromString(mail_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
 
     def _open_settings_dialog(self):
         """설정 다이얼로그를 연다."""
