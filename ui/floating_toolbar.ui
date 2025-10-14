@@ -163,10 +163,10 @@
       </size>
      </property>
      <property name="toolTip">
-      <string>복사</string>
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;회전&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="text">
-      <string>📋</string>
+      <string>🔄</string>
      </property>
     </widget>
    </item>
