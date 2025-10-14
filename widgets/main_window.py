@@ -23,6 +23,7 @@ from widgets.settings_dialog import SettingsDialog
 from widgets.login_dialog import LoginDialog
 from widgets.mail_dialog import MailDialog
 from widgets.worker_progress_dialog import WorkerProgressDialog
+from widgets.alarm_widget import AlarmWidget
 
 
 class MainWindow(QMainWindow):
@@ -46,6 +47,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget = PdfViewWidget()
         self._pdf_load_widget = PdfLoadWidget()
         self._info_panel = InfoPanelWidget()
+        self._alarm_widget = AlarmWidget()
         self._todo_widget = ToDoWidget(self)
         self._settings_dialog = SettingsDialog(self)
         self._mail_dialog = MailDialog(self)
@@ -61,6 +63,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.hide()
         self._thumbnail_viewer.hide()
         self._info_panel.hide()
+        self._alarm_widget.show()  # alarm_widget은 초기에 표시
         self._todo_widget.hide()
 
         # --- 메뉴바 및 액션 설정 ---
@@ -108,10 +111,20 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self._pdf_load_widget)
         content_layout.addWidget(self._pdf_view_widget)
         
-        # 정보 패널 컨테이너에 배치
-        info_panel_layout = QHBoxLayout(self.ui_info_panel_container)
+        # 정보 패널 컨테이너에 배치 (VBoxLayout으로 변경하여 alarm_widget과 info_panel을 수직으로 배치)
+        from PyQt6.QtWidgets import QVBoxLayout, QSpacerItem, QSizePolicy
+        info_panel_layout = QVBoxLayout(self.ui_info_panel_container)
         info_panel_layout.setContentsMargins(0, 0, 0, 0)
         info_panel_layout.setSpacing(0)
+        
+        # alarm_widget 추가 (상단)
+        info_panel_layout.addWidget(self._alarm_widget)
+        
+        # vertical spacer 추가
+        vertical_spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        info_panel_layout.addItem(vertical_spacer)
+        
+        # info_panel은 나중에 표시될 때 사용 (초기에는 숨김)
         info_panel_layout.addWidget(self._info_panel)
         
         # 스플리터 크기 설정
@@ -136,6 +149,10 @@ class MainWindow(QMainWindow):
     @property
     def info_panel(self):
         return self._info_panel
+    
+    @property
+    def alarm_widget(self):
+        return self._alarm_widget
     
     @property
     def todo_widget(self):
@@ -616,7 +633,8 @@ class MainWindow(QMainWindow):
         self._pdf_load_widget.hide()
         self._pdf_view_widget.show()
         self._thumbnail_viewer.show()
-        self._info_panel.show()
+        self._alarm_widget.hide()  # PDF 로드 시 alarm_widget 숨김
+        self._info_panel.show()  # PDF 로드 시 info_panel 표시
 
         # 기본 스플리터 사이즈를 즉시 한 번 강제하여 초기 힌트를 통일
         self.set_splitter_sizes(False)
@@ -666,6 +684,7 @@ class MainWindow(QMainWindow):
         self._thumbnail_viewer.clear_thumbnails()
         self._info_panel.hide()
         self._info_panel.clear_info()
+        self._alarm_widget.show()  # 메인화면으로 돌아갈 때 alarm_widget 표시
 
         self._update_page_navigation()
 
