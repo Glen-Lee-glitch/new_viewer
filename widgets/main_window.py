@@ -794,6 +794,7 @@ class MainWindow(QMainWindow):
 
         worker_name = self._worker_name or metadata.get('worker', '')
         rn_value = metadata.get('rn')
+        existing_worker = metadata.get('worker', '').strip()  # 이미 배정된 작업자
         
         # 현재 작업 중인 RN 저장
         self._current_rn = rn_value or ""
@@ -801,6 +802,21 @@ class MainWindow(QMainWindow):
         if not worker_name or not rn_value:
             self._pending_basic_info = self._normalize_basic_info(metadata)
             self.load_document(pdf_paths)
+            return
+
+        # 관리자 권한 확인
+        admin_workers = ['이경구', '이호형']
+        is_admin = self._worker_name in admin_workers
+        
+        # 이미 작업자가 배정되어 있고, 현재 로그인 사용자가 관리자인 경우 조회 모드로 진행
+        if existing_worker and is_admin:
+            print(f"[관리자 조회 모드] 작업자: {existing_worker}, 관리자: {self._worker_name}")
+            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self.load_document(pdf_paths)
+            
+            # PDF 로드 후 메일 content 표시
+            if mail_content:
+                self._pdf_view_widget.set_mail_content(mail_content)
             return
 
         if not claim_subsidy_work(rn_value, worker_name):
