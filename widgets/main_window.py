@@ -390,6 +390,12 @@ class MainWindow(QMainWindow):
         todo_action.setCheckable(True)
         todo_action.triggered.connect(self._todo_widget.toggle_overlay)
         self.menu_view.addAction(todo_action)
+        
+        self.menu_view.addSeparator()
+        
+        worker_progress_action = QAction("작업자 현황", self)
+        worker_progress_action.triggered.connect(self._open_worker_progress_dialog)
+        self.menu_view.addAction(worker_progress_action)
 
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
