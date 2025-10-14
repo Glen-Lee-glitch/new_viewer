@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
-from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget, QMessageBox
+from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget, QMessageBox, QApplication
 
 from core.pdf_render import PdfRender
 from core.edit_mixin import EditMixin
@@ -112,10 +112,20 @@ class ThumbnailViewWidget(QWidget):
 
     def on_thumbnail_clicked(self, item):
         """썸네일 클릭 시 호출"""
-        # UserRole(실제 번호) 대신 리스트의 '보이는' 순서(row)를 전달
-        row = self.thumbnail_list_widget.row(item)
-        if row != -1:
-            self.page_selected.emit(row)
+        # Ctrl/Shift 키가 눌린 상태(다중 선택 모드)인지 확인
+        modifiers = QApplication.keyboardModifiers()
+        is_multi_select_mode = (
+            modifiers & Qt.KeyboardModifier.ControlModifier or 
+            modifiers & Qt.KeyboardModifier.ShiftModifier
+        )
+        
+        # 다중 선택 모드가 아닐 때만 page_selected 시그널을 emit
+        # 다중 선택 모드일 때는 Qt의 기본 선택 로직만 작동하도록 함
+        if not is_multi_select_mode:
+            # UserRole(실제 번호) 대신 리스트의 '보이는' 순서(row)를 전달
+            row = self.thumbnail_list_widget.row(item)
+            if row != -1:
+                self.page_selected.emit(row)
     
     def _on_rows_moved(self):
         """드래그 앤 드롭으로 아이템 순서가 바뀌었을 때 호출"""
