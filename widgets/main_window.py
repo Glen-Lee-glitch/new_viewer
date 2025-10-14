@@ -682,6 +682,11 @@ class MainWindow(QMainWindow):
         self.load_document(pdf_paths)
 
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
+        # 컨텍스트 메뉴를 통한 작업 시작 여부 확인
+        is_context_menu_work = metadata.get('is_context_menu_work', False)
+        if is_context_menu_work:
+            print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
+        
         # 메일 content 조회
         thread_id = metadata.get('recent_thread_id')
         mail_content = ""
@@ -745,6 +750,7 @@ class MainWindow(QMainWindow):
             'name': _coerce(metadata.get('name')),
             'region': _coerce(metadata.get('region')),
             'special_note': _coerce(metadata.get('special_note')),
+            'is_context_menu_work': metadata.get('is_context_menu_work', False)  # 컨텍스트 메뉴 작업 여부 추가
         }
 
     def _collect_pending_basic_info(self) -> tuple[str, str, str]:

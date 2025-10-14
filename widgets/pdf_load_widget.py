@@ -24,6 +24,7 @@ class PdfLoadWidget(QWidget):
         self.init_ui()
         self.setup_connections()
         self._pdf_view_widget = None
+        self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 시작 여부
     
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
@@ -108,10 +109,14 @@ class PdfLoadWidget(QWidget):
 
     def start_selected_work(self):
         """선택된 행을 emit하여 다운로드 로직이 처리하도록 한다."""
+        # 컨텍스트 메뉴를 통한 작업 시작임을 표시
+        self._is_context_menu_work = True
+        
         table = self.complement_table_widget
         selected_items = table.selectedItems()
         if not selected_items:
             QMessageBox.information(self, "선택 필요", "작업을 시작할 행을 선택해주세요.")
+            self._is_context_menu_work = False  # 실패 시 플래그 리셋
             return
 
         row = selected_items[0].row()
@@ -120,12 +125,14 @@ class PdfLoadWidget(QWidget):
 
         if file_item is None:
             QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
+            self._is_context_menu_work = False  # 실패 시 플래그 리셋
             return
 
         file_path = self._normalize_file_path(file_item.data(Qt.ItemDataRole.UserRole))
 
         if not file_path:
             QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
+            self._is_context_menu_work = False  # 실패 시 플래그 리셋
             return
 
         resolved_path = Path(file_path)
@@ -135,15 +142,22 @@ class PdfLoadWidget(QWidget):
                 "파일 없음",
                 f"경로를 찾을 수 없습니다.\n{resolved_path}"
             )
+            self._is_context_menu_work = False  # 실패 시 플래그 리셋
             return
 
         metadata = self._extract_row_metadata(rn_item)
         metadata['rn'] = metadata.get('rn') or self._safe_item_text(rn_item)
         metadata['region'] = metadata.get('region') or self._safe_item_text(table.item(row, 1))
         metadata['worker'] = metadata.get('worker') or self._safe_item_text(table.item(row, 2))
+        
+        # 컨텍스트 메뉴를 통한 작업 시작임을 metadata에 추가
+        metadata['is_context_menu_work'] = self._is_context_menu_work
 
         # 원본 파일 경로를 그대로 전달 (pdf_render.py에서 분할 파일 감지 처리)
         self.work_started.emit([str(resolved_path)], metadata)
+        
+        # 작업 시작 후 플래그 리셋
+        self._is_context_menu_work = False
     
     @staticmethod
     def _normalize_file_path(raw_path):
@@ -210,10 +224,10 @@ class PdfLoadWidget(QWidget):
 
     def _extract_row_metadata(self, rn_item: QTableWidgetItem | None) -> dict:
         if rn_item is None:
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': ""}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'is_context_menu_work': False}
         data = rn_item.data(Qt.ItemDataRole.UserRole)
         if not isinstance(data, dict):
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': ""}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'is_context_menu_work': False}
         return {
             'rn': data.get('rn', ""),
             'name': data.get('name', ""),
@@ -221,4 +235,5 @@ class PdfLoadWidget(QWidget):
             'worker': data.get('worker', ""),
             'special_note': data.get('special_note', ""),
             'recent_thread_id': data.get('recent_thread_id', ""),  # 추가
+            'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
         }
