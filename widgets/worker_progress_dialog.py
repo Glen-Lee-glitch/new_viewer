@@ -48,7 +48,8 @@ class WorkerProgressDialog(QDialog):
                         payment_dict[row['worker']] = row['count']
                 
                 # 모든 작업자 목록 생성 (지원 + 지급)
-                all_workers = list(set(support_workers + payment_dict.keys()))
+                payment_workers = list(payment_dict.keys())
+                all_workers = list(set(support_workers + payment_workers))
                 all_workers.sort()  # 정렬
                 
                 # 각 작업자별 지원/지급 건수 매핑
