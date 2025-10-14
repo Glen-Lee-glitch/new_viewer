@@ -683,7 +683,17 @@ class MainWindow(QMainWindow):
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
             # 저장 완료 후 자동으로 메인화면으로 돌아가도록 플래그 설정
             self._auto_return_to_main_after_save = True
-            self._pdf_view_widget.save_pdf(page_order=self._page_order)
+            try:
+                self._pdf_view_widget.save_pdf(page_order=self._page_order)
+            except Exception as e:
+                # 저장 호출 중 예외 발생 시 안전장치
+                print(f"[저장 호출 중 예외] {e}")
+                self._auto_return_to_main_after_save = False
+                # 컨텍스트 메뉴 작업이었다면 플래그 리셋
+                if self._is_context_menu_work:
+                    self._is_context_menu_work = False
+                    print("[컨텍스트 메뉴 작업 플래그] 저장 호출 예외로 인해 False로 리셋됨")
+                QMessageBox.critical(self, "오류", f"저장 호출 중 오류가 발생했습니다:\n\n{str(e)}")
         
     def show_load_view(self):
         """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""

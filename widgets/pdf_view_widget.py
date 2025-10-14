@@ -554,37 +554,46 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
 
     def save_pdf(self, page_order: list[int] | None = None):
         """PDF 저장 프로세스를 시작한다."""
-        if not self.renderer or not self.renderer.get_pdf_bytes():
-            QMessageBox.warning(self, "저장 오류", "저장할 PDF 파일이 없습니다.")
-            return
+        try:
+            if not self.renderer or not self.renderer.get_pdf_bytes():
+                QMessageBox.warning(self, "저장 오류", "저장할 PDF 파일이 없습니다.")
+                self.save_completed.emit()  # 저장 실패 시에도 정리 작업 수행
+                return
 
-        if page_order is None:
-            page_order = list(range(self.renderer.get_page_count()))
+            if page_order is None:
+                page_order = list(range(self.renderer.get_page_count()))
 
-        default_path = self.get_current_pdf_path() or "untitled.pdf"
-        output_path, _ = QFileDialog.getSaveFileName(
-            self, "PDF로 저장", default_path, "PDF Files (*.pdf)"
-        )
+            default_path = self.get_current_pdf_path() or "untitled.pdf"
+            output_path, _ = QFileDialog.getSaveFileName(
+                self, "PDF로 저장", default_path, "PDF Files (*.pdf)"
+            )
 
-        if not output_path:
-            return
+            if not output_path:
+                # 사용자가 저장 다이얼로그에서 취소한 경우에도 정리 작업 수행
+                self.save_completed.emit()
+                return
 
-        input_bytes = self.renderer.get_pdf_bytes()
-        rotations = self.get_page_rotations()  # <--- 파라미터 없이 원본 데이터 전달
-        stamp_data = self.get_stamp_items_data() # <--- 파라미터 없이 원본 데이터 전달
+            input_bytes = self.renderer.get_pdf_bytes()
+            rotations = self.get_page_rotations()  # <--- 파라미터 없이 원본 데이터 전달
+            stamp_data = self.get_stamp_items_data() # <--- 파라미터 없이 원본 데이터 전달
 
-        worker = PdfSaveWorker(
-            input_bytes=input_bytes, output_path=output_path,
-            rotations=rotations,
-            stamp_data=stamp_data,
-            page_order=page_order
-        )
+            worker = PdfSaveWorker(
+                input_bytes=input_bytes, output_path=output_path,
+                rotations=rotations,
+                stamp_data=stamp_data,
+                page_order=page_order
+            )
 
-        worker.signals.save_finished.connect(self._on_save_finished)
-        worker.signals.save_error.connect(self._on_save_error)
+            worker.signals.save_finished.connect(self._on_save_finished)
+            worker.signals.save_error.connect(self._on_save_error)
 
-        print(f"'{output_path}' 경로로 PDF 저장을 시작합니다...")
-        self.thread_pool.start(worker)
+            print(f"'{output_path}' 경로로 PDF 저장을 시작합니다...")
+            self.thread_pool.start(worker)
+            
+        except Exception as e:
+            # 예상치 못한 예외 발생 시에도 정리 작업 수행
+            QMessageBox.critical(self, "저장 오류", f"저장 중 예상치 못한 오류가 발생했습니다:\n\n{str(e)}")
+            self.save_completed.emit()
 
     def _on_save_finished(self, output_path: str, success: bool):
         """PDF 저장이 완료되었을 때 호출된다."""
@@ -602,6 +611,9 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     def _on_save_error(self, error_msg: str):
         """PDF 저장 중 오류가 발생했을 때 호출된다."""
         QMessageBox.critical(self, "저장 오류", f"PDF를 저장하는 중 오류가 발생했습니다:\n\n{error_msg}")
+        
+        # 저장 오류 시에도 save_completed 시그널을 emit하여 상위에서 정리 작업 수행
+        self.save_completed.emit()
 
     def get_stamp_items_data(self) -> dict[int, list[dict]]:
         """
