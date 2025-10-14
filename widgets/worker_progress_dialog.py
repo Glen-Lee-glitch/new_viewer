@@ -44,10 +44,10 @@ class WorkerProgressDialog(QDialog):
                 # 각 작업자마다 새로운 데이터(테스트용 랜덤 값) 생성
                 new_counts = [random.randint(0, 5) for _ in workers]
                 
-                # 총 건수 계산 및 표시 (기존 + 새로운)
+                # 총 건수 계산 및 표시 (지원 + 지급)
                 total_existing = sum(existing_counts)
                 total_new = sum(new_counts)
-                self.title_label.setText(f"금일 총 신청 건수: {total_existing}건 (기존) + {total_new}건 (신규)")
+                self.title_label.setText(f"금일 총 신청 건수: {total_existing}건 (지원) + {total_new}건 (지급)")
                 
                 # 이중 막대 차트 생성
                 if workers and existing_counts:
@@ -176,8 +176,8 @@ class WorkerProgressDialog(QDialog):
         chart_height = 200  # 차트 전체 높이
         
         # 막대 색상 설정
-        existing_color = '#3498db'  # 파란색 (기존 데이터)
-        new_color = '#e74c3c'      # 빨간색 (새로운 데이터)
+        existing_color = '#3498db'  # 파란색 (지원 데이터)
+        new_color = '#e74c3c'      # 빨간색 (지급 데이터)
         
         for i, (worker, existing_count, new_count) in enumerate(zip(workers, existing_counts, new_counts)):
             # 각 작업자별 컨테이너
@@ -286,23 +286,23 @@ class WorkerProgressDialog(QDialog):
         legend_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         legend_layout.setSpacing(10)
         
-        # 기존 데이터 범례
+        # 지원 데이터 범례
         existing_legend = QHBoxLayout()
         existing_legend_color = QWidget()
         existing_legend_color.setFixedSize(15, 15)
         existing_legend_color.setStyleSheet(f"background-color: {existing_color}; border: 1px solid #2c3e50;")
-        existing_legend_label = QLabel("기존")
+        existing_legend_label = QLabel("지원")
         existing_legend_label.setStyleSheet("font-size: 12px; color: #ffffff;")
         existing_legend.addWidget(existing_legend_color)
         existing_legend.addWidget(existing_legend_label)
         existing_legend.addStretch()
         
-        # 새로운 데이터 범례
+        # 지급 데이터 범례
         new_legend = QHBoxLayout()
         new_legend_color = QWidget()
         new_legend_color.setFixedSize(15, 15)
         new_legend_color.setStyleSheet(f"background-color: {new_color}; border: 1px solid #2c3e50;")
-        new_legend_label = QLabel("신규")
+        new_legend_label = QLabel("지급")
         new_legend_label.setStyleSheet("font-size: 12px; color: #ffffff;")
         new_legend.addWidget(new_legend_color)
         new_legend.addWidget(new_legend_label)
