@@ -319,7 +319,7 @@ class WorkerProgressDialog(QDialog):
         
         legend_widget = QWidget()
         legend_widget.setLayout(legend_layout)
-        legend_widget.setFixedWidth(60)
+        legend_widget.setFixedWidth(80)
         
         # 여백 추가
         main_layout.addStretch()
