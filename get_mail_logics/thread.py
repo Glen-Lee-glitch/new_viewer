@@ -449,27 +449,38 @@ def download_worker_thread():
                 )
                 
                 if final_path != 'N':
-                    # 파일 크기 확인
-                    file_size_mb = os.path.getsize(final_path) / (1024 * 1024)
+                    # 세미콜론으로 구분된 여러 파일 확인
+                    file_paths = final_path.split(';')
+                    file_paths = [p.strip() for p in file_paths if p.strip()]
+                    
+                    # PDF 파일들만 필터링
+                    pdf_files = [p for p in file_paths if p.lower().endswith('.pdf')]
+                    
+                    # 전체 용량 계산 (PDF만)
+                    total_size_mb = sum(os.path.getsize(p) / (1024 * 1024) for p in pdf_files)
+                    
                     needs_preprocess = False
                     
-                    # ✨ PDF이고 3MB 초과 시에만 전처리 필요
-                    if final_path.lower().endswith('.pdf') and file_size_mb > PREPROCESS_THRESHOLD_MB:
+                    # PDF가 1개 이상이고 전체 용량이 3MB 초과 시 전처리 필요
+                    if pdf_files and total_size_mb > PREPROCESS_THRESHOLD_MB:
                         needs_preprocess = True
-                        print(f"  📏 파일 크기: {file_size_mb:.2f} MB → 전처리 필요")
-                    else:
-                        print(f"  📏 파일 크기: {file_size_mb:.2f} MB → 전처리 불필요")
-                    
-                    # DB 업데이트: file_rendered = 0 (아직 전처리 안됨)
-                    update_email_attachment_path(conn, thread_id, final_path, file_rendered=0)
-                    
-                    # 전처리가 필요한 경우만 큐에 추가
-                    if needs_preprocess:
+                        print(f"  📏 PDF 파일 {len(pdf_files)}개, 총 크기: {total_size_mb:.2f} MB → 전처리 필요")
+                        
+                        # 전처리 큐에 추가 (여러 파일을 리스트로 전달)
                         preprocess_queue.put({
                             'thread_id': thread_id,
-                            'original_path': final_path
+                            'original_paths': pdf_files  # 여러 파일을 리스트로
                         })
-                        print(f"  📋 전처리 큐에 추가: {thread_id}")
+                        print(f"  📋 전처리 큐에 추가: {len(pdf_files)}개 파일 병합 예정")
+                    else:
+                        if pdf_files:
+                            print(f"  📏 PDF 파일 {len(pdf_files)}개, 총 크기: {total_size_mb:.2f} MB → 전처리 불필요")
+                        else:
+                            print(f"  📏 PDF 파일 없음 → 전처리 불필요")
+                    
+                    # DB 업데이트: file_rendered = 0 (아직 전처리 안됨)
+                    final_paths_str = ';'.join(file_paths)
+                    update_email_attachment_path(conn, thread_id, final_paths_str, file_rendered=0)
                 
                 print(f"✅ 다운로드 완료: {thread_id}")
 
@@ -486,7 +497,7 @@ def download_worker_thread():
 
 
 def preprocess_worker_thread():
-    """✨ 전처리 큐를 감시하고 대용량 PDF 최적화 수행"""
+    """✨ 전처리 큐를 감시하고 대용량 PDF 최적화 수행 (여러 파일 병합)"""
     print("🚀 전처리 워커 스레드 시작")
     
     # 전처리 디렉토리 생성
@@ -497,35 +508,46 @@ def preprocess_worker_thread():
         try:
             task = preprocess_queue.get()
             thread_id = task['thread_id']
-            original_path = task['original_path']
+            original_paths = task.get('original_paths', [])  # 리스트로 받음
             
-            # 파일 크기 재확인 (안전장치)
-            file_size_mb = os.path.getsize(original_path) / (1024 * 1024)
-            print(f"🔧 전처리 시작: {thread_id} ({file_size_mb:.2f} MB)")
+            # 단일 파일인 경우 리스트로 변환 (하위 호환성)
+            if not isinstance(original_paths, list):
+                original_paths = [original_paths]
+            
+            if not original_paths:
+                preprocess_queue.task_done()
+                continue
+            
+            # 전체 파일 크기 계산
+            total_size_mb = sum(os.path.getsize(p) / (1024 * 1024) for p in original_paths)
+            print(f"🔧 전처리 시작: {len(original_paths)}개 파일, 총 {total_size_mb:.2f} MB")
             
             try:
-                # 전처리 수행
-                processed_path = preprocess_pdf_for_rendering(original_path, PROCESSED_DIR)
+                # 여러 PDF를 하나로 병합 + 전처리
+                merged_processed_path = merge_and_preprocess_pdfs(original_paths, PROCESSED_DIR, thread_id)
                 
-                if processed_path:
-                    # ✨ DB 업데이트: attached_file_path를 전처리된 경로로 변경, file_rendered = 1
+                if merged_processed_path:
+                    # ✨ DB 업데이트: 병합된 파일 하나의 경로로 교체
                     conn = get_database_connection()
                     if conn:
                         try:
                             cursor = conn.cursor()
                             
                             # 전처리된 파일 크기
-                            processed_size_mb = os.path.getsize(processed_path) / (1024 * 1024)
+                            processed_size_mb = os.path.getsize(merged_processed_path) / (1024 * 1024)
                             
+                            # DB 업데이트: 병합된 파일 경로만 저장
                             sql = """UPDATE emails 
                                      SET attached_file_path = %s,
                                          file_rendered = 1
                                      WHERE thread_id = %s"""
-                            cursor.execute(sql, (processed_path, thread_id))
+                            cursor.execute(sql, (merged_processed_path, thread_id))
                             conn.commit()
                             
-                            print(f"  ✅ 전처리 완료: {thread_id}")
-                            print(f"     원본: {file_size_mb:.2f} MB → 전처리: {processed_size_mb:.2f} MB")
+                            print(f"  ✅ 병합 및 전처리 완료:")
+                            print(f"     원본: {len(original_paths)}개 파일, {total_size_mb:.2f} MB")
+                            print(f"     전처리: 1개 파일, {processed_size_mb:.2f} MB")
+                            print(f"     저장 경로: {merged_processed_path}")
                             
                         except Error as e:
                             print(f"  ⚠️ DB 업데이트 실패: {e}")
@@ -534,16 +556,104 @@ def preprocess_worker_thread():
                             if conn.is_connected():
                                 conn.close()
                 else:
-                    print(f"  ⚠️ 전처리 실패: {thread_id} (원본 파일 사용)")
+                    print(f"  ⚠️ 전처리 실패: (원본 파일 사용)")
                 
             except Exception as e:
-                print(f"  ❌ 전처리 중 예외 발생: {thread_id}, {e}")
+                print(f"  ❌ 전처리 중 예외 발생: {e}")
+                import traceback
+                traceback.print_exc()
             finally:
                 preprocess_queue.task_done()
                 
         except Exception as e:
             print(f"❌ 전처리 워커 오류: {e}")
             time.sleep(5)
+
+
+def merge_and_preprocess_pdfs(pdf_paths: list, processed_dir: str, thread_id: str) -> str | None:
+    """여러 PDF 파일을 하나로 병합하고 최적화 (벡터 유지)
+    
+    Args:
+        pdf_paths: 병합할 PDF 파일 경로 리스트
+        processed_dir: 처리된 파일을 저장할 디렉토리
+        thread_id: 메일 스레드 ID (파일명 생성용)
+    
+    Returns:
+        병합 및 최적화된 PDF 파일 경로 (실패 시 None)
+    """
+    try:
+        from pathlib import Path
+        import pymupdf
+        
+        if not pdf_paths:
+            return None
+        
+        # 단일 파일인 경우 기존 함수 사용
+        if len(pdf_paths) == 1:
+            return preprocess_pdf_for_rendering(pdf_paths[0], processed_dir)
+        
+        # 병합된 파일명 생성: thread_id 기반
+        merged_filename = f"{thread_id}_merged_processed.pdf"
+        merged_path = os.path.join(processed_dir, merged_filename)
+        
+        # 이미 처리된 파일이 있는지 확인
+        if os.path.exists(merged_path):
+            # 모든 원본 파일보다 최신인지 확인
+            merged_mtime = os.path.getmtime(merged_path)
+            if all(merged_mtime >= os.path.getmtime(p) for p in pdf_paths if os.path.exists(p)):
+                print(f"  ⚡ 이미 병합 전처리됨: {merged_filename}")
+                return merged_path
+        
+        print(f"  🔧 {len(pdf_paths)}개 PDF 병합 및 최적화 중...")
+        
+        # 병합 및 A4 최적화
+        merged_doc = pymupdf.open()
+        
+        for idx, pdf_path in enumerate(pdf_paths):
+            print(f"    - [{idx+1}/{len(pdf_paths)}] {os.path.basename(pdf_path)}")
+            
+            try:
+                with pymupdf.open(pdf_path) as source_doc:
+                    # 각 페이지를 A4로 변환하여 병합
+                    for page_num in range(len(source_doc)):
+                        page = source_doc[page_num]
+                        bounds = page.bound()
+                        is_landscape = bounds.width > bounds.height
+                        
+                        if is_landscape:
+                            a4_rect = pymupdf.paper_rect("a4-l")
+                        else:
+                            a4_rect = pymupdf.paper_rect("a4")
+                        
+                        # 새 A4 페이지 생성
+                        new_page = merged_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+                        
+                        # 벡터 기반으로 페이지 복사
+                        new_page.show_pdf_page(new_page.rect, source_doc, page_num)
+            
+            except Exception as e:
+                print(f"    ⚠️ 파일 병합 실패: {os.path.basename(pdf_path)} - {e}")
+                continue
+        
+        # 병합된 PDF 저장 (최적화)
+        merged_doc.save(
+            merged_path,
+            garbage=4,
+            deflate=True,
+            clean=True,
+            pretty=False,
+            linear=False,
+        )
+        merged_doc.close()
+        
+        print(f"  ✅ 병합 완료: {merged_filename}")
+        return merged_path
+        
+    except Exception as e:
+        print(f"  ⚠️ 병합 및 전처리 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 def preprocess_pdf_for_rendering(original_path: str, processed_dir: str) -> str | None:
