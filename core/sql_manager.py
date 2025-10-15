@@ -222,6 +222,36 @@ def update_subsidy_status(rn: str, status: str) -> bool:
         traceback.print_exc()
         return False
 
+def get_today_completed_subsidies() -> list:
+    """
+    오늘 '지원완료' 처리된 지원금 신청 지역 목록을 반환한다.
+    
+    Returns:
+        오늘 완료된 지역 목록 (중복 제거됨)
+    """
+    try:
+        # 한국 시간 (KST) 생성
+        kst = pytz.timezone('Asia/Seoul')
+        today = datetime.now(kst).date()
+        
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT DISTINCT region 
+                FROM subsidy_applications 
+                WHERE status = '지원완료' 
+                AND DATE(status_updated_at) = %s
+                AND region IS NOT NULL
+                ORDER BY region
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (today,))
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+                
+    except Exception:
+        traceback.print_exc()
+        return []
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
