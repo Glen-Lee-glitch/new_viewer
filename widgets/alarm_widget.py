@@ -47,8 +47,14 @@ class AlarmWidget(QWidget):
             # 리스트 위젯 생성 및 추가
             self._finished_list = QListWidget()
             # 최소 5개 row가 보이도록 높이 조정 (항목당 약 28px로 계산)
-            self._finished_list.setMinimumHeight(140)  # 5 * 28 = 140px
-            self._finished_list.setMaximumHeight(160)  # 최대 높이도 약간 증가
+            self._finished_list.setMinimumHeight(120)  # 5 * 28 = 140px
+            self._finished_list.setMaximumHeight(140)  # 최대 높이도 약간 증가
+
+            # 폰트 크기 조정 (1pt 줄이기)
+            font = self._finished_list.font()
+            font.setPointSize(font.pointSize() - 2)
+            self._finished_list.setFont(font)
+
             layout.addWidget(self._finished_list)
     
     def _load_completed_regions(self):
