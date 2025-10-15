@@ -344,6 +344,7 @@ def export_deleted_pages(
         page_indices: list[int],
         output_dir: str | Path,
         base_name: str,
+        delete_info: dict = None,
 ) -> list[Path]:
     """삭제된 페이지를 원본 그대로 개별 PDF로 저장한다."""
     if not pdf_bytes:
@@ -364,14 +365,36 @@ def export_deleted_pages(
                 temp_doc = pymupdf.open()
                 try:
                     temp_doc.insert_pdf(src, from_page=page_idx, to_page=page_idx)
-                    # 파일명: {원본파일명}_{페이지번호}.pdf
-                    file_name = f"{base_name}_{page_idx + 1}.pdf"
+                    
+                    # 삭제 사유 추출 및 파일명에 포함
+                    reason = ""
+                    if delete_info and delete_info.get("reason"):
+                        reason_text = delete_info["reason"]
+                        # "기타"인 경우 커스텀 텍스트 사용 (파일명에 적합하도록 정리)
+                        if reason_text == "기타" and delete_info.get("custom_text"):
+                            custom_text = delete_info["custom_text"].strip()
+                            # 파일명에 사용할 수 없는 문자 제거
+                            custom_text = "".join(c for c in custom_text if c.isalnum() or c in "._- ")
+                            custom_text = custom_text.replace(" ", "_")[:20]  # 최대 20자로 제한
+                            reason = f"기타_{custom_text}" if custom_text else "기타"
+                        else:
+                            reason = reason_text
+                    
+                    # 파일명 생성: {원본파일명}_{사유}_{페이지번호}.pdf
+                    if reason:
+                        file_name = f"{base_name}_{reason}_{page_idx + 1}.pdf"
+                    else:
+                        file_name = f"{base_name}_{page_idx + 1}.pdf"
+                    
                     dest_path = destination / file_name
                     
                     # 파일이 이미 존재하면 타임스탬프 추가
                     if dest_path.exists():
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        file_name = f"{base_name}_{page_idx + 1}_{timestamp}.pdf"
+                        if reason:
+                            file_name = f"{base_name}_{reason}_{page_idx + 1}_{timestamp}.pdf"
+                        else:
+                            file_name = f"{base_name}_{page_idx + 1}_{timestamp}.pdf"
                         dest_path = destination / file_name
                     
                     temp_doc.save(str(dest_path), deflate=False, clean=False)

@@ -599,7 +599,7 @@ class MainWindow(QMainWindow):
         self.ui_push_button_prev.setEnabled(total_pages > 0 and current_visual_page > 0)
         self.ui_push_button_next.setEnabled(total_pages > 0 and current_visual_page < total_pages - 1)
 
-    def _handle_page_delete_request(self, visual_page_num: int):
+    def _handle_page_delete_request(self, visual_page_num: int, delete_info: dict):
         """페이지 삭제 요청을 처리하는 중앙 슬롯"""
         if not self.renderer or not (0 <= visual_page_num < len(self._page_order)):
             return
@@ -608,7 +608,7 @@ class MainWindow(QMainWindow):
         actual_page_to_delete = self._page_order[visual_page_num]
 
         # 2. PdfViewWidget에 실제 페이지 번호를 전달하여 삭제 실행
-        self._pdf_view_widget.delete_pages([actual_page_to_delete], worker_name=self._worker_name)
+        self._pdf_view_widget.delete_pages([actual_page_to_delete], worker_name=self._worker_name, delete_info=delete_info)
         
         # 3. 페이지 순서 목록 업데이트
         self._page_order.pop(visual_page_num)

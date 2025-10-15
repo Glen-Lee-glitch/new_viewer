@@ -13,7 +13,7 @@ class ThumbnailViewWidget(QWidget):
     page_change_requested = pyqtSignal(int)
     page_order_changed = pyqtSignal(list) # 변경된 페이지 순서를 전달하는 새 시그널
     undo_requested = pyqtSignal()
-    page_delete_requested = pyqtSignal(int) # '보이는' 페이지 번호로 삭제 요청
+    page_delete_requested = pyqtSignal(int, dict) # '보이는' 페이지 번호와 삭제 정보로 삭제 요청
     
     def __init__(self):
         super().__init__()
@@ -65,7 +65,7 @@ class ThumbnailViewWidget(QWidget):
                 print(f"기타 사유: {delete_result['custom_text']}")
             
             # MainWindow에 선택된 '보이는' 페이지의 삭제를 요청한다.
-            self.page_delete_requested.emit(page_to_delete)
+            self.page_delete_requested.emit(page_to_delete, delete_result)
 
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""

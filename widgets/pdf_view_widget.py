@@ -25,7 +25,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     page_change_requested = pyqtSignal(int)
     page_aspect_ratio_changed = pyqtSignal(bool)  # is_landscape: 가로가 긴 페이지 여부
     save_completed = pyqtSignal()  # 저장 완료 후 화면 전환을 위한 신호
-    page_delete_requested = pyqtSignal(int) # '보이는' 페이지 번호로 삭제를 요청하는 신호
+    page_delete_requested = pyqtSignal(int, dict) # '보이는' 페이지 번호와 삭제 정보로 삭제를 요청하는 신호
 
     # --- 정보 패널 연동을 위한 신호 ---
     pdf_loaded = pyqtSignal(str, float, int)  # file_path, file_size_mb, total_pages
@@ -526,9 +526,9 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 print(f"기타 사유: {delete_result['custom_text']}")
             
             # MainWindow에 현재 '보이는' 페이지의 삭제를 요청한다.
-            self.page_delete_requested.emit(self.current_page)
+            self.page_delete_requested.emit(self.current_page, delete_result)
 
-    def delete_pages(self, pages_to_delete: list[int], worker_name: str = ""):
+    def delete_pages(self, pages_to_delete: list[int], worker_name: str = "", delete_info: dict = None):
         """(공개 메서드) 지정된 '실제' 페이지 인덱스를 삭제하고 데이터를 업데이트한다."""
         if not self.renderer or not pages_to_delete:
             return
@@ -555,6 +555,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                     page_indices=pages_to_delete,
                     output_dir=output_dir,
                     base_name=base_name,
+                    delete_info=delete_info,
                 )
             except Exception as save_error:
                 print(f"삭제 페이지 보관 중 오류: {save_error}")
