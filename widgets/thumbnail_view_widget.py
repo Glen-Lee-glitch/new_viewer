@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
-from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget, QApplication
+from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget, QApplication, QMenu
 
 from core.pdf_render import PdfRender
 from core.edit_mixin import EditMixin
@@ -67,6 +67,27 @@ class ThumbnailViewWidget(QWidget):
             # MainWindow에 선택된 '보이는' 페이지의 삭제를 요청한다.
             self.page_delete_requested.emit(page_to_delete, delete_result)
 
+    def _show_context_menu(self, position):
+        """컨텍스트 메뉴를 표시한다."""
+        # 클릭된 위치의 아이템 가져오기
+        item = self.thumbnail_list_widget.itemAt(position)
+        if not item:
+            return  # 빈 공간을 클릭한 경우 메뉴 표시 안 함
+        
+        # 클릭된 아이템을 선택 상태로 만들기
+        self.thumbnail_list_widget.setCurrentItem(item)
+        
+        # 컨텍스트 메뉴 생성
+        context_menu = QMenu(self)
+        
+        # 페이지 삭제 액션 추가
+        delete_action = context_menu.addAction("페이지 삭제")
+        delete_action.triggered.connect(self._prompt_delete_selected_page)
+        
+        # 메뉴를 글로벌 좌표로 표시
+        global_position = self.thumbnail_list_widget.mapToGlobal(position)
+        context_menu.exec(global_position)
+
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
         ui_path = Path(__file__).parent.parent / "ui" / "thumbnail_viewer.ui"
@@ -86,6 +107,10 @@ class ThumbnailViewWidget(QWidget):
         # --- 드래그 앤 드롭 활성화 ---
         list_widget.setDragDropMode(QListWidget.DragDropMode.InternalMove)
         list_widget.setMovement(QListWidget.Movement.Snap)
+        
+        # --- 컨텍스트 메뉴 설정 ---
+        list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        list_widget.customContextMenuRequested.connect(self._show_context_menu)
         
         # --- 모델의 데이터 변경 시그널 연결 ---
         list_widget.model().rowsMoved.connect(self._on_rows_moved)
