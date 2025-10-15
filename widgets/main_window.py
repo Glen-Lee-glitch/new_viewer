@@ -673,7 +673,8 @@ class MainWindow(QMainWindow):
             else:
                 self.worker_label_2.setText("작업자: 미로그인")
 
-
+    # === 이벤트 처리 ===
+    
     def showEvent(self, event):
         """창이 처음 표시될 때 제목 표시줄을 포함한 전체 높이를 화면에 맞게 조정한다."""
         super().showEvent(event)
@@ -707,6 +708,80 @@ class MainWindow(QMainWindow):
             
             self._initial_resize_done = True
         
+    def closeEvent(self, event):
+        """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
+        if self.renderer:
+            self.renderer.close()
+        event.accept()
+
+    # === 사용자 상호작용 핸들러 ===
+    
+    def _prompt_save_before_reset(self):
+        """'메인 화면' 버튼 클릭 시 저장 여부를 묻는 대화상자를 표시한다."""
+        if not self.renderer:
+            self.show_load_view()
+            return
+
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Question)
+        msg_box.setWindowTitle("메인화면으로 돌아가기")
+        msg_box.setText("변경사항을 저장하시겠습니까?")
+        msg_box.setInformativeText("저장하지 않으면 변경사항이 모두 사라집니다.")
+
+        # 사용자 요청에 따른 버튼 생성
+        no_save_button = msg_box.addButton("저장X", QMessageBox.ButtonRole.DestructiveRole)
+        save_button = msg_box.addButton("저장O", QMessageBox.ButtonRole.AcceptRole)
+        cancel_button = msg_box.addButton("취소", QMessageBox.ButtonRole.RejectRole)
+        
+        msg_box.setDefaultButton(cancel_button)
+        msg_box.exec()
+        
+        clicked_button = msg_box.clickedButton()
+        
+        if clicked_button == no_save_button:
+            self.show_load_view()
+            # 메인화면으로 돌아갈 때 데이터 새로고침
+            self._pdf_load_widget.refresh_data()
+        elif clicked_button == save_button:
+            self._save_document()
+            # 저장 후 메인화면으로 돌아갈 때도 데이터 새로고침
+            self._pdf_load_widget.refresh_data()
+        # 취소 버튼을 누르면 아무것도 하지 않고 대화상자만 닫힘
+
+    def _handle_undo_request(self):
+        """썸네일에서 Undo 요청이 왔을 때 PDF 뷰어의 되돌리기를 실행한다."""
+        if self._pdf_view_widget and self.renderer:
+            self._pdf_view_widget.undo_last_action()
+
+    # === 유틸리티 및 헬퍼 ===
+
+    @staticmethod
+    def _normalize_basic_info(metadata: dict | None) -> dict:
+        if not metadata:
+            return {'name': "", 'region': "", 'special_note': ""}
+
+        def _coerce(value):
+            if value is None:
+                return ""
+            return str(value).strip()
+
+        return {
+            'name': _coerce(metadata.get('name')),
+            'region': _coerce(metadata.get('region')),
+            'special_note': _coerce(metadata.get('special_note')),
+            'is_context_menu_work': metadata.get('is_context_menu_work', False)  # 컨텍스트 메뉴 작업 여부 추가
+        }
+
+    def _collect_pending_basic_info(self) -> tuple[str, str, str]:
+        info = self._pending_basic_info or {'name': "", 'region': "", 'special_note': ""}
+        name = info.get('name', "")
+        region = info.get('region', "")
+        special_note = info.get('special_note', "")
+        self._pending_basic_info = info
+        return name, region, special_note
+
+    # === 테스트 관련 함수 ===
+
     def start_batch_test(self):
         """PDF 일괄 테스트를 시작한다 (test.py의 로직 사용)."""
         self.ui_status_bar.showMessage("PDF 일괄 테스트를 시작합니다...", 0)
@@ -769,41 +844,6 @@ class MainWindow(QMainWindow):
                 filename = Path(self._pdf_view_widget.get_current_pdf_path()).name
                 self.test_worker.signals.error.emit(filename, f"포커스 이동 중 오류: {e}")
 
-
-    
-
-    def _prompt_save_before_reset(self):
-        """'메인 화면' 버튼 클릭 시 저장 여부를 묻는 대화상자를 표시한다."""
-        if not self.renderer:
-            self.show_load_view()
-            return
-
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Question)
-        msg_box.setWindowTitle("메인화면으로 돌아가기")
-        msg_box.setText("변경사항을 저장하시겠습니까?")
-        msg_box.setInformativeText("저장하지 않으면 변경사항이 모두 사라집니다.")
-
-        # 사용자 요청에 따른 버튼 생성
-        no_save_button = msg_box.addButton("저장X", QMessageBox.ButtonRole.DestructiveRole)
-        save_button = msg_box.addButton("저장O", QMessageBox.ButtonRole.AcceptRole)
-        cancel_button = msg_box.addButton("취소", QMessageBox.ButtonRole.RejectRole)
-        
-        msg_box.setDefaultButton(cancel_button)
-        msg_box.exec()
-        
-        clicked_button = msg_box.clickedButton()
-        
-        if clicked_button == no_save_button:
-            self.show_load_view()
-            # 메인화면으로 돌아갈 때 데이터 새로고침
-            self._pdf_load_widget.refresh_data()
-        elif clicked_button == save_button:
-            self._save_document()
-            # 저장 후 메인화면으로 돌아갈 때도 데이터 새로고침
-            self._pdf_load_widget.refresh_data()
-        # 취소 버튼을 누르면 아무것도 하지 않고 대화상자만 닫힘
-
     def _on_batch_test_error(self, filename: str, error_msg: str):
         """일괄 테스트 중 오류 발생 시 호출될 슬롯"""
         # 워커를 중지시켜 더 이상 진행되지 않도록 함
@@ -825,48 +865,7 @@ class MainWindow(QMainWindow):
         self.ui_status_bar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
         QMessageBox.information(self, "테스트 완료", "지정된 모든 PDF 파일의 열기/저장 테스트를 성공적으로 완료했습니다.")
 
-    
-    def _handle_undo_request(self):
-        """썸네일에서 Undo 요청이 왔을 때 PDF 뷰어의 되돌리기를 실행한다."""
-        if self._pdf_view_widget and self.renderer:
-            self._pdf_view_widget.undo_last_action()
-
-    
-    @staticmethod
-    def _normalize_basic_info(metadata: dict | None) -> dict:
-        if not metadata:
-            return {'name': "", 'region': "", 'special_note': ""}
-
-        def _coerce(value):
-            if value is None:
-                return ""
-            return str(value).strip()
-
-        return {
-            'name': _coerce(metadata.get('name')),
-            'region': _coerce(metadata.get('region')),
-            'special_note': _coerce(metadata.get('special_note')),
-            'is_context_menu_work': metadata.get('is_context_menu_work', False)  # 컨텍스트 메뉴 작업 여부 추가
-        }
-
-    def _collect_pending_basic_info(self) -> tuple[str, str, str]:
-        info = self._pending_basic_info or {'name': "", 'region': "", 'special_note': ""}
-        name = info.get('name', "")
-        region = info.get('region', "")
-        special_note = info.get('special_note', "")
-        self._pending_basic_info = info
-        return name, region, special_note
-
-    
-    def closeEvent(self, event):
-        """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
-        if self.renderer:
-            self.renderer.close()
-        event.accept()
-
-    
-
-    
+# === 모듈 레벨 함수 ===
 def create_app():
     """QApplication을 생성하고 메인 윈도우를 반환한다."""
     app = QApplication(sys.argv)
