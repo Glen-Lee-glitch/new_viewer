@@ -108,11 +108,11 @@ class PageDeleteDialog(QDialog):
         """삭제 버튼 클릭 시 호출"""
         # 선택된 사유 저장
         if self._radio_additional.isChecked():
-            self._selected_reason = "추가 서류"
+            self._selected_reason = "추가 서류(지방세, 환수동의서 등 -> 지급신청 시 사용)"
         elif self._radio_unnecessary.isChecked():
-            self._selected_reason = "필요 없음"
+            self._selected_reason = "필요 없음(중복 서류 및 전혀 필요 없는 서류)"
         elif self._radio_other.isChecked():
-            self._selected_reason = "기타"
+            self._selected_reason = "기타(기타 사유를 입력해주세요)"
             self._custom_text = self._custom_input.text().strip()
             
             # 기타 선택 시 텍스트 입력 확인
