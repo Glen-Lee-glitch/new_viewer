@@ -2,7 +2,8 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import QWidget, QMenu
 
 
 class StampOverlayWidget(QWidget):
@@ -20,7 +21,18 @@ class StampOverlayWidget(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.hide()
+        self._setup_stamp_button_5_menu()
         self._connect_signals()
+
+    def _setup_stamp_button_5_menu(self):
+        if hasattr(self, 'stamp_button_5'):
+            menu = QMenu(self)
+            check_action = QAction("체크", self)
+            check_action.triggered.connect(lambda: self._on_stamp_button_clicked(
+                {'path': 'assets/체크.png', 'width': 50}
+            ))
+            menu.addAction(check_action)
+            self.stamp_button_5.setMenu(menu)
 
     def _connect_signals(self):
         if hasattr(self, 'stamp_button_1'):
@@ -35,10 +47,6 @@ class StampOverlayWidget(QWidget):
             self.stamp_button_3.clicked.connect(self._on_stamp_selected)
         if hasattr(self, 'stamp_button_4'):
             self.stamp_button_4.clicked.connect(self._on_stamp_selected)
-        if hasattr(self, 'stamp_button_5'):
-            self.stamp_button_5.clicked.connect(lambda: self._on_stamp_button_clicked(
-                {'path': 'assets/체크.png', 'width': 50}
-            ))
 
     def _on_stamp_button_clicked(self, stamp_info: dict):
         """도장 버튼 클릭 시, 선택된 도장 정보를 포함한 시그널을 발생시킨다."""
