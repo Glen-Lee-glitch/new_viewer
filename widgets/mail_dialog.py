@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QStyle
 
 from widgets.unqualified_document_dialog import UnqualifiedDocumentDialog
 from core.mail_utils import copy_to_clipboard
+from core.sql_manager import update_subsidy_status
 
 
 class MailDialog(QDialog):
@@ -82,13 +83,26 @@ class MailDialog(QDialog):
             self.textEdit.append("기타 사항: ")
     
     def _on_accepted(self):
-        """OK 버튼 클릭 시 신청번호와 우선순위를 클립보드에 복사한다."""
+        """OK 버튼 클릭 시 신청번호와 우선순위를 클립보드에 복사하고 status를 업데이트한다."""
         apply_number = self._get_apply_number()
         priority_text = self._get_priority_text()
+        rn_value = self.get_rn_value()
         
         if apply_number:
             copied_text = copy_to_clipboard(apply_number, priority_text)
             print(f"클립보드에 복사됨: {copied_text}")
+        
+        # RN 값이 있으면 status를 '지원완료'로 업데이트
+        if rn_value:
+            try:
+                success = update_subsidy_status(rn_value, '지원완료')
+                if success:
+                    print(f"RN {rn_value} 상태를 '지원완료'로 업데이트 완료")
+                else:
+                    print(f"RN {rn_value} 상태 업데이트 실패: 해당 RN을 찾을 수 없습니다")
+            except Exception as e:
+                print(f"상태 업데이트 중 오류 발생: {e}")
+                QMessageBox.warning(self, "업데이트 오류", f"상태 업데이트 중 오류가 발생했습니다:\n{str(e)}")
         
         # 다이얼로그 닫기
         self.accept()
