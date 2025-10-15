@@ -476,6 +476,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 page_size,
                 page_index=self.current_page,
                 history_callback=self._on_stamp_background_toggled,
+                delete_callback=self._on_stamp_delete_requested,
             )
             stamp_item.setPos(final_pos)
 
@@ -772,6 +773,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                     page_size,
                     page_index=self.current_page,
                     history_callback=self._on_stamp_background_toggled,
+                    delete_callback=self._on_stamp_delete_requested,
                 )
                 
                 # 저장된 비율을 기반으로 위치 설정
@@ -808,6 +810,40 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 },
             )
         )
+    
+    def _on_stamp_delete_requested(self, page_index: int, stamp_data: dict, stamp_item):
+        """콜백: 스탬프 삭제 요청 시 데이터에서 제거하고 히스토리에 기록한다."""
+        # 1. _overlay_items에서 해당 stamp_data 찾아서 제거
+        if page_index in self._overlay_items:
+            try:
+                # stamp_data의 참조를 찾아서 제거
+                self._overlay_items[page_index].remove(stamp_data)
+                print(f"페이지 {page_index + 1}의 스탬프를 데이터에서 제거했습니다. (남은 개수: {len(self._overlay_items[page_index])})")
+            except ValueError:
+                print(f"경고: 페이지 {page_index + 1}에서 삭제할 스탬프 데이터를 찾을 수 없습니다.")
+        
+        # 2. scene에서 아이템 제거
+        scene = stamp_item.scene()
+        if scene:
+            scene.removeItem(stamp_item)
+        
+        # 3. 히스토리에 기록 (되돌리기 지원)
+        # stamp_data의 복사본을 저장 (원본 pixmap 포함)
+        stamp_data_copy = {
+            'pixmap': stamp_data.get('pixmap').copy() if stamp_data.get('pixmap') else None,
+            'x_ratio': stamp_data.get('x_ratio', 0.0),
+            'y_ratio': stamp_data.get('y_ratio', 0.0),
+            'w_ratio': stamp_data.get('w_ratio', 0.0),
+            'h_ratio': stamp_data.get('h_ratio', 0.0),
+            'original_pixmap': stamp_data.get('original_pixmap').copy() if stamp_data.get('original_pixmap') else None,
+            'background_applied': stamp_data.get('background_applied', False),
+        }
+        
+        self._history_stack.append(
+            ('delete_stamp', page_index, stamp_data_copy)
+        )
+        
+        print(f"페이지 {page_index + 1}의 스탬프를 삭제했습니다.")
 
     def _undo_last_action(self):
         """마지막으로 수행한 작업을 되돌린다."""
@@ -867,6 +903,14 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
 
                 if page_num == self.current_page:
                     self.show_page(self.current_page)
+        
+        elif action == 'delete_stamp':
+            # 삭제된 스탬프를 복원한다
+            if data:
+                if page_num not in self._overlay_items:
+                    self._overlay_items[page_num] = []
+                self._overlay_items[page_num].append(data)
+                print(f"페이지 {page_num + 1}의 삭제된 스탬프를 복원했습니다.")
 
         # 현재 보고 있는 페이지의 작업을 되돌렸다면, 화면을 새로고침
         if page_num == self.current_page:

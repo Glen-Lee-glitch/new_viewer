@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import QGraphicsPixmapItem, QMenu
 
 class MovableStampItem(QGraphicsPixmapItem):
     """A stamp item that can be moved and updates its data dictionary when moved."""
+    
+    # 삭제 요청 시그널: (page_index, stamp_data)
+    delete_requested = pyqtSignal(int, dict)
 
     def __init__(
         self,
@@ -15,12 +18,14 @@ class MovableStampItem(QGraphicsPixmapItem):
         page_size: QSizeF,
         page_index: int,
         history_callback: Callable | None = None,
+        delete_callback: Callable | None = None,
     ):
         super().__init__(pixmap, parent_item)
         self.stamp_data = stamp_data
         self.page_size = page_size
         self._page_index = page_index
         self._history_callback = history_callback
+        self._delete_callback = delete_callback
         self._drag_start_pos = QPointF()
 
         original_pixmap = self.stamp_data.get('original_pixmap')
@@ -101,7 +106,7 @@ class MovableStampItem(QGraphicsPixmapItem):
         if selected_action == background_action:
             self._toggle_background()
         elif selected_action == delete_action:
-            pass  # TODO: 삭제 기능 구현
+            self._delete_self()
 
     def paint(self, painter, option, widget=None):
         """Draws the pixmap and a dashed border if the item is selected."""
@@ -170,3 +175,14 @@ class MovableStampItem(QGraphicsPixmapItem):
                 new_pixmap=new_pixmap.copy(),
                 new_state=new_state,
             )
+    
+    def _delete_self(self):
+        """스탬프 아이템을 삭제한다."""
+        if self._delete_callback:
+            self._delete_callback(self._page_index, self.stamp_data, self)
+        else:
+            # 콜백이 없으면 scene에서만 제거
+            scene = self.scene()
+            if scene:
+                scene.removeItem(self)
+            print(f"페이지 {self._page_index + 1}의 스탬프를 삭제했습니다.")
