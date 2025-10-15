@@ -378,7 +378,185 @@ class MainWindow(QMainWindow):
         worker_progress_dialog = WorkerProgressDialog(self)
         worker_progress_dialog.exec()
 
+    # === 문서 생명주기 관리 ===
     
+    def load_document(self, pdf_paths: list):
+        """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
+        if not pdf_paths:
+            return
+
+        if self.renderer:
+            self.renderer.close()
+
+        try:
+            self.renderer = PdfRender()
+            self.renderer.load_pdf(pdf_paths) # 경로 리스트를 전달
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"문서를 여는 데 실패했습니다: {e}")
+            self.renderer = None
+            return
+
+        # 페이지 순서 초기화
+        self._page_order = list(range(self.renderer.get_page_count()))
+
+        # 첫 번째 파일 이름을 기준으로 창 제목 설정
+        self.setWindowTitle(f"PDF Viewer - {Path(pdf_paths[0]).name}")
+        
+        self._thumbnail_viewer.set_renderer(self.renderer)
+        self._pdf_view_widget.set_renderer(self.renderer)
+
+        self._pdf_load_widget.hide()
+        self._pdf_view_widget.show()
+        self._thumbnail_viewer.show()
+        self._alarm_widget.hide()  # PDF 로드 시 alarm_widget 숨김
+        self._info_panel.show()  # PDF 로드 시 info_panel 표시
+
+        # 기본 스플리터 사이즈를 즉시 한 번 강제하여 초기 힌트를 통일
+        self.set_splitter_sizes(False)
+
+        name, region, special_note = self._collect_pending_basic_info()
+        self._info_panel.update_basic_info(name, region, special_note)
+
+        # UI가 표시된 다음 틱에 첫 페이지 렌더를 예약하여 초기 크기 기준을 보장한다.
+        if self.renderer.get_page_count() > 0:
+            QTimer.singleShot(0, lambda: self.go_to_page(0))
+
+    def _handle_pdf_selected(self, pdf_paths: list):
+        self._pending_basic_info = None
+        self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
+        self._is_context_menu_work = False  # 로컬 파일 열기 시 컨텍스트 메뉴 작업 플래그 리셋
+        self._info_panel.update_basic_info("", "", "")
+        self.load_document(pdf_paths)
+
+    def _handle_work_started(self, pdf_paths: list, metadata: dict):
+        # 컨텍스트 메뉴를 통한 작업 시작 여부 확인 및 저장
+        self._is_context_menu_work = metadata.get('is_context_menu_work', False)
+        if self._is_context_menu_work:
+            print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
+        
+        # 메일 content 조회
+        thread_id = metadata.get('recent_thread_id')
+        mail_content = ""
+        if thread_id:
+            from core.sql_manager import get_mail_content_by_thread_id
+            mail_content = get_mail_content_by_thread_id(thread_id)
+            print(f"\n{'='*80}")
+            print(f"[메일 Content 조회 - thread_id: {thread_id}]")
+            print(f"{'='*80}")  
+            print(mail_content)
+            print(f"{'='*80}\n")
+        
+        # 기존 로직
+        if not metadata:
+            self._current_rn = ""  # metadata가 없는 경우 RN 초기화
+            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self.load_document(pdf_paths)
+            return
+
+        worker_name = self._worker_name or metadata.get('worker', '')
+        rn_value = metadata.get('rn')
+        existing_worker = metadata.get('worker', '').strip()  # 이미 배정된 작업자
+        
+        # 현재 작업 중인 RN 저장
+        self._current_rn = rn_value or ""
+
+        if not worker_name or not rn_value:
+            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self.load_document(pdf_paths)
+            return
+
+        # 관리자 권한 확인
+        admin_workers = ['이경구', '이호형']
+        is_admin = self._worker_name in admin_workers
+        
+        # 이미 작업자가 배정되어 있고, 현재 로그인 사용자가 관리자인 경우 조회 모드로 진행
+        if existing_worker and is_admin:
+            print(f"[관리자 조회 모드] 작업자: {existing_worker}, 관리자: {self._worker_name}")
+            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self.load_document(pdf_paths)
+            
+            # PDF 로드 후 메일 content 표시
+            if mail_content:
+                self._pdf_view_widget.set_mail_content(mail_content)
+            return
+
+        if not claim_subsidy_work(rn_value, worker_name):
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("이미 작업 중")
+            msg_box.setText("해당 신청 건은 다른 작업자가 진행 중입니다.")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            
+            # 메시지박스가 닫힐 때 자동으로 데이터 새로고침 실행
+            msg_box.finished.connect(self._pdf_load_widget.refresh_data)
+            msg_box.exec()
+            return
+
+        self._pending_basic_info = self._normalize_basic_info(metadata)
+        self.load_document(pdf_paths)
+        
+        # PDF 로드 후 메일 content 표시
+        if mail_content:
+            self._pdf_view_widget.set_mail_content(mail_content)
+
+    def _save_document(self):
+        """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
+        if self.renderer:
+            print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
+            # 저장 완료 후 자동으로 메인화면으로 돌아가도록 플래그 설정
+            self._auto_return_to_main_after_save = True
+            try:
+                self._pdf_view_widget.save_pdf(page_order=self._page_order, worker_name=self._worker_name)
+            except Exception as e:
+                # 저장 호출 중 예외 발생 시 안전장치
+                print(f"[저장 호출 중 예외] {e}")
+                self._auto_return_to_main_after_save = False
+                # 컨텍스트 메뉴 작업이었다면 플래그 리셋
+                if self._is_context_menu_work:
+                    self._is_context_menu_work = False
+                    print("[컨텍스트 메뉴 작업 플래그] 저장 호출 예외로 인해 False로 리셋됨")
+                QMessageBox.critical(self, "오류", f"저장 호출 중 오류가 발생했습니다:\n\n{str(e)}")
+        
+    def _handle_save_completed(self):
+        """PDF 저장이 완료되었을 때 호출된다."""
+        if hasattr(self, '_auto_return_to_main_after_save') and self._auto_return_to_main_after_save:
+            self._auto_return_to_main_after_save = False
+            
+            # 컨텍스트 메뉴를 통한 작업이었다면 이메일 창을 먼저 열기
+            if self._is_context_menu_work:
+                self._is_context_menu_work = False  # 플래그 리셋
+                self._open_mail_dialog_then_return_to_main()
+            else:
+                # 일반적인 경우 바로 메인화면으로 돌아가기
+                self.show_load_view()
+                # 메인화면으로 돌아갈 때 데이터 새로고침
+                self._pdf_load_widget.refresh_data()
+
+    def show_load_view(self):
+        """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
+        self.setWindowTitle("PDF Viewer")
+        if self.renderer:
+            self.renderer.close()
+        
+        self.renderer = None
+        self.current_page = -1
+        self._current_rn = ""  # 현재 RN 초기화
+        self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
+
+        self._pdf_load_widget.show()
+        
+        # 뷰어 관련 위젯들 숨기기 및 초기화
+        self._pdf_view_widget.hide()
+        self._pdf_view_widget.set_renderer(None) # 뷰어 내부 상태 초기화
+        self._thumbnail_viewer.hide()
+        self._thumbnail_viewer.clear_thumbnails()
+        self._info_panel.hide()
+        self._info_panel.clear_info()
+        self._alarm_widget.show()  # 메인화면으로 돌아갈 때 alarm_widget 표시
+
+        self._update_page_navigation()
+
+
     def showEvent(self, event):
         """창이 처음 표시될 때 제목 표시줄을 포함한 전체 높이를 화면에 맞게 조정한다."""
         super().showEvent(event)
@@ -508,21 +686,7 @@ class MainWindow(QMainWindow):
         # 파일 정보 패널 업데이트
         self._info_panel.update_total_pages(new_total_pages)
 
-    def _handle_save_completed(self):
-        """PDF 저장이 완료되었을 때 호출된다."""
-        if hasattr(self, '_auto_return_to_main_after_save') and self._auto_return_to_main_after_save:
-            self._auto_return_to_main_after_save = False
-            
-            # 컨텍스트 메뉴를 통한 작업이었다면 이메일 창을 먼저 열기
-            if self._is_context_menu_work:
-                self._is_context_menu_work = False  # 플래그 리셋
-                self._open_mail_dialog_then_return_to_main()
-            else:
-                # 일반적인 경우 바로 메인화면으로 돌아가기
-                self.show_load_view()
-                # 메인화면으로 돌아갈 때 데이터 새로고침
-                self._pdf_load_widget.refresh_data()
-
+    
     def _update_page_order(self, new_order: list[int]):
         """페이지 순서가 변경되면 호출되는 슬롯"""
         self._page_order = new_order
@@ -621,167 +785,10 @@ class MainWindow(QMainWindow):
             # 안전 장치: 실패해도 크래시 방지
             pass
     
-    def load_document(self, pdf_paths: list):
-        """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
-        if not pdf_paths:
-            return
-
-        if self.renderer:
-            self.renderer.close()
-
-        try:
-            self.renderer = PdfRender()
-            self.renderer.load_pdf(pdf_paths) # 경로 리스트를 전달
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"문서를 여는 데 실패했습니다: {e}")
-            self.renderer = None
-            return
-
-        # 페이지 순서 초기화
-        self._page_order = list(range(self.renderer.get_page_count()))
-
-        # 첫 번째 파일 이름을 기준으로 창 제목 설정
-        self.setWindowTitle(f"PDF Viewer - {Path(pdf_paths[0]).name}")
-        
-        self._thumbnail_viewer.set_renderer(self.renderer)
-        self._pdf_view_widget.set_renderer(self.renderer)
-
-        self._pdf_load_widget.hide()
-        self._pdf_view_widget.show()
-        self._thumbnail_viewer.show()
-        self._alarm_widget.hide()  # PDF 로드 시 alarm_widget 숨김
-        self._info_panel.show()  # PDF 로드 시 info_panel 표시
-
-        # 기본 스플리터 사이즈를 즉시 한 번 강제하여 초기 힌트를 통일
-        self.set_splitter_sizes(False)
-
-        name, region, special_note = self._collect_pending_basic_info()
-        self._info_panel.update_basic_info(name, region, special_note)
-
-        # UI가 표시된 다음 틱에 첫 페이지 렌더를 예약하여 초기 크기 기준을 보장한다.
-        if self.renderer.get_page_count() > 0:
-            QTimer.singleShot(0, lambda: self.go_to_page(0))
-
-    def _save_document(self):
-        """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
-        if self.renderer:
-            print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
-            # 저장 완료 후 자동으로 메인화면으로 돌아가도록 플래그 설정
-            self._auto_return_to_main_after_save = True
-            try:
-                self._pdf_view_widget.save_pdf(page_order=self._page_order, worker_name=self._worker_name)
-            except Exception as e:
-                # 저장 호출 중 예외 발생 시 안전장치
-                print(f"[저장 호출 중 예외] {e}")
-                self._auto_return_to_main_after_save = False
-                # 컨텍스트 메뉴 작업이었다면 플래그 리셋
-                if self._is_context_menu_work:
-                    self._is_context_menu_work = False
-                    print("[컨텍스트 메뉴 작업 플래그] 저장 호출 예외로 인해 False로 리셋됨")
-                QMessageBox.critical(self, "오류", f"저장 호출 중 오류가 발생했습니다:\n\n{str(e)}")
-        
-    def show_load_view(self):
-        """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
-        self.setWindowTitle("PDF Viewer")
-        if self.renderer:
-            self.renderer.close()
-        
-        self.renderer = None
-        self.current_page = -1
-        self._current_rn = ""  # 현재 RN 초기화
-        self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
-
-        self._pdf_load_widget.show()
-        
-        # 뷰어 관련 위젯들 숨기기 및 초기화
-        self._pdf_view_widget.hide()
-        self._pdf_view_widget.set_renderer(None) # 뷰어 내부 상태 초기화
-        self._thumbnail_viewer.hide()
-        self._thumbnail_viewer.clear_thumbnails()
-        self._info_panel.hide()
-        self._info_panel.clear_info()
-        self._alarm_widget.show()  # 메인화면으로 돌아갈 때 alarm_widget 표시
-
-        self._update_page_navigation()
-
-    def _handle_pdf_selected(self, pdf_paths: list):
-        self._pending_basic_info = None
-        self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
-        self._is_context_menu_work = False  # 로컬 파일 열기 시 컨텍스트 메뉴 작업 플래그 리셋
-        self._info_panel.update_basic_info("", "", "")
-        self.load_document(pdf_paths)
-
-    def _handle_work_started(self, pdf_paths: list, metadata: dict):
-        # 컨텍스트 메뉴를 통한 작업 시작 여부 확인 및 저장
-        self._is_context_menu_work = metadata.get('is_context_menu_work', False)
-        if self._is_context_menu_work:
-            print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
-        
-        # 메일 content 조회
-        thread_id = metadata.get('recent_thread_id')
-        mail_content = ""
-        if thread_id:
-            from core.sql_manager import get_mail_content_by_thread_id
-            mail_content = get_mail_content_by_thread_id(thread_id)
-            print(f"\n{'='*80}")
-            print(f"[메일 Content 조회 - thread_id: {thread_id}]")
-            print(f"{'='*80}")  
-            print(mail_content)
-            print(f"{'='*80}\n")
-        
-        # 기존 로직
-        if not metadata:
-            self._current_rn = ""  # metadata가 없는 경우 RN 초기화
-            self._pending_basic_info = self._normalize_basic_info(metadata)
-            self.load_document(pdf_paths)
-            return
-
-        worker_name = self._worker_name or metadata.get('worker', '')
-        rn_value = metadata.get('rn')
-        existing_worker = metadata.get('worker', '').strip()  # 이미 배정된 작업자
-        
-        # 현재 작업 중인 RN 저장
-        self._current_rn = rn_value or ""
-
-        if not worker_name or not rn_value:
-            self._pending_basic_info = self._normalize_basic_info(metadata)
-            self.load_document(pdf_paths)
-            return
-
-        # 관리자 권한 확인
-        admin_workers = ['이경구', '이호형']
-        is_admin = self._worker_name in admin_workers
-        
-        # 이미 작업자가 배정되어 있고, 현재 로그인 사용자가 관리자인 경우 조회 모드로 진행
-        if existing_worker and is_admin:
-            print(f"[관리자 조회 모드] 작업자: {existing_worker}, 관리자: {self._worker_name}")
-            self._pending_basic_info = self._normalize_basic_info(metadata)
-            self.load_document(pdf_paths)
-            
-            # PDF 로드 후 메일 content 표시
-            if mail_content:
-                self._pdf_view_widget.set_mail_content(mail_content)
-            return
-
-        if not claim_subsidy_work(rn_value, worker_name):
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("이미 작업 중")
-            msg_box.setText("해당 신청 건은 다른 작업자가 진행 중입니다.")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            
-            # 메시지박스가 닫힐 때 자동으로 데이터 새로고침 실행
-            msg_box.finished.connect(self._pdf_load_widget.refresh_data)
-            msg_box.exec()
-            return
-
-        self._pending_basic_info = self._normalize_basic_info(metadata)
-        self.load_document(pdf_paths)
-        
-        # PDF 로드 후 메일 content 표시
-        if mail_content:
-            self._pdf_view_widget.set_mail_content(mail_content)
-
+    
+    
+    
+    
     @staticmethod
     def _normalize_basic_info(metadata: dict | None) -> dict:
         if not metadata:
