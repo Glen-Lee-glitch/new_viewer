@@ -373,29 +373,39 @@ def export_deleted_pages(
                         # "기타"인 경우 커스텀 텍스트 사용 (파일명에 적합하도록 정리)
                         if reason_text == "기타" and delete_info.get("custom_text"):
                             custom_text = delete_info["custom_text"].strip()
-                            # 파일명에 사용할 수 없는 문자 제거
-                            custom_text = "".join(c for c in custom_text if c.isalnum() or c in "._- ")
-                            custom_text = custom_text.replace(" ", "_")[:20]  # 최대 20자로 제한
+                            # 파일명에 안전한 문자만 허용 (한글, 영문, 숫자, 일부 기호만)
+                            safe_chars = []
+                            for c in custom_text:
+                                if c.isalnum() or c in "._-":
+                                    safe_chars.append(c)
+                                elif c == " ":
+                                    safe_chars.append("_")
+                            custom_text = "".join(safe_chars)[:10]  # 최대 10자로 제한
                             reason = f"기타_{custom_text}" if custom_text else "기타"
                         else:
-                            reason = reason_text
+                            reason = reason_text.replace(" ", "_")
                     
-                    # 파일명 생성: {원본파일명}_{사유}_{페이지번호}.pdf
+                    # 기본 파일명 생성: {원본파일명}_{사유}_{페이지번호}
                     if reason:
-                        file_name = f"{base_name}_{reason}_{page_idx + 1}.pdf"
+                        base_filename = f"{base_name}_{reason}_{page_idx + 1}"
                     else:
-                        file_name = f"{base_name}_{page_idx + 1}.pdf"
+                        base_filename = f"{base_name}_{page_idx + 1}"
                     
+                    # 중복 방지를 위한 번호 추가 로직
+                    file_name = f"{base_filename}.pdf"
                     dest_path = destination / file_name
                     
-                    # 파일이 이미 존재하면 타임스탬프 추가
-                    if dest_path.exists():
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        if reason:
-                            file_name = f"{base_name}_{reason}_{page_idx + 1}_{timestamp}.pdf"
-                        else:
-                            file_name = f"{base_name}_{page_idx + 1}_{timestamp}.pdf"
+                    counter = 1
+                    while dest_path.exists():
+                        file_name = f"{base_filename}_{counter}.pdf"
                         dest_path = destination / file_name
+                        counter += 1
+                        # 무한 루프 방지
+                        if counter > 1000:
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                            file_name = f"{base_filename}_{timestamp}.pdf"
+                            dest_path = destination / file_name
+                            break
                     
                     temp_doc.save(str(dest_path), deflate=False, clean=False)
                     exported_files.append(dest_path)
