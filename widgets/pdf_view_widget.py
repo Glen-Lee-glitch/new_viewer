@@ -592,6 +592,19 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 suffix = PathLib(original_filename).suffix
                 output_path = str(save_dir / f"{stem}_{timestamp}{suffix}")
             
+            # 저장 확인 다이얼로그
+            reply = QMessageBox.question(
+                self, 
+                "저장 확인", 
+                f"다음 경로에 PDF를 저장하시겠습니까?\n\n{output_path}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply != QMessageBox.StandardButton.Yes:
+                # 사용자가 취소한 경우 그냥 확인창만 닫고 현재 상태 유지
+                return
+            
             print(f"자동 저장 경로: {output_path}")
 
             input_bytes = self.renderer.get_pdf_bytes()
