@@ -366,24 +366,17 @@ def export_deleted_pages(
                 try:
                     temp_doc.insert_pdf(src, from_page=page_idx, to_page=page_idx)
                     
-                    # 삭제 사유 추출 및 파일명에 포함
+                    # 삭제 사유를 파일명에 적합한 형태로 매핑
                     reason = ""
                     if delete_info and delete_info.get("reason"):
                         reason_text = delete_info["reason"]
-                        # "기타"인 경우 커스텀 텍스트 사용 (파일명에 적합하도록 정리)
-                        if reason_text == "기타" and delete_info.get("custom_text"):
-                            custom_text = delete_info["custom_text"].strip()
-                            # 파일명에 안전한 문자만 허용 (한글, 영문, 숫자, 일부 기호만)
-                            safe_chars = []
-                            for c in custom_text:
-                                if c.isalnum() or c in "._-":
-                                    safe_chars.append(c)
-                                elif c == " ":
-                                    safe_chars.append("_")
-                            custom_text = "".join(safe_chars)[:10]  # 최대 10자로 제한
-                            reason = f"기타_{custom_text}" if custom_text else "기타"
-                        else:
-                            reason = reason_text.replace(" ", "_")
+                        # 사유별 파일명 매핑 (깔끔한 키워드만 사용)
+                        reason_mapping = {
+                            "추가 서류": "추가서류",
+                            "필요 없음": "필요없음", 
+                            "기타": "기타"
+                        }
+                        reason = reason_mapping.get(reason_text, "기타")
                     
                     # 기본 파일명 생성: {원본파일명}_{사유}_{페이지번호}
                     if reason:
