@@ -377,6 +377,9 @@ class MainWindow(QMainWindow):
         self.show_load_view()
         # 메인화면으로 돌아갈 때 데이터 새로고침
         self._pdf_load_widget.refresh_data()
+        # 알람 위젯도 함께 새로고침
+        if hasattr(self, '_alarm_widget'):
+            self._alarm_widget.refresh_data()
 
     def _open_worker_progress_dialog(self):
         """작업자 현황 다이얼로그를 연다."""
@@ -501,7 +504,7 @@ class MainWindow(QMainWindow):
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             
             # 메시지박스가 닫힐 때 자동으로 데이터 새로고침 실행
-            msg_box.finished.connect(self._pdf_load_widget.refresh_data)
+            msg_box.finished.connect(self._refresh_all_data)
             msg_box.exec()
             return
 
@@ -543,7 +546,7 @@ class MainWindow(QMainWindow):
                 # 일반적인 경우 바로 메인화면으로 돌아가기
                 self.show_load_view()
                 # 메인화면으로 돌아갈 때 데이터 새로고침
-                self._pdf_load_widget.refresh_data()
+                self._refresh_all_data()
 
     def show_load_view(self):
         """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
@@ -665,6 +668,12 @@ class MainWindow(QMainWindow):
         """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
         self.set_splitter_sizes(is_landscape)
 
+    def _refresh_all_data(self):
+        """모든 데이터를 새로고침한다 (PDF 로드 위젯과 알람 위젯)."""
+        self._pdf_load_widget.refresh_data()
+        if hasattr(self, '_alarm_widget'):
+            self._alarm_widget.refresh_data()
+
     def _update_worker_label(self):
         """worker_label_2에 작업자 이름을 표시하고, 관리자 권한에 따라 버튼 가시성을 설정한다."""
         # 관리자 작업자 목록
@@ -754,11 +763,11 @@ class MainWindow(QMainWindow):
         if clicked_button == no_save_button:
             self.show_load_view()
             # 메인화면으로 돌아갈 때 데이터 새로고침
-            self._pdf_load_widget.refresh_data()
+            self._refresh_all_data()
         elif clicked_button == save_button:
             self._save_document()
             # 저장 후 메인화면으로 돌아갈 때도 데이터 새로고침
-            self._pdf_load_widget.refresh_data()
+            self._refresh_all_data()
         # 취소 버튼을 누르면 아무것도 하지 않고 대화상자만 닫힘
 
     def _handle_undo_request(self):

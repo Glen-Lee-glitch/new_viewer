@@ -1,6 +1,6 @@
 from pathlib import Path
-from PyQt6.QtWidgets import QWidget, QListWidget, QVBoxLayout
-from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QWidget, QListWidget, QVBoxLayout, QLabel
+from PyQt6.QtCore import QTimer, Qt
 from PyQt6 import uic
 
 from core.sql_manager import get_today_completed_subsidies
@@ -38,9 +38,17 @@ class AlarmWidget(QWidget):
             if layout is None:
                 layout = QVBoxLayout(self.groupBox_finished)
             
+            # 제목 라벨 추가
+            title_label = QLabel("금일 처리완료 건")
+            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            title_label.setStyleSheet("font-weight: bold; color: #333; margin-bottom: 5px;")
+            layout.addWidget(title_label)
+            
             # 리스트 위젯 생성 및 추가
             self._finished_list = QListWidget()
-            self._finished_list.setMaximumHeight(100)  # 높이 제한
+            # 최소 5개 row가 보이도록 높이 조정 (대략 25px per row)
+            self._finished_list.setMinimumHeight(125)  # 5 * 25 = 125px
+            self._finished_list.setMaximumHeight(150)  # 최대 높이도 약간 증가
             layout.addWidget(self._finished_list)
     
     def _load_completed_regions(self):
