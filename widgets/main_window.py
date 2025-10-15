@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
         self.thread_pool = QThreadPool()
         self._initial_resize_done = False  # 초기 크기 조정 완료 플래그
         self._auto_return_to_main_after_save = False
+        self._worker_name = ""  # 작업자 이름 저장용 (위젯 생성 전에 초기화)
         
         # --- 위젯 인스턴스 생성 ---
         self._thumbnail_viewer = ThumbnailViewWidget()
@@ -83,7 +84,6 @@ class MainWindow(QMainWindow):
 
         # 로그인 다이얼로그 초기화
         self._login_dialog = LoginDialog(self)
-        self._worker_name = ""  # 작업자 이름 저장용
         self._current_rn = ""  # 현재 작업 중인 RN 번호 저장용
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 여부
         
