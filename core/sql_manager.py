@@ -247,7 +247,7 @@ def get_today_completed_subsidies(worker: str = None) -> list:
                     AND DATE(status_updated_at) = %s
                     AND worker = %s
                     AND region IS NOT NULL
-                    ORDER BY status_updated_at
+                    ORDER BY status_updated_at DESC
                 """
                 params = (today, worker)
             else:
@@ -257,7 +257,7 @@ def get_today_completed_subsidies(worker: str = None) -> list:
                     WHERE status = '지원완료' 
                     AND DATE(status_updated_at) = %s
                     AND region IS NOT NULL
-                    ORDER BY status_updated_at
+                    ORDER BY status_updated_at DESC
                 """
                 params = (today,)
             
