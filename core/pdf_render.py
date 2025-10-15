@@ -5,6 +5,7 @@ import os
 from PIL import Image
 from PyQt6.QtGui import QPixmap, QImage, QIcon, QTransform
 from PyQt6.QtCore import Qt, QBuffer, QIODevice
+from pathlib import Path
 
 A4_WIDTH_PT = 595.276
 A4_HEIGHT_PT = 841.890
@@ -26,6 +27,25 @@ class PdfRender:
         self.page_count = 0
         self.pdf_path: str | None = None
         self.pdf_bytes: bytes | None = None
+
+    def load_preprocessed_pdf(self, path: str) -> None:
+        """전처리된 PDF 파일을 빠르게 로드한다."""
+        if not Path(path).exists():
+            raise FileNotFoundError(f"전처리된 파일을 찾을 수 없습니다: {path}")
+        
+        try:
+            print(f"🚀 전처리된 파일 고속 로딩 시작: {Path(path).name}")
+            with open(path, 'rb') as f:
+                self.pdf_bytes = f.read()
+            
+            self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
+            self.pdf_path = path
+            self.page_count = len(self.doc)
+            print(f"✅ 고속 로딩 완료. 총 {self.page_count} 페이지.")
+        
+        except Exception as exc:
+            traceback.print_exc()
+            raise ValueError(f"전처리된 문서 로딩 중 오류 발생: {exc}")
 
     def load_pdf(self, paths: list) -> None:
         """여러 PDF 및 이미지 파일을 병합하고, 모든 페이지를 A4 규격으로 변환하여 메모리에 저장한다."""

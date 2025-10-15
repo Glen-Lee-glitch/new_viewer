@@ -7,7 +7,7 @@ import traceback
 from contextlib import closing
 
 FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
-FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id']
+FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id', 'file_rendered']
 
 # MySQL 연결 정보
 DB_CONFIG = {
@@ -68,7 +68,8 @@ def fetch_recent_subsidy_applications():
                 "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
                 "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "
                 "       e.attached_file_path AS original_filepath, "
-                "       sa.recent_thread_id "  # 추가
+                "       sa.recent_thread_id, "
+                "       e.file_rendered "  # file_rendered 칼럼 추가
                 "FROM subsidy_applications sa "
                 "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
                 "WHERE sa.recent_received_date >= %s "

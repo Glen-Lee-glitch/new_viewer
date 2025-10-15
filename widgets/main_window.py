@@ -377,7 +377,7 @@ class MainWindow(QMainWindow):
 
     # === 문서 생명주기 관리 ===
     
-    def load_document(self, pdf_paths: list):
+    def load_document(self, pdf_paths: list, is_preprocessed: bool = False):
         """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
         if not pdf_paths:
             return
@@ -387,7 +387,13 @@ class MainWindow(QMainWindow):
 
         try:
             self.renderer = PdfRender()
-            self.renderer.load_pdf(pdf_paths) # 경로 리스트를 전달
+            if is_preprocessed and len(pdf_paths) == 1:
+                # 고속 로딩: 전처리된 단일 파일
+                self.renderer.load_preprocessed_pdf(pdf_paths[0])
+            else:
+                # 일반 로딩: 전처리 안됐거나 여러 파일
+                self.renderer.load_pdf(pdf_paths)
+                
         except Exception as e:
             QMessageBox.critical(self, "오류", f"문서를 여는 데 실패했습니다: {e}")
             self.renderer = None
@@ -428,6 +434,8 @@ class MainWindow(QMainWindow):
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
         # 컨텍스트 메뉴를 통한 작업 시작 여부 확인 및 저장
         self._is_context_menu_work = metadata.get('is_context_menu_work', False)
+        is_preprocessed = metadata.get('file_rendered', 0) == 1
+        
         if self._is_context_menu_work:
             print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
         
@@ -490,7 +498,7 @@ class MainWindow(QMainWindow):
             return
 
         self._pending_basic_info = normalize_basic_info(metadata)
-        self.load_document(pdf_paths)
+        self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
         
         # PDF 로드 후 메일 content 표시
         if mail_content:

@@ -77,6 +77,7 @@ class PdfLoadWidget(QWidget):
                 'name': self._sanitize_text(row.get('name', '')),
                 'special_note': self._sanitize_text(row.get('special_note', '')),
                 'recent_thread_id': self._sanitize_text(row.get('recent_thread_id', '')),  # 추가
+                'file_rendered': row.get('file_rendered', 0)  # file_rendered 상태 추가
             }
 
             rn_item = QTableWidgetItem(row_data['rn'])
@@ -149,6 +150,9 @@ class PdfLoadWidget(QWidget):
         metadata['rn'] = metadata.get('rn') or self._safe_item_text(rn_item)
         metadata['region'] = metadata.get('region') or self._safe_item_text(table.item(row, 1))
         metadata['worker'] = metadata.get('worker') or self._safe_item_text(table.item(row, 2))
+        
+        # file_rendered 상태 추가
+        metadata['file_rendered'] = rn_item.data(Qt.ItemDataRole.UserRole).get('file_rendered', 0)
         
         # 컨텍스트 메뉴를 통한 작업 시작임을 metadata에 추가
         metadata['is_context_menu_work'] = self._is_context_menu_work
@@ -224,10 +228,10 @@ class PdfLoadWidget(QWidget):
 
     def _extract_row_metadata(self, rn_item: QTableWidgetItem | None) -> dict:
         if rn_item is None:
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'is_context_menu_work': False}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'is_context_menu_work': False}
         data = rn_item.data(Qt.ItemDataRole.UserRole)
         if not isinstance(data, dict):
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'is_context_menu_work': False}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'is_context_menu_work': False}
         return {
             'rn': data.get('rn', ""),
             'name': data.get('name', ""),
@@ -235,5 +239,6 @@ class PdfLoadWidget(QWidget):
             'worker': data.get('worker', ""),
             'special_note': data.get('special_note', ""),
             'recent_thread_id': data.get('recent_thread_id', ""),  # 추가
+            'file_rendered': data.get('file_rendered', 0), # 추가
             'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
         }
