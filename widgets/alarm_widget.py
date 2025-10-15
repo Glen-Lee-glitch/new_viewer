@@ -57,15 +57,18 @@ class AlarmWidget(QWidget):
             return
         
         try:
-            # 현재 로그인한 작업자 정보와 함께 완료된 지역 목록 조회
-            completed_regions = get_today_completed_subsidies(self._worker_name)
+            # 현재 로그인한 작업자 정보와 함께 완료된 지역 및 시간 목록 조회
+            completed_items = get_today_completed_subsidies(self._worker_name)
             
             # 리스트 클리어 후 새 데이터 추가
             self._finished_list.clear()
             
-            if completed_regions:
-                for region in completed_regions:
-                    self._finished_list.addItem(f"✅ {region}")
+            if completed_items:
+                for region, completed_at in completed_items:
+                    # 시간 포맷팅: HH_MM (예: 15_57)
+                    time_str = completed_at.strftime('%H_%M')
+                    item_text = f"✅ {region}_{time_str}"
+                    self._finished_list.addItem(item_text)
             else:
                 if self._worker_name:
                     self._finished_list.addItem(f"오늘 {self._worker_name}님이 완료한 지원 건이 없습니다.")
