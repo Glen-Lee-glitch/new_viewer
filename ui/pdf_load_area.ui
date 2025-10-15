@@ -127,6 +127,13 @@
              </layout>
             </item>
             <item>
+             <widget class="QLabel" name="label_2">
+              <property name="text">
+               <string>지원</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QTableWidget" name="complement_table_widget">
               <property name="contextMenuPolicy">
                <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
@@ -140,18 +147,52 @@
               <property name="selectionBehavior">
                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
               </property>
+              <attribute name="verticalHeaderVisible">
+               <bool>false</bool>
+              </attribute>
              </widget>
             </item>
             <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_3">
-              <item>
-               <widget class="QLabel" name="worker_label_1">
-                <property name="text">
-                 <string/>
-                </property>
-               </widget>
-              </item>
-             </layout>
+             <widget class="QLabel" name="label">
+              <property name="text">
+               <string>지급</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTableWidget" name="tableWidget">
+              <attribute name="verticalHeaderVisible">
+               <bool>false</bool>
+              </attribute>
+              <column>
+               <property name="text">
+                <string>RN</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>작업자</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>지역</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>상태</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>메모</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_3"/>
             </item>
            </layout>
           </widget>
