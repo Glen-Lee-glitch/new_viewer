@@ -43,7 +43,7 @@ class PdfLoadWidget(QWidget):
         """테이블 위젯 초기 설정"""
         table = self.complement_table_widget
         table.setColumnCount(4)
-        table.setHorizontalHeaderLabels(['RN', '지역', '작업자', '파일여부'])
+        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '파일여부'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -80,11 +80,13 @@ class PdfLoadWidget(QWidget):
                 'file_rendered': row.get('file_rendered', 0)  # file_rendered 상태 추가
             }
 
-            rn_item = QTableWidgetItem(row_data['rn'])
-            rn_item.setData(Qt.ItemDataRole.UserRole, row_data)
-            table.setItem(row_index, 0, rn_item)
+            # 컬럼 순서: ['지역', 'RN', '작업자', '파일여부']
+            region_item = QTableWidgetItem(row_data['region'])
+            table.setItem(row_index, 0, region_item)
 
-            table.setItem(row_index, 1, QTableWidgetItem(row_data['region']))
+            rn_item = QTableWidgetItem(row_data['rn'])
+            rn_item.setData(Qt.ItemDataRole.UserRole, row_data)  # RN 아이템에 전체 데이터 저장
+            table.setItem(row_index, 1, rn_item)
 
             worker_item = QTableWidgetItem(row_data['worker'])
             worker_item.setData(Qt.ItemDataRole.UserRole, row_data['worker'])
@@ -121,7 +123,7 @@ class PdfLoadWidget(QWidget):
             return
 
         row = selected_items[0].row()
-        rn_item = table.item(row, 0)
+        rn_item = table.item(row, 1)  # RN은 이제 1번 컬럼
         file_item = table.item(row, 3)
 
         if file_item is None:
@@ -148,7 +150,7 @@ class PdfLoadWidget(QWidget):
 
         metadata = self._extract_row_metadata(rn_item)
         metadata['rn'] = metadata.get('rn') or self._safe_item_text(rn_item)
-        metadata['region'] = metadata.get('region') or self._safe_item_text(table.item(row, 1))
+        metadata['region'] = metadata.get('region') or self._safe_item_text(table.item(row, 0))  # 지역은 이제 0번 컬럼
         metadata['worker'] = metadata.get('worker') or self._safe_item_text(table.item(row, 2))
         
         # file_rendered 상태 추가
