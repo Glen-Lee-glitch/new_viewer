@@ -14,6 +14,7 @@ from core.pdf_render import PdfRender
 from core.pdf_saved import compress_pdf_with_multiple_stages
 from core.sql_manager import claim_subsidy_work
 from core.workers import BatchTestSignals, PdfBatchTestWorker
+from core.utility import normalize_basic_info
 from widgets.pdf_load_widget import PdfLoadWidget
 from widgets.pdf_view_widget import PdfViewWidget
 from widgets.thumbnail_view_widget import ThumbnailViewWidget
@@ -265,7 +266,7 @@ class MainWindow(QMainWindow):
         crop_shortcut = settings.value("shortcuts/crop", "Y")
         self.crop_action.setShortcut(QKeySequence.fromString(crop_shortcut, QKeySequence.SequenceFormat.PortableText))
 
-    # === 프로퍼티 정의 ===
+    # === 프로퍼티 정의(선택 범위 숨김 권장) ===
 
     # 속성 접근을 위한 프로퍼티들 (기존 코드와의 호환성을 위해)
     @property
@@ -449,7 +450,7 @@ class MainWindow(QMainWindow):
         # 기존 로직
         if not metadata:
             self._current_rn = ""  # metadata가 없는 경우 RN 초기화
-            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self._pending_basic_info = normalize_basic_info(metadata)
             self.load_document(pdf_paths)
             return
 
@@ -461,7 +462,7 @@ class MainWindow(QMainWindow):
         self._current_rn = rn_value or ""
 
         if not worker_name or not rn_value:
-            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self._pending_basic_info = normalize_basic_info(metadata)
             self.load_document(pdf_paths)
             return
 
@@ -472,7 +473,7 @@ class MainWindow(QMainWindow):
         # 이미 작업자가 배정되어 있고, 현재 로그인 사용자가 관리자인 경우 조회 모드로 진행
         if existing_worker and is_admin:
             print(f"[관리자 조회 모드] 작업자: {existing_worker}, 관리자: {self._worker_name}")
-            self._pending_basic_info = self._normalize_basic_info(metadata)
+            self._pending_basic_info = normalize_basic_info(metadata)
             self.load_document(pdf_paths)
             
             # PDF 로드 후 메일 content 표시
@@ -492,7 +493,7 @@ class MainWindow(QMainWindow):
             msg_box.exec()
             return
 
-        self._pending_basic_info = self._normalize_basic_info(metadata)
+        self._pending_basic_info = normalize_basic_info(metadata)
         self.load_document(pdf_paths)
         
         # PDF 로드 후 메일 content 표시
@@ -755,24 +756,8 @@ class MainWindow(QMainWindow):
 
     # === 유틸리티 및 헬퍼 ===
 
-    @staticmethod
-    def _normalize_basic_info(metadata: dict | None) -> dict:
-        if not metadata:
-            return {'name': "", 'region': "", 'special_note': ""}
-
-        def _coerce(value):
-            if value is None:
-                return ""
-            return str(value).strip()
-
-        return {
-            'name': _coerce(metadata.get('name')),
-            'region': _coerce(metadata.get('region')),
-            'special_note': _coerce(metadata.get('special_note')),
-            'is_context_menu_work': metadata.get('is_context_menu_work', False)  # 컨텍스트 메뉴 작업 여부 추가
-        }
-
     def _collect_pending_basic_info(self) -> tuple[str, str, str]:
+        """대기 중인 기본 정보를 추출하여 튜플로 반환한다."""
         info = self._pending_basic_info or {'name': "", 'region': "", 'special_note': ""}
         name = info.get('name', "")
         region = info.get('region', "")
@@ -780,6 +765,7 @@ class MainWindow(QMainWindow):
         self._pending_basic_info = info
         return name, region, special_note
 
+    
     # === 테스트 관련 함수 ===
 
     def start_batch_test(self):
