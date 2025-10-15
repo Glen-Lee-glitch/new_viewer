@@ -105,7 +105,8 @@ class StampOverlayWidget(QWidget):
             return
 
         if key == Qt.Key.Key_5:
-            self._on_stamp_button_clicked({'path': 'assets/체크.png', 'width': 50})
+            if hasattr(self, 'stamp_button_5'):
+                self.stamp_button_5.showMenu()
             return
 
         super().keyPressEvent(event)
