@@ -123,10 +123,6 @@ class MainWindow(QMainWindow):
         # alarm_widget 추가 (상단)
         info_panel_layout.addWidget(self._alarm_widget)
         
-        # vertical spacer 추가
-        vertical_spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-        info_panel_layout.addItem(vertical_spacer)
-        
         # info_panel은 나중에 표시될 때 사용 (초기에는 숨김)
         info_panel_layout.addWidget(self._info_panel)
         
