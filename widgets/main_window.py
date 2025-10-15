@@ -28,6 +28,8 @@ from widgets.alarm_widget import AlarmWidget
 
 class MainWindow(QMainWindow):
     """메인 윈도우"""
+
+    # --- 초기화 및 설정 ---
     
     def __init__(self):
         super().__init__()
@@ -133,150 +135,6 @@ class MainWindow(QMainWindow):
         # QHBoxLayout 구조에서는 각 컨테이너의 사이즈 정책으로 제어
         # UI 파일에서 horstretch 값으로 기본 비율이 설정되어 있음
 
-    # 속성 접근을 위한 프로퍼티들 (기존 코드와의 호환성을 위해)
-    @property
-    def thumbnail_viewer(self):
-        return self._thumbnail_viewer
-    
-    @property
-    def pdf_view_widget(self):
-        return self._pdf_view_widget
-    
-    @property
-    def pdf_load_widget(self):
-        return self._pdf_load_widget
-    
-    @property
-    def info_panel(self):
-        return self._info_panel
-    
-    @property
-    def alarm_widget(self):
-        return self._alarm_widget
-    
-    @property
-    def todo_widget(self):
-        return self._todo_widget
-    
-    @property
-    def settings_dialog(self):
-        return self._settings_dialog
-  
-    @property
-    def statusBar(self):
-        return self.ui_status_bar
-    
-    @property
-    def test_button(self):
-        return self.ui_test_button
-    
-    @property
-    def pushButton_prev(self):
-        return self.ui_push_button_prev
-    
-    @property
-    def pushButton_next(self):
-        return self.ui_push_button_next
-    
-    @property
-    def label_page_nav(self):
-        return self.ui_label_page_nav
-    
-    @property
-    def pushButton_reset(self):
-        return self.ui_push_button_reset
-
-    def _setup_global_shortcuts(self):
-        """전역 단축키를 설정하고 액션에 연결한다."""
-        # ToDo 리스트 토글 액션
-        self.toggle_todo_action = QAction(self)
-        self.addAction(self.toggle_todo_action)
-        self.toggle_todo_action.triggered.connect(self._todo_widget.toggle_overlay)
-        
-        # 스탬프 오버레이 토글 액션
-        self.toggle_stamp_overlay_action = QAction(self)
-        self.addAction(self.toggle_stamp_overlay_action)
-        self.toggle_stamp_overlay_action.triggered.connect(self._pdf_view_widget.toggle_stamp_overlay)
-        
-        # 메일 오버레이 토글 액션
-        self.toggle_mail_overlay_action = QAction(self)
-        self.addAction(self.toggle_mail_overlay_action)
-        self.toggle_mail_overlay_action.triggered.connect(self._pdf_view_widget.toggle_mail_overlay)
-        
-        # 자르기 액션
-        self.crop_action = QAction(self)
-        self.addAction(self.crop_action)
-        self.crop_action.triggered.connect(self._pdf_view_widget._open_crop_dialog)
-
-        self._apply_shortcuts()
-
-    def _apply_shortcuts(self):
-        """QSettings에서 단축키를 불러와 액션에 적용한다."""
-        settings = self._settings_dialog.settings
-        
-        # TODO: settings.ui 위젯 이름이 확정되면 키 값을 맞춰야 함
-        todo_shortcut = settings.value("shortcuts/toggle_todo", "grave") # '`' 키
-        self.toggle_todo_action.setShortcut(QKeySequence.fromString(todo_shortcut, QKeySequence.SequenceFormat.PortableText))
-
-        # 스탬프 오버레이 단축키 적용
-        stamp_overlay_shortcut = settings.value("shortcuts/toggle_stamp_overlay", "Ctrl+T")
-        self.toggle_stamp_overlay_action.setShortcut(QKeySequence.fromString(stamp_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
-        
-        # 메일 오버레이 단축키 적용
-        mail_overlay_shortcut = settings.value("shortcuts/toggle_mail_overlay", "M")
-        self.toggle_mail_overlay_action.setShortcut(QKeySequence.fromString(mail_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
-        
-        # 자르기 단축키 적용
-        crop_shortcut = settings.value("shortcuts/crop", "Y")
-        self.crop_action.setShortcut(QKeySequence.fromString(crop_shortcut, QKeySequence.SequenceFormat.PortableText))
-
-    def _open_settings_dialog(self):
-        """설정 다이얼로그를 연다."""
-        if self._settings_dialog.exec():
-            # 사용자가 OK를 누르면 변경된 단축키를 다시 적용
-            self._apply_shortcuts()
-    
-    def _open_mail_dialog(self):
-        """메일 다이얼로그를 연다."""
-        # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
-        if self._current_rn:
-            self._mail_dialog.set_rn_value(self._current_rn)
-        
-        if self._mail_dialog.exec():
-            rn_value = self._mail_dialog.get_rn_value()
-            content = self._mail_dialog.get_content()
-            print(f"메일 전송 요청 - RN: {rn_value}, 내용: {content}")
-            # TODO: 실제 메일 전송 로직 구현
-
-    def _open_mail_dialog_then_return_to_main(self):
-        """이메일 다이얼로그를 열고, 완료 후 메인화면으로 돌아간다."""
-        # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
-        if self._current_rn:
-            self._mail_dialog.set_rn_value(self._current_rn)
-        
-        # 이메일 다이얼로그를 모달로 실행
-        dialog_result = self._mail_dialog.exec()
-        
-        if dialog_result:
-            rn_value = self._mail_dialog.get_rn_value()
-            content = self._mail_dialog.get_content()
-            print(f"[컨텍스트 메뉴 작업 완료 후 메일 전송] RN: {rn_value}, 내용: {content}")
-            # TODO: 실제 메일 전송 로직 구현
-        
-        # 이메일 창 완료 후 즉시 컨텍스트 메뉴 작업 플래그 리셋
-        self._is_context_menu_work = False
-        print("[컨텍스트 메뉴 작업 플래그] 이메일 창 완료 후 False로 리셋됨")
-        
-        # 이메일 창이 닫힌 후 메인화면으로 돌아가기
-        self.show_load_view()
-        # 메인화면으로 돌아갈 때 데이터 새로고침
-        self._pdf_load_widget.refresh_data()
-
-    def _open_worker_progress_dialog(self):
-        """작업자 현황 다이얼로그를 연다."""
-        worker_progress_dialog = WorkerProgressDialog(self)
-        worker_progress_dialog.exec()
-
     def _setup_menus(self):
         """메뉴바를 설정합니다."""
         # 파일 메뉴
@@ -363,6 +221,153 @@ class MainWindow(QMainWindow):
         # toggle_todo_action.triggered.connect(self.todo_widget.toggle_overlay)
         # self.addAction(toggle_todo_action)
 
+    def _setup_global_shortcuts(self):
+        """전역 단축키를 설정하고 액션에 연결한다."""
+        # ToDo 리스트 토글 액션
+        self.toggle_todo_action = QAction(self)
+        self.addAction(self.toggle_todo_action)
+        self.toggle_todo_action.triggered.connect(self._todo_widget.toggle_overlay)
+        
+        # 스탬프 오버레이 토글 액션
+        self.toggle_stamp_overlay_action = QAction(self)
+        self.addAction(self.toggle_stamp_overlay_action)
+        self.toggle_stamp_overlay_action.triggered.connect(self._pdf_view_widget.toggle_stamp_overlay)
+        
+        # 메일 오버레이 토글 액션
+        self.toggle_mail_overlay_action = QAction(self)
+        self.addAction(self.toggle_mail_overlay_action)
+        self.toggle_mail_overlay_action.triggered.connect(self._pdf_view_widget.toggle_mail_overlay)
+        
+        # 자르기 액션
+        self.crop_action = QAction(self)
+        self.addAction(self.crop_action)
+        self.crop_action.triggered.connect(self._pdf_view_widget._open_crop_dialog)
+
+        self._apply_shortcuts()
+
+    def _apply_shortcuts(self):
+        """QSettings에서 단축키를 불러와 액션에 적용한다."""
+        settings = self._settings_dialog.settings
+        
+        # TODO: settings.ui 위젯 이름이 확정되면 키 값을 맞춰야 함
+        todo_shortcut = settings.value("shortcuts/toggle_todo", "grave") # '`' 키
+        self.toggle_todo_action.setShortcut(QKeySequence.fromString(todo_shortcut, QKeySequence.SequenceFormat.PortableText))
+
+        # 스탬프 오버레이 단축키 적용
+        stamp_overlay_shortcut = settings.value("shortcuts/toggle_stamp_overlay", "Ctrl+T")
+        self.toggle_stamp_overlay_action.setShortcut(QKeySequence.fromString(stamp_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
+        
+        # 메일 오버레이 단축키 적용
+        mail_overlay_shortcut = settings.value("shortcuts/toggle_mail_overlay", "M")
+        self.toggle_mail_overlay_action.setShortcut(QKeySequence.fromString(mail_overlay_shortcut, QKeySequence.SequenceFormat.PortableText))
+        
+        # 자르기 단축키 적용
+        crop_shortcut = settings.value("shortcuts/crop", "Y")
+        self.crop_action.setShortcut(QKeySequence.fromString(crop_shortcut, QKeySequence.SequenceFormat.PortableText))
+
+    # === 프로퍼티 정의 ===
+
+    # 속성 접근을 위한 프로퍼티들 (기존 코드와의 호환성을 위해)
+    @property
+    def thumbnail_viewer(self):
+        return self._thumbnail_viewer
+    
+    @property
+    def pdf_view_widget(self):
+        return self._pdf_view_widget
+    
+    @property
+    def pdf_load_widget(self):
+        return self._pdf_load_widget
+    
+    @property
+    def info_panel(self):
+        return self._info_panel
+    
+    @property
+    def alarm_widget(self):
+        return self._alarm_widget
+    
+    @property
+    def todo_widget(self):
+        return self._todo_widget
+    
+    @property
+    def settings_dialog(self):
+        return self._settings_dialog
+  
+    @property
+    def statusBar(self):
+        return self.ui_status_bar
+    
+    @property
+    def test_button(self):
+        return self.ui_test_button
+    
+    @property
+    def pushButton_prev(self):
+        return self.ui_push_button_prev
+    
+    @property
+    def pushButton_next(self):
+        return self.ui_push_button_next
+    
+    @property
+    def label_page_nav(self):
+        return self.ui_label_page_nav
+    
+    @property
+    def pushButton_reset(self):
+        return self.ui_push_button_reset
+
+    def _open_settings_dialog(self):
+        """설정 다이얼로그를 연다."""
+        if self._settings_dialog.exec():
+            # 사용자가 OK를 누르면 변경된 단축키를 다시 적용
+            self._apply_shortcuts()
+    
+    def _open_mail_dialog(self):
+        """메일 다이얼로그를 연다."""
+        # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
+        if self._current_rn:
+            self._mail_dialog.set_rn_value(self._current_rn)
+        
+        if self._mail_dialog.exec():
+            rn_value = self._mail_dialog.get_rn_value()
+            content = self._mail_dialog.get_content()
+            print(f"메일 전송 요청 - RN: {rn_value}, 내용: {content}")
+            # TODO: 실제 메일 전송 로직 구현
+
+    def _open_mail_dialog_then_return_to_main(self):
+        """이메일 다이얼로그를 열고, 완료 후 메인화면으로 돌아간다."""
+        # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
+        if self._current_rn:
+            self._mail_dialog.set_rn_value(self._current_rn)
+        
+        # 이메일 다이얼로그를 모달로 실행
+        dialog_result = self._mail_dialog.exec()
+        
+        if dialog_result:
+            rn_value = self._mail_dialog.get_rn_value()
+            content = self._mail_dialog.get_content()
+            print(f"[컨텍스트 메뉴 작업 완료 후 메일 전송] RN: {rn_value}, 내용: {content}")
+            # TODO: 실제 메일 전송 로직 구현
+        
+        # 이메일 창 완료 후 즉시 컨텍스트 메뉴 작업 플래그 리셋
+        self._is_context_menu_work = False
+        print("[컨텍스트 메뉴 작업 플래그] 이메일 창 완료 후 False로 리셋됨")
+        
+        # 이메일 창이 닫힌 후 메인화면으로 돌아가기
+        self.show_load_view()
+        # 메인화면으로 돌아갈 때 데이터 새로고침
+        self._pdf_load_widget.refresh_data()
+
+    def _open_worker_progress_dialog(self):
+        """작업자 현황 다이얼로그를 연다."""
+        worker_progress_dialog = WorkerProgressDialog(self)
+        worker_progress_dialog.exec()
+
+    
     def showEvent(self, event):
         """창이 처음 표시될 때 제목 표시줄을 포함한 전체 높이를 화면에 맞게 조정한다."""
         super().showEvent(event)
