@@ -356,7 +356,6 @@ def export_deleted_pages(
     try:
         with pymupdf.open(stream=pdf_bytes, filetype="pdf") as src:
             total_pages = src.page_count
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             for page_idx in sorted(set(page_indices)):
                 if not (0 <= page_idx < total_pages):
@@ -365,8 +364,16 @@ def export_deleted_pages(
                 temp_doc = pymupdf.open()
                 try:
                     temp_doc.insert_pdf(src, from_page=page_idx, to_page=page_idx)
-                    file_name = f"{base_name}_page_{page_idx + 1}_{timestamp}.pdf"
+                    # 파일명: {원본파일명}_{페이지번호}.pdf
+                    file_name = f"{base_name}_{page_idx + 1}.pdf"
                     dest_path = destination / file_name
+                    
+                    # 파일이 이미 존재하면 타임스탬프 추가
+                    if dest_path.exists():
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        file_name = f"{base_name}_{page_idx + 1}_{timestamp}.pdf"
+                        dest_path = destination / file_name
+                    
                     temp_doc.save(str(dest_path), deflate=False, clean=False)
                     exported_files.append(dest_path)
                 finally:

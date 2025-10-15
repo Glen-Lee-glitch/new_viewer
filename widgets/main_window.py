@@ -608,7 +608,7 @@ class MainWindow(QMainWindow):
         actual_page_to_delete = self._page_order[visual_page_num]
 
         # 2. PdfViewWidget에 실제 페이지 번호를 전달하여 삭제 실행
-        self._pdf_view_widget.delete_pages([actual_page_to_delete])
+        self._pdf_view_widget.delete_pages([actual_page_to_delete], worker_name=self._worker_name)
         
         # 3. 페이지 순서 목록 업데이트
         self._page_order.pop(visual_page_num)

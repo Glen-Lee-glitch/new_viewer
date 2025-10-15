@@ -527,7 +527,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             # MainWindow에 현재 '보이는' 페이지의 삭제를 요청한다.
             self.page_delete_requested.emit(self.current_page)
 
-    def delete_pages(self, pages_to_delete: list[int]):
+    def delete_pages(self, pages_to_delete: list[int], worker_name: str = ""):
         """(공개 메서드) 지정된 '실제' 페이지 인덱스를 삭제하고 데이터를 업데이트한다."""
         if not self.renderer or not pages_to_delete:
             return
@@ -535,13 +535,24 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         pdf_bytes = self.renderer.get_pdf_bytes()
         if pdf_bytes:
             try:
+                from datetime import datetime
+                from pathlib import Path as PathLib
+                
                 pdf_copy = bytes(pdf_bytes)
                 base_path = self.get_current_pdf_path()
-                base_name = Path(base_path).stem if base_path else "untitled"
+                base_name = PathLib(base_path).stem if base_path else "untitled"
+                
+                # 작업자 폴더/날짜 구조로 저장 경로 구성
+                base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\2025_4Q_deleted'
+                today = datetime.now().strftime('%Y-%m-%d')
+                worker_folder = worker_name if worker_name else "미지정"
+                
+                output_dir = PathLib(base_dir) / worker_folder / today
+                
                 export_deleted_pages(
                     pdf_bytes=pdf_copy,
                     page_indices=pages_to_delete,
-                    output_dir=r"\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\2025_4Q_deleted",
+                    output_dir=output_dir,
                     base_name=base_name,
                 )
             except Exception as save_error:
