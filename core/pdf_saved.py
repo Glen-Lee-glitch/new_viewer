@@ -370,13 +370,16 @@ def export_deleted_pages(
                     reason = ""
                     if delete_info and delete_info.get("reason"):
                         reason_text = delete_info["reason"]
-                        # 사유별 파일명 매핑 (깔끔한 키워드만 사용)
-                        reason_mapping = {
-                            "추가 서류": "추가서류",
-                            "필요 없음": "필요없음", 
-                            "기타": "기타"
-                        }
-                        reason = reason_mapping.get(reason_text, "기타")
+                        
+                        # 텍스트에서 키워드를 찾아서 매핑 (긴 설명이 와도 처리)
+                        if "추가 서류" in reason_text:
+                            reason = "추가서류"
+                        elif "필요 없음" in reason_text:
+                            reason = "필요없음"
+                        elif "기타" in reason_text:
+                            reason = "기타"
+                        else:
+                            reason = "기타"  # 기본값
                     
                     # 기본 파일명 생성: {원본파일명}_{사유}_{페이지번호}
                     if reason:
