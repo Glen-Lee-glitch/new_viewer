@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6 import uic
 from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
-from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget, QMessageBox, QApplication
+from PyQt6.QtWidgets import QListWidgetItem, QWidget, QListWidget, QApplication
 
 from core.pdf_render import PdfRender
 from core.edit_mixin import EditMixin
@@ -52,16 +52,18 @@ class ThumbnailViewWidget(QWidget):
 
         item = selected_items[0]
         page_to_delete = self.thumbnail_list_widget.row(item)
+        visual_page_num = page_to_delete + 1
 
-        reply = QMessageBox.question(
-            self,
-            '페이지 삭제 확인',
-            f'{page_to_delete + 1} 페이지를 정말로 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        # 공통 삭제 확인 함수 사용
+        from core.delete_utils import prompt_page_delete
+        
+        delete_result = prompt_page_delete(self, visual_page_num)
+        if delete_result and delete_result.get("confirmed"):
+            # 삭제 정보 가져오기 (나중에 활용 예정)
+            print(f"삭제 사유: {delete_result['reason']}")
+            if delete_result['custom_text']:
+                print(f"기타 사유: {delete_result['custom_text']}")
+            
             # MainWindow에 선택된 '보이는' 페이지의 삭제를 요청한다.
             self.page_delete_requested.emit(page_to_delete)
 

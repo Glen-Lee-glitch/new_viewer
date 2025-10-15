@@ -515,16 +515,15 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
 
         visual_page_num = self.current_page + 1
 
-        # 커스텀 삭제 확인 다이얼로그 사용
-        from .page_delete_dialog import PageDeleteDialog
+        # 공통 삭제 확인 함수 사용
+        from core.delete_utils import prompt_page_delete
         
-        dialog = PageDeleteDialog(visual_page_num, self)
-        if dialog.exec() == PageDeleteDialog.DialogCode.Accepted:
+        delete_result = prompt_page_delete(self, visual_page_num)
+        if delete_result and delete_result.get("confirmed"):
             # 삭제 정보 가져오기 (나중에 활용 예정)
-            delete_info = dialog.get_delete_info()
-            print(f"삭제 사유: {delete_info['reason']}")
-            if delete_info['custom_text']:
-                print(f"기타 사유: {delete_info['custom_text']}")
+            print(f"삭제 사유: {delete_result['reason']}")
+            if delete_result['custom_text']:
+                print(f"기타 사유: {delete_result['custom_text']}")
             
             # MainWindow에 현재 '보이는' 페이지의 삭제를 요청한다.
             self.page_delete_requested.emit(self.current_page)
