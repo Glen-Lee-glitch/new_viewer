@@ -25,10 +25,10 @@ class AlarmWidget(QWidget):
         # 데이터 로드
         self._load_completed_regions()
         
-        # 주기적 업데이트 타이머 (5분마다)
-        self._timer = QTimer()
-        self._timer.timeout.connect(self._load_completed_regions)
-        self._timer.start(300000)  # 5분 = 300,000ms
+        # # 주기적 업데이트 타이머 (5분마다)
+        # self._timer = QTimer()
+        # self._timer.timeout.connect(self._load_completed_regions)
+        # self._timer.start(300000)  # 5분 = 300,000ms
     
     def _setup_finished_list(self):
         """처리완료 그룹박스에 리스트 위젯을 추가한다."""
@@ -53,7 +53,7 @@ class AlarmWidget(QWidget):
             # 폰트 크기 조정 (1pt 줄이기)
             font = self._finished_list.font()
             font.setPointSize(font.pointSize() - 2)
-            self._finished_list.setFont(font)
+            self._finished_list.setFont(    font)
 
             layout.addWidget(self._finished_list)
     
