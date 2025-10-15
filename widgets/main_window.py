@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget = PdfViewWidget()
         self._pdf_load_widget = PdfLoadWidget()
         self._info_panel = InfoPanelWidget()
-        self._alarm_widget = AlarmWidget()
+        self._alarm_widget = AlarmWidget(self._worker_name)
         self._todo_widget = ToDoWidget(self)
         self._settings_dialog = SettingsDialog(self)
         self._mail_dialog = MailDialog(self)
@@ -328,6 +328,10 @@ class MainWindow(QMainWindow):
         if self._login_dialog.exec() == QDialog.DialogCode.Accepted:
             self._worker_name = self._login_dialog.get_worker_name()
             self._update_worker_label()
+            # 로그인 후 알람 위젯 업데이트
+            if hasattr(self, '_alarm_widget'):
+                self._alarm_widget._worker_name = self._worker_name
+                self._alarm_widget.refresh_data()
         else:
             # 취소 시 앱 종료
             self.close()

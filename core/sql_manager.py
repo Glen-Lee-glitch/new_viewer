@@ -222,9 +222,12 @@ def update_subsidy_status(rn: str, status: str) -> bool:
         traceback.print_exc()
         return False
 
-def get_today_completed_subsidies() -> list:
+def get_today_completed_subsidies(worker: str = None) -> list:
     """
     오늘 '지원완료' 처리된 지원금 신청 지역 목록을 반환한다.
+    
+    Args:
+        worker: 작업자 이름 (선택사항, 제공되면 해당 작업자만 필터링)
     
     Returns:
         오늘 완료된 지역 목록 (중복 제거됨)
@@ -235,16 +238,31 @@ def get_today_completed_subsidies() -> list:
         today = datetime.now(kst).date()
         
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = """
-                SELECT DISTINCT region 
-                FROM subsidy_applications 
-                WHERE status = '지원완료' 
-                AND DATE(status_updated_at) = %s
-                AND region IS NOT NULL
-                ORDER BY region
-            """
+            # worker 파라미터에 따른 쿼리 분기
+            if worker:
+                query = """
+                    SELECT DISTINCT region 
+                    FROM subsidy_applications 
+                    WHERE status = '지원완료' 
+                    AND DATE(status_updated_at) = %s
+                    AND worker = %s
+                    AND region IS NOT NULL
+                    ORDER BY region
+                """
+                params = (today, worker)
+            else:
+                query = """
+                    SELECT DISTINCT region 
+                    FROM subsidy_applications 
+                    WHERE status = '지원완료' 
+                    AND DATE(status_updated_at) = %s
+                    AND region IS NOT NULL
+                    ORDER BY region
+                """
+                params = (today,)
+            
             with connection.cursor() as cursor:
-                cursor.execute(query, (today,))
+                cursor.execute(query, params)
                 rows = cursor.fetchall()
                 return [row[0] for row in rows]
                 

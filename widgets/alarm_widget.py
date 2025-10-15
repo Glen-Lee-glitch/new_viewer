@@ -9,8 +9,11 @@ from core.sql_manager import get_today_completed_subsidies
 class AlarmWidget(QWidget):
     """알림 위젯 - PDF 불러오기 전 표시되는 위젯"""
     
-    def __init__(self, parent=None):
+    def __init__(self, worker_name: str = None, parent=None):
         super().__init__(parent)
+        
+        # 현재 로그인한 작업자 이름 저장
+        self._worker_name = worker_name
         
         # UI 파일 로드
         ui_path = Path(__file__).parent.parent / "ui" / "alarm_widget.ui"
@@ -46,7 +49,8 @@ class AlarmWidget(QWidget):
             return
         
         try:
-            completed_regions = get_today_completed_subsidies()
+            # 현재 로그인한 작업자 정보와 함께 완료된 지역 목록 조회
+            completed_regions = get_today_completed_subsidies(self._worker_name)
             
             # 리스트 클리어 후 새 데이터 추가
             self._finished_list.clear()
@@ -55,7 +59,10 @@ class AlarmWidget(QWidget):
                 for region in completed_regions:
                     self._finished_list.addItem(f"✅ {region}")
             else:
-                self._finished_list.addItem("오늘 완료된 지원 건이 없습니다.")
+                if self._worker_name:
+                    self._finished_list.addItem(f"오늘 {self._worker_name}님이 완료한 지원 건이 없습니다.")
+                else:
+                    self._finished_list.addItem("오늘 완료된 지원 건이 없습니다.")
                 
         except Exception as e:
             print(f"완료된 지역 로드 중 오류: {e}")
