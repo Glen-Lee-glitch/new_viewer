@@ -478,7 +478,7 @@ class MainWindow(QMainWindow):
         if existing_worker and is_admin:
             print(f"[관리자 조회 모드] 작업자: {existing_worker}, 관리자: {self._worker_name}")
             self._pending_basic_info = normalize_basic_info(metadata)
-            self.load_document(pdf_paths)
+            self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
             
             # PDF 로드 후 메일 content 표시
             if mail_content:
