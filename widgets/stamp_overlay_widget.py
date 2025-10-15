@@ -36,7 +36,9 @@ class StampOverlayWidget(QWidget):
         if hasattr(self, 'stamp_button_4'):
             self.stamp_button_4.clicked.connect(self._on_stamp_selected)
         if hasattr(self, 'stamp_button_5'):
-            self.stamp_button_5.clicked.connect(self._on_stamp_selected)
+            self.stamp_button_5.clicked.connect(lambda: self._on_stamp_button_clicked(
+                {'path': 'assets/체크.png', 'width': 50}
+            ))
 
     def _on_stamp_button_clicked(self, stamp_info: dict):
         """도장 버튼 클릭 시, 선택된 도장 정보를 포함한 시그널을 발생시킨다."""
@@ -89,10 +91,13 @@ class StampOverlayWidget(QWidget):
         if key in (
             Qt.Key.Key_3,
             Qt.Key.Key_4,
-            Qt.Key.Key_5,
         ):
-            # 2-5번 도장은 현재 기능이 없으므로 기존 동작 유지
+            # 3-4번 도장은 현재 기능이 없으므로 기존 동작 유지
             self._on_stamp_selected()
+            return
+
+        if key == Qt.Key.Key_5:
+            self._on_stamp_button_clicked({'path': 'assets/체크.png', 'width': 50})
             return
 
         super().keyPressEvent(event)
