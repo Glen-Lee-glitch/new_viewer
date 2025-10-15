@@ -320,6 +320,17 @@ class MainWindow(QMainWindow):
     def pushButton_reset(self):
         return self.ui_push_button_reset
 
+    # === 다이얼로그(창) 관리 ===
+
+    def _show_login_dialog(self):
+        """로그인 다이얼로그를 표시하고 작업자 이름을 설정한다."""
+        if self._login_dialog.exec() == QDialog.DialogCode.Accepted:
+            self._worker_name = self._login_dialog.get_worker_name()
+            self._update_worker_label()
+        else:
+            # 취소 시 앱 종료
+            self.close()
+
     def _open_settings_dialog(self):
         """설정 다이얼로그를 연다."""
         if self._settings_dialog.exec():
@@ -820,14 +831,7 @@ class MainWindow(QMainWindow):
             self.renderer.close()
         event.accept()
 
-    def _show_login_dialog(self):
-        """로그인 다이얼로그를 표시하고 작업자 이름을 설정한다."""
-        if self._login_dialog.exec() == QDialog.DialogCode.Accepted:
-            self._worker_name = self._login_dialog.get_worker_name()
-            self._update_worker_label()
-        else:
-            # 취소 시 앱 종료
-            self.close()
+    
 
     def _update_worker_label(self):
         """worker_label_2에 작업자 이름을 표시하고, 관리자 권한에 따라 버튼 가시성을 설정한다."""
