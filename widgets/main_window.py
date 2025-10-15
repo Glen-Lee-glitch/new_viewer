@@ -556,6 +556,123 @@ class MainWindow(QMainWindow):
 
         self._update_page_navigation()
 
+    # === 페이지 네비게이션 ===
+
+    def go_to_page(self, visual_page_num: int):
+        """'보이는' 페이지 번호로 뷰를 이동시킨다."""
+        if self.renderer and 0 <= visual_page_num < len(self._page_order):
+            self.current_page = visual_page_num
+            
+            # '보이는' 순서를 '실제' 페이지 번호로 변환
+            actual_page_num = self._page_order[visual_page_num]
+            
+            self._pdf_view_widget.show_page(actual_page_num)
+            self._thumbnail_viewer.set_current_page(visual_page_num)
+            self._update_page_navigation()
+    
+    def change_page(self, delta: int):
+        """현재 페이지에서 delta만큼 페이지를 이동시킨다."""
+        if self.renderer and self.current_page != -1:
+            new_page = self.current_page + delta
+            self.go_to_page(new_page)
+
+    def _update_page_order(self, new_order: list[int]):
+        """페이지 순서가 변경되면 호출되는 슬롯"""
+        self._page_order = new_order
+        print(f"MainWindow가 새 페이지 순서를 받음: {self._page_order}")
+
+    def _update_page_navigation(self):
+        """페이지 네비게이션 상태(라벨, 버튼 활성화)를 업데이트한다."""
+        total_pages = len(self._page_order)
+        current_visual_page = self.current_page
+        
+        if total_pages > 0:
+            self.ui_label_page_nav.setText(f"{current_visual_page + 1} / {total_pages}")
+        else:
+            self.ui_label_page_nav.setText("N/A")
+
+        self.ui_push_button_prev.setEnabled(total_pages > 0 and current_visual_page > 0)
+        self.ui_push_button_next.setEnabled(total_pages > 0 and current_visual_page < total_pages - 1)
+
+    def _handle_page_delete_request(self, visual_page_num: int):
+        """페이지 삭제 요청을 처리하는 중앙 슬롯"""
+        if not self.renderer or not (0 <= visual_page_num < len(self._page_order)):
+            return
+
+        # 1. '보이는' 순서를 '실제' 페이지 번호로 변환
+        actual_page_to_delete = self._page_order[visual_page_num]
+
+        # 2. PdfViewWidget에 실제 페이지 번호를 전달하여 삭제 실행
+        self._pdf_view_widget.delete_pages([actual_page_to_delete])
+        
+        # 3. 페이지 순서 목록 업데이트
+        self._page_order.pop(visual_page_num)
+        # 삭제된 페이지 뒤의 페이지들의 순서 값도 갱신해야 함 (실제 파일 인덱스가 바뀌었으므로)
+        for i in range(len(self._page_order)):
+            if self._page_order[i] > actual_page_to_delete:
+                self._page_order[i] -= 1
+        
+        # 4. 썸네일 뷰 갱신
+        self._thumbnail_viewer.set_renderer(self.renderer)
+
+        # 5. 뷰어 및 네비게이션 갱신
+        new_total_pages = len(self._page_order)
+        if new_total_pages == 0:
+            self.show_load_view() # 모든 페이지 삭제 시 로드 화면으로
+            return                # 로드 화면으로 전환했으므로 여기서 함수 종료
+        else:
+            # 삭제 후 현재 위치 또는 그 앞으로 포커스 이동
+            next_visual_page = min(visual_page_num, new_total_pages - 1)
+            self.go_to_page(next_visual_page)
+        
+        # 파일 정보 패널 업데이트
+        self._info_panel.update_total_pages(new_total_pages)
+
+    # === UI 및 레이아웃 업데이트 ===
+
+    def set_splitter_sizes(self, is_landscape: bool):
+        # 현재 UI는 QHBoxLayout 구조이므로 각 컨테이너의 고정 크기를 설정한다.
+        try:
+            # 썸네일 컨테이너 고정 크기 설정
+            thumbnail_width = 220
+            self.ui_thumbnail_container.setFixedWidth(thumbnail_width)
+            
+            # 정보 패널 컨테이너 고정 크기 설정
+            info_width = 340 if is_landscape else 300
+            self.ui_info_panel_container.setFixedWidth(info_width)
+            
+            # 중앙 컨테이너는 나머지 공간을 차지하도록 설정 (기본 확장 정책 유지)
+            self.ui_content_container.setMinimumWidth(400)
+            
+        except Exception:
+            # 안전 장치: 실패해도 크래시 방지
+            pass
+
+    def adjust_viewer_layout(self, is_landscape: bool):
+        """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
+        self.set_splitter_sizes(is_landscape)
+
+    def _update_worker_label(self):
+        """worker_label_2에 작업자 이름을 표시하고, 관리자 권한에 따라 버튼 가시성을 설정한다."""
+        # 관리자 작업자 목록
+        admin_workers = ['이경구', '이호형', '백주현']
+        is_admin = self._worker_name in admin_workers
+        
+        # 작업자 현황 버튼 가시성 설정
+        if hasattr(self, 'pushButton_worker_progress'):
+            self.pushButton_worker_progress.setVisible(is_admin)
+        
+        # 작업자 현황 메뉴 항목 가시성 설정
+        if hasattr(self, 'worker_progress_action'):
+            self.worker_progress_action.setVisible(is_admin)
+        
+        # 작업자 라벨 업데이트
+        if hasattr(self, 'worker_label_2'):
+            if self._worker_name:
+                self.worker_label_2.setText(f"작업자: {self._worker_name}")
+            else:
+                self.worker_label_2.setText("작업자: 미로그인")
+
 
     def showEvent(self, event):
         """창이 처음 표시될 때 제목 표시줄을 포함한 전체 높이를 화면에 맞게 조정한다."""
@@ -652,58 +769,8 @@ class MainWindow(QMainWindow):
                 filename = Path(self._pdf_view_widget.get_current_pdf_path()).name
                 self.test_worker.signals.error.emit(filename, f"포커스 이동 중 오류: {e}")
 
-    def _handle_page_delete_request(self, visual_page_num: int):
-        """페이지 삭제 요청을 처리하는 중앙 슬롯"""
-        if not self.renderer or not (0 <= visual_page_num < len(self._page_order)):
-            return
-
-        # 1. '보이는' 순서를 '실제' 페이지 번호로 변환
-        actual_page_to_delete = self._page_order[visual_page_num]
-
-        # 2. PdfViewWidget에 실제 페이지 번호를 전달하여 삭제 실행
-        self._pdf_view_widget.delete_pages([actual_page_to_delete])
-        
-        # 3. 페이지 순서 목록 업데이트
-        self._page_order.pop(visual_page_num)
-        # 삭제된 페이지 뒤의 페이지들의 순서 값도 갱신해야 함 (실제 파일 인덱스가 바뀌었으므로)
-        for i in range(len(self._page_order)):
-            if self._page_order[i] > actual_page_to_delete:
-                self._page_order[i] -= 1
-        
-        # 4. 썸네일 뷰 갱신
-        self._thumbnail_viewer.set_renderer(self.renderer)
-
-        # 5. 뷰어 및 네비게이션 갱신
-        new_total_pages = len(self._page_order)
-        if new_total_pages == 0:
-            self.show_load_view() # 모든 페이지 삭제 시 로드 화면으로
-            return                # 로드 화면으로 전환했으므로 여기서 함수 종료
-        else:
-            # 삭제 후 현재 위치 또는 그 앞으로 포커스 이동
-            next_visual_page = min(visual_page_num, new_total_pages - 1)
-            self.go_to_page(next_visual_page)
-        
-        # 파일 정보 패널 업데이트
-        self._info_panel.update_total_pages(new_total_pages)
 
     
-    def _update_page_order(self, new_order: list[int]):
-        """페이지 순서가 변경되면 호출되는 슬롯"""
-        self._page_order = new_order
-        print(f"MainWindow가 새 페이지 순서를 받음: {self._page_order}")
-
-    def _update_page_navigation(self):
-        """페이지 네비게이션 상태(라벨, 버튼 활성화)를 업데이트한다."""
-        total_pages = len(self._page_order)
-        current_visual_page = self.current_page
-        
-        if total_pages > 0:
-            self.ui_label_page_nav.setText(f"{current_visual_page + 1} / {total_pages}")
-        else:
-            self.ui_label_page_nav.setText("N/A")
-
-        self.ui_push_button_prev.setEnabled(total_pages > 0 and current_visual_page > 0)
-        self.ui_push_button_next.setEnabled(total_pages > 0 and current_visual_page < total_pages - 1)
 
     def _prompt_save_before_reset(self):
         """'메인 화면' 버튼 클릭 시 저장 여부를 묻는 대화상자를 표시한다."""
@@ -758,36 +825,12 @@ class MainWindow(QMainWindow):
         self.ui_status_bar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
         QMessageBox.information(self, "테스트 완료", "지정된 모든 PDF 파일의 열기/저장 테스트를 성공적으로 완료했습니다.")
 
-    def adjust_viewer_layout(self, is_landscape: bool):
-        """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
-        self.set_splitter_sizes(is_landscape)
-
+    
     def _handle_undo_request(self):
         """썸네일에서 Undo 요청이 왔을 때 PDF 뷰어의 되돌리기를 실행한다."""
         if self._pdf_view_widget and self.renderer:
             self._pdf_view_widget.undo_last_action()
 
-    def set_splitter_sizes(self, is_landscape: bool):
-        # 현재 UI는 QHBoxLayout 구조이므로 각 컨테이너의 고정 크기를 설정한다.
-        try:
-            # 썸네일 컨테이너 고정 크기 설정
-            thumbnail_width = 220
-            self.ui_thumbnail_container.setFixedWidth(thumbnail_width)
-            
-            # 정보 패널 컨테이너 고정 크기 설정
-            info_width = 340 if is_landscape else 300
-            self.ui_info_panel_container.setFixedWidth(info_width)
-            
-            # 중앙 컨테이너는 나머지 공간을 차지하도록 설정 (기본 확장 정책 유지)
-            self.ui_content_container.setMinimumWidth(400)
-            
-        except Exception:
-            # 안전 장치: 실패해도 크래시 방지
-            pass
-    
-    
-    
-    
     
     @staticmethod
     def _normalize_basic_info(metadata: dict | None) -> dict:
@@ -814,24 +857,7 @@ class MainWindow(QMainWindow):
         self._pending_basic_info = info
         return name, region, special_note
 
-    def go_to_page(self, visual_page_num: int):
-        """'보이는' 페이지 번호로 뷰를 이동시킨다."""
-        if self.renderer and 0 <= visual_page_num < len(self._page_order):
-            self.current_page = visual_page_num
-            
-            # '보이는' 순서를 '실제' 페이지 번호로 변환
-            actual_page_num = self._page_order[visual_page_num]
-            
-            self._pdf_view_widget.show_page(actual_page_num)
-            self._thumbnail_viewer.set_current_page(visual_page_num)
-            self._update_page_navigation()
     
-    def change_page(self, delta: int):
-        """현재 페이지에서 delta만큼 페이지를 이동시킨다."""
-        if self.renderer and self.current_page != -1:
-            new_page = self.current_page + delta
-            self.go_to_page(new_page)
-
     def closeEvent(self, event):
         """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
         if self.renderer:
@@ -840,27 +866,7 @@ class MainWindow(QMainWindow):
 
     
 
-    def _update_worker_label(self):
-        """worker_label_2에 작업자 이름을 표시하고, 관리자 권한에 따라 버튼 가시성을 설정한다."""
-        # 관리자 작업자 목록
-        admin_workers = ['이경구', '이호형', '백주현']
-        is_admin = self._worker_name in admin_workers
-        
-        # 작업자 현황 버튼 가시성 설정
-        if hasattr(self, 'pushButton_worker_progress'):
-            self.pushButton_worker_progress.setVisible(is_admin)
-        
-        # 작업자 현황 메뉴 항목 가시성 설정
-        if hasattr(self, 'worker_progress_action'):
-            self.worker_progress_action.setVisible(is_admin)
-        
-        # 작업자 라벨 업데이트
-        if hasattr(self, 'worker_label_2'):
-            if self._worker_name:
-                self.worker_label_2.setText(f"작업자: {self._worker_name}")
-            else:
-                self.worker_label_2.setText("작업자: 미로그인")
-
+    
 def create_app():
     """QApplication을 생성하고 메인 윈도우를 반환한다."""
     app = QApplication(sys.argv)
