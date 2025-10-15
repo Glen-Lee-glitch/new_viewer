@@ -178,6 +178,10 @@ class MainWindow(QMainWindow):
         self.worker_progress_action.triggered.connect(self._open_worker_progress_dialog)
         self.menu_view.addAction(self.worker_progress_action)
 
+        self.view_saved_pdfs_action = QAction("저장된 PDF 보기", self)
+        # self.view_saved_pdfs_action.triggered.connect(self._open_saved_pdfs_dialog)
+        self.menu_view.addAction(self.view_saved_pdfs_action)
+
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
         self._pdf_load_widget.pdf_selected.connect(self._handle_pdf_selected)
