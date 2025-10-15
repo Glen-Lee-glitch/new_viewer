@@ -95,10 +95,13 @@ class MovableStampItem(QGraphicsPixmapItem):
         menu = QMenu()
         action_text = "배경 제거" if self._background_applied else "배경 입히기"
         background_action = menu.addAction(action_text)
+        delete_action = menu.addAction("삭제하기")
 
         selected_action = menu.exec(event.screenPos())
         if selected_action == background_action:
             self._toggle_background()
+        elif selected_action == delete_action:
+            pass  # TODO: 삭제 기능 구현
 
     def paint(self, painter, option, widget=None):
         """Draws the pixmap and a dashed border if the item is selected."""
