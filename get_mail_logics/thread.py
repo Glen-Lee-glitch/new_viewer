@@ -18,6 +18,9 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.auth.transport.requests import Request
 
+# 주석 손실 감지 유틸 (Stamp/Ink 등)
+from get_mail_logics.pdf_annotation_guard import pdf_will_lose_objects
+
 # --- 전역 설정 ---
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 MYSQL_CONFIG = {
@@ -463,15 +466,26 @@ def download_worker_thread():
                     
                     # PDF가 1개 이상이고 전체 용량이 3MB 초과 시 전처리 필요
                     if pdf_files and total_size_mb > PREPROCESS_THRESHOLD_MB:
-                        needs_preprocess = True
-                        print(f"  📏 PDF 파일 {len(pdf_files)}개, 총 크기: {total_size_mb:.2f} MB → 전처리 필요")
-                        
-                        # 전처리 큐에 추가 (여러 파일을 리스트로 전달)
-                        preprocess_queue.put({
-                            'thread_id': thread_id,
-                            'original_paths': pdf_files  # 여러 파일을 리스트로
-                        })
-                        print(f"  📋 전처리 큐에 추가: {len(pdf_files)}개 파일 병합 예정")
+                        # 전처리 전에 위험 주석(Stamp/Ink/FreeText 등) 존재 여부 검사
+                        try:
+                            has_dropping_annots = any(pdf_will_lose_objects(p) for p in pdf_files)
+                        except Exception as e:
+                            has_dropping_annots = False
+                            print(f"  ⚠️ 주석 검사 실패(건너뜀): {e}")
+
+                        if has_dropping_annots:
+                            needs_preprocess = False
+                            print(f"  🛑 위험 주석 포함 → 전처리 스킵, 원본 유지 ({len(pdf_files)}개)")
+                        else:
+                            needs_preprocess = True
+                            print(f"  📏 PDF 파일 {len(pdf_files)}개, 총 크기: {total_size_mb:.2f} MB → 전처리 필요")
+                            
+                            # 전처리 큐에 추가 (여러 파일을 리스트로 전달)
+                            preprocess_queue.put({
+                                'thread_id': thread_id,
+                                'original_paths': pdf_files  # 여러 파일을 리스트로
+                            })
+                            print(f"  📋 전처리 큐에 추가: {len(pdf_files)}개 파일 병합 예정")
                     else:
                         if pdf_files:
                             print(f"  📏 PDF 파일 {len(pdf_files)}개, 총 크기: {total_size_mb:.2f} MB → 전처리 불필요")
