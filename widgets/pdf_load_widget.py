@@ -44,9 +44,6 @@ class PdfLoadWidget(QWidget):
         table = self.complement_table_widget
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '파일여부'])
-        
-        # 최대 행 수를 20개로 설정
-        table.setMaximumRowCount(20)
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -70,9 +67,14 @@ class PdfLoadWidget(QWidget):
             return
 
         row_count = len(df)
-        table.setRowCount(row_count)
+        # 최대 20개 행까지만 표시
+        display_count = min(row_count, 20)
+        table.setRowCount(display_count)
 
         for row_index, (_, row) in enumerate(df.iterrows()):
+            # 20개를 초과하면 중단
+            if row_index >= 20:
+                break
             row_data = {
                 'rn': self._sanitize_text(row.get('RN', '')),
                 'region': self._sanitize_text(row.get('region', '')),
