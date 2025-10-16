@@ -74,7 +74,7 @@ def fetch_recent_subsidy_applications():
                 "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
                 "WHERE sa.recent_received_date >= %s "
                 "ORDER BY sa.recent_received_date DESC "
-                "LIMIT 10"
+                "LIMIT 20"
             )
             params = ('2025-09-30 09:00',)
             df = pd.read_sql(query, connection, params=params)
