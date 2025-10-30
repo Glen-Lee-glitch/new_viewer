@@ -1,0 +1,13 @@
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+google-genai
+filelock
+pytz
+PyPDF2
+pymupdf
+Pillow
+reportlab
+mysql-connector-python
+pandas

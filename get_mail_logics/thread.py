@@ -1,8 +1,10 @@
 import os
+import json
 import re
 import base64
 import time
 import tempfile
+import pathlib
 import threading
 from queue import Queue
 from datetime import datetime, timedelta
@@ -17,6 +19,19 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.auth.transport.requests import Request
+
+# Gemini
+from google import genai
+from google.genai import types
+
+# Gemini utils
+from get_mail_logics.gemini_utils import (
+    parse_response_contract,
+    parse_response_resident_cert,
+    prompt_contract,
+    prompt_resident_cert,
+)
+from get_mail_logics.config import API_KEY
 
 # 주석 손실 감지 유틸 (Stamp/Ink 등)
 from get_mail_logics.pdf_annotation_guard import pdf_will_lose_objects
@@ -38,6 +53,10 @@ ATTACHMENT_SAVE_DIR = "C:\\Users\\HP\\Desktop\\greet_db\\files\\new"
 # 스레드 간 통신을 위한 공유 큐
 download_queue = Queue()
 preprocess_queue = Queue()  # 전처리 큐 추가
+gemini_queue = Queue()  # Gemini 판단 큐 추가
+
+# Gemini 대상 지역
+TARGET_REGIONS = ['서울특별시', '울산광역시', '부산광역시']
 
 # 전처리 임계값 설정
 PREPROCESS_THRESHOLD_MB = 3.0  # 3MB 초과 시에만 전처리
@@ -495,6 +514,37 @@ def download_worker_thread():
                     # DB 업데이트: file_rendered = 0 (아직 전처리 안됨)
                     final_paths_str = ';'.join(file_paths)
                     update_email_attachment_path(conn, thread_id, final_paths_str, file_rendered=0)
+
+                    # 🔎 RN/region 확인 후 Gemini 큐에 추가
+                    try:
+                        info = extract_info_from_subject(subject)
+                        rn_for_gemini = info.get('rn_num') if info else None
+
+                        # RN을 파일명에서도 보조 추출
+                        if not rn_for_gemini:
+                            for p in pdf_files:
+                                m = re.search(r'(RN\d{9})', os.path.basename(p))
+                                if m:
+                                    rn_for_gemini = m.group(1)
+                                    break
+
+                        if rn_for_gemini:
+                            cur = conn.cursor()
+                            cur.execute("SELECT region FROM subsidy_applications WHERE RN=%s", (rn_for_gemini,))
+                            row = cur.fetchone()
+                            region = row[0] if row and len(row) > 0 else None
+                            if region in TARGET_REGIONS:
+                                # 원본 PDF 중 첫 번째 경로만 사용하여 Gemini 처리
+                                if pdf_files:
+                                    gemini_queue.put({
+                                        'rn': rn_for_gemini,
+                                        'pdf_path': pdf_files[0],
+                                        'thread_id': thread_id,
+                                        'region': region,
+                                    })
+                                    print(f"  🤖 Gemini 큐 추가: {rn_for_gemini} ({region}) → {pdf_files[0]}")
+                    except Exception as e:
+                        print(f"  ⚠️ Gemini 큐 추가 중 오류: {e}")
                 
                 print(f"✅ 다운로드 완료: {thread_id}")
 
@@ -583,6 +633,180 @@ def preprocess_worker_thread():
             print(f"❌ 전처리 워커 오류: {e}")
             time.sleep(5)
 
+
+def save_contract_to_mysql(rn: str, data: dict) -> bool:
+    """test_ai_구매계약서 테이블 UPSERT"""
+    try:
+        conn = get_database_connection()
+        if not conn:
+            return False
+        cursor = conn.cursor()
+
+        ai_계약일자 = data.get('order_date') if data else None
+        ai_이름 = data.get('customer_name') if data else None
+        전화번호 = data.get('phone_number') if data else None
+        이메일 = data.get('email') if data else None
+        차종 = data.get('vehicle_config') if data else None
+
+        sql = (
+            """
+            INSERT INTO test_ai_구매계약서 (RN, modified_date, ai_계약일자, ai_이름, 전화번호, 이메일, 차종)
+            VALUES (%s, NOW(), %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                modified_date = VALUES(modified_date),
+                ai_계약일자 = VALUES(ai_계약일자),
+                ai_이름 = VALUES(ai_이름),
+                전화번호 = VALUES(전화번호),
+                이메일 = VALUES(이메일),
+                차종 = VALUES(차종)
+            """
+        )
+        cursor.execute(sql, (rn, ai_계약일자, ai_이름, 전화번호, 이메일, 차종))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ MySQL 저장 실패(구매계약서) {rn}: {e}")
+        try:
+            if conn and conn.is_connected():
+                conn.rollback()
+        except Exception:
+            pass
+        return False
+    finally:
+        try:
+            if conn and conn.is_connected():
+                conn.close()
+        except Exception:
+            pass
+
+
+def save_resident_cert_to_mysql(rn: str, data: dict) -> bool:
+    """test_ai_초본 테이블 UPSERT"""
+    try:
+        conn = get_database_connection()
+        if not conn:
+            return False
+        cursor = conn.cursor()
+
+        address_1 = (data or {}).get('address_1')
+        address_2 = (data or {}).get('address_2')
+        at_date = (data or {}).get('at_date')
+        birth_date = (data or {}).get('birth_date')
+        name = (data or {}).get('name')
+        issue_date = (data or {}).get('issue_date')
+        page_number = (data or {}).get('page_number')
+        page_number_json = json.dumps(page_number) if page_number else None
+
+        sql = (
+            """
+            INSERT INTO test_ai_초본 (RN, modified_date, address_1, address_2, at_date, birth_date, name, issue_date, page_number)
+            VALUES (%s, NOW(), %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                modified_date = VALUES(modified_date),
+                address_1 = VALUES(address_1),
+                address_2 = VALUES(address_2),
+                at_date = VALUES(at_date),
+                birth_date = VALUES(birth_date),
+                name = VALUES(name),
+                issue_date = VALUES(issue_date),
+                page_number = VALUES(page_number)
+            """
+        )
+        cursor.execute(sql, (rn, address_1, address_2, at_date, birth_date, name, issue_date, page_number_json))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ MySQL 저장 실패(초본) {rn}: {e}")
+        try:
+            if conn and conn.is_connected():
+                conn.rollback()
+        except Exception:
+            pass
+        return False
+    finally:
+        try:
+            if conn and conn.is_connected():
+                conn.close()
+        except Exception:
+            pass
+
+
+def gemini_worker_thread():
+    """Gemini 큐를 감시하고 문서 판단 수행 (구매계약서/초본)"""
+    print("🚀 Gemini 워커 스레드 시작")
+    try:
+        client = genai.Client(api_key=API_KEY)
+    except Exception as e:
+        print(f"❌ Gemini 클라이언트 초기화 실패: {e}")
+        return
+
+    while True:
+        try:
+            task = gemini_queue.get()
+            rn = task.get('rn')
+            pdf_path = task.get('pdf_path')
+            if not (rn and pdf_path and os.path.exists(pdf_path)):
+                gemini_queue.task_done()
+                continue
+
+            print(f"🤖 Gemini 처리 시작: {rn} → {pdf_path}")
+
+            pdf_bytes = pathlib.Path(pdf_path).read_bytes()
+
+            def _call(prompt_text, parse_func):
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[
+                        types.Part.from_bytes(data=pdf_bytes, mime_type='application/pdf'),
+                        prompt_text,
+                    ],
+                )
+                if parse_func is parse_response_contract:
+                    order_date, vehicle_config, customer_name, extracted_rn, phone_number, email, page_number = parse_func(response.text)
+                    return {
+                        'order_date': order_date,
+                        'vehicle_config': vehicle_config,
+                        'customer_name': customer_name,
+                        'rn': extracted_rn,
+                        'phone_number': phone_number,
+                        'email': email,
+                        'page_number': page_number,
+                    }
+                else:
+                    return parse_func(response.text)
+
+            # 두 작업 병렬 실행 (구매계약서, 초본)
+            from concurrent.futures import ThreadPoolExecutor
+            results = {}
+
+            with ThreadPoolExecutor(max_workers=2) as ex:
+                futures = {
+                    ex.submit(_call, prompt_contract, parse_response_contract): 'contract',
+                    ex.submit(_call, prompt_resident_cert, parse_response_resident_cert): 'resident',
+                }
+                for fut in futures:
+                    key = futures[fut]
+                    try:
+                        results[key] = fut.result()
+                    except Exception as e:
+                        print(f"  ⚠️ Gemini 호출 실패({key}): {e}")
+                        results[key] = None
+
+            # 저장 (덮어쓰기)
+            if results.get('contract') is not None:
+                save_contract_to_mysql(rn, results['contract'])
+            if results.get('resident') is not None:
+                save_resident_cert_to_mysql(rn, results['resident'])
+
+            print(f"✅ Gemini 처리 완료: {rn}")
+
+        except Exception as e:
+            print(f"❌ Gemini 워커 예외: {e}")
+        finally:
+            try:
+                gemini_queue.task_done()
+            except Exception:
+                pass
 
 def merge_and_preprocess_pdfs(pdf_paths: list, processed_dir: str, thread_id: str) -> str | None:
     """여러 PDF 파일을 하나로 병합하고 최적화 (벡터 유지)
@@ -752,12 +976,17 @@ if __name__ == "__main__":
     pdf_preprocessor = threading.Thread(target=preprocess_worker_thread, daemon=True)
     pdf_preprocessor.start()
 
+    # 4. Gemini 워커 스레드 (신규)
+    gemini_processor = threading.Thread(target=gemini_worker_thread, daemon=True)
+    gemini_processor.start()
+
     # 메인 스레드는 데몬 스레드가 종료되지 않도록 유지
     try:
         # 스레드가 살아있는지 주기적으로 확인
         while (mail_collector.is_alive() and 
                attachment_downloader.is_alive() and 
-               pdf_preprocessor.is_alive()):
+               pdf_preprocessor.is_alive() and 
+               gemini_processor.is_alive()):
             time.sleep(1)
     except KeyboardInterrupt:
         print("\n🚫 서비스를 종료합니다.")
