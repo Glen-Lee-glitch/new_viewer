@@ -24,6 +24,17 @@ assets/
 *.swo
 *~
 
+# secrets
+.env
+.env.*
+config/*.env
+secrets/*
+*.key
+*.pem
+
+# project-specific secrets
+get_mail_logics/config.py
+
 # OS generated files
 .DS_Store
 .DS_Store?
