@@ -1,4 +1,5 @@
 from pathlib import Path
+import html
 
 from PyQt6 import uic
 from PyQt6.QtWidgets import QDialog
@@ -55,15 +56,28 @@ class GeminiResultsDialog(QDialog):
             for i in range(min_length):
                 local_name = local_names[i] if i < len(local_names) else '데이터 없음'
                 range_date = range_dates[i] if i < len(range_dates) else '데이터 없음'
-                pairs.append(f"{local_name}: {range_date}")
+                pairs.append((local_name, range_date))
             
             # 쌍이 없으면 데이터 없음 표시
             if not pairs:
                 youth_text = '데이터 없음'
             else:
-                youth_text = '\n'.join(pairs)
+                # 각 쌍을 HTML div로 감싸서 시각적으로 구분
+                pair_htmls = []
+                for local_name, range_date in pairs:
+                    # HTML 이스케이프 처리
+                    local_name_escaped = html.escape(str(local_name))
+                    range_date_escaped = html.escape(str(range_date))
+                    pair_html = f"""
+                    <div style="border: 1px solid #555555; border-radius: 3px; padding: 6px 8px; margin-bottom: 6px; background-color: #1e1e1e;">
+                        <span style="font-weight: bold; color: #ffffff;">{local_name_escaped}</span>: <span style="color: #cccccc;">{range_date_escaped}</span>
+                    </div>
+                    """
+                    pair_htmls.append(pair_html.strip())
+                youth_text = ''.join(pair_htmls)
             
             self.youth_data_label.setText(youth_text)
+            self.youth_data_label.setTextFormat(Qt.TextFormat.RichText)  # HTML 형식으로 표시
             self.youth_groupBox.setVisible(True)
         else:
             self.youth_groupBox.setVisible(False)
