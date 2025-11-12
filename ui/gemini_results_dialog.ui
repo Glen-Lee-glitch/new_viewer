@@ -7,124 +7,222 @@
     <x>0</x>
     <y>0</y>
     <width>600</width>
-    <height>300</height>
+    <height>355</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <widget class="QDialogButtonBox" name="buttonBox">
-   <property name="geometry">
-    <rect>
-     <x>30</x>
-     <y>240</y>
-     <width>541</width>
-     <height>32</height>
-    </rect>
-   </property>
-   <property name="orientation">
-    <enum>Qt::Orientation::Horizontal</enum>
-   </property>
-   <property name="standardButtons">
-    <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
-   </property>
-  </widget>
-  <widget class="QGroupBox" name="groupBox">
-   <property name="geometry">
-    <rect>
-     <x>20</x>
-     <y>10</y>
-     <width>151</width>
-     <height>261</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>구매계약서</string>
-   </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
-    <item>
-     <widget class="QLabel" name="label">
-      <property name="text">
-       <string>이름</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="name_label">
-      <property name="text">
-       <string/>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="label_2">
-      <property name="text">
-       <string>계약일자</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="contract_date_label">
-      <property name="text">
-       <string/>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="label_3">
-      <property name="text">
-       <string>휴대폰</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="phone_label">
-      <property name="text">
-       <string/>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="label_4">
-      <property name="text">
-       <string>이메일</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="email_label">
-      <property name="text">
-       <string/>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
-  <widget class="QGroupBox" name="youth_groupBox">
-   <property name="geometry">
-    <rect>
-     <x>190</x>
-     <y>10</y>
-     <width>381</width>
-     <height>221</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>청년생애</string>
-   </property>
-   <layout class="QVBoxLayout" name="verticalLayout_2">
-    <item>
-     <widget class="QLabel" name="youth_data_label">
-      <property name="text">
-       <string/>
-      </property>
-      <property name="wordWrap">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
+  <layout class="QHBoxLayout" name="horizontalLayout_2">
+   <item>
+    <layout class="QVBoxLayout" name="verticalLayout_3">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout" stretch="3,7">
+       <item>
+        <widget class="QGroupBox" name="groupBox">
+         <property name="title">
+          <string>구매계약서</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout">
+          <property name="spacing">
+           <number>6</number>
+          </property>
+          <property name="leftMargin">
+           <number>8</number>
+          </property>
+          <property name="topMargin">
+           <number>8</number>
+          </property>
+          <property name="rightMargin">
+           <number>8</number>
+          </property>
+          <property name="bottomMargin">
+           <number>8</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="label">
+            <property name="styleSheet">
+             <string>QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+            </property>
+            <property name="text">
+             <string>이름</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="name_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_2">
+            <property name="styleSheet">
+             <string>QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+            </property>
+            <property name="text">
+             <string>계약일자</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="contract_date_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_3">
+            <property name="styleSheet">
+             <string>QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+            </property>
+            <property name="text">
+             <string>휴대폰</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="phone_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_4">
+            <property name="styleSheet">
+             <string>QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+            </property>
+            <property name="text">
+             <string>이메일</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="email_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="youth_groupBox">
+         <property name="title">
+          <string>청년생애</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_2">
+          <property name="spacing">
+           <number>6</number>
+          </property>
+          <property name="leftMargin">
+           <number>8</number>
+          </property>
+          <property name="topMargin">
+           <number>8</number>
+          </property>
+          <property name="rightMargin">
+           <number>8</number>
+          </property>
+          <property name="bottomMargin">
+           <number>8</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="youth_data_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QDialogButtonBox" name="buttonBox">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="standardButtons">
+        <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections>
