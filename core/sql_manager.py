@@ -308,4 +308,63 @@ def fetch_gemini_contract_results(rn: str) -> dict:
     except Exception:
         traceback.print_exc()
         return {}
+
+def check_gemini_flags(rn: str) -> dict:
+    """
+    gemini_results 테이블에서 RN으로 플래그들을 조회한다.
+    """
+    if not rn:
+        return {}
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT 구매계약서, 청년생애, 다자녀, 공동명의, 초본
+                FROM gemini_results
+                WHERE RN = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        '구매계약서': bool(row[0]),
+                        '청년생애': bool(row[1]),
+                        '다자녀': bool(row[2]),
+                        '공동명의': bool(row[3]),
+                        '초본': bool(row[4])
+                    }
+                return {}
+    except Exception:
+        traceback.print_exc()
+        return {}
+
+def fetch_gemini_youth_results(rn: str) -> dict:
+    """
+    test_ai_청년생애 테이블에서 RN으로 데이터를 조회한다.
+    JSON 칼럼을 파이썬 리스트로 변환하여 반환한다.
+    """
+    if not rn:
+        return {}
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT local_name, range_date
+                FROM test_ai_청년생애
+                WHERE RN = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                if row:
+                    import json
+                    return {
+                        'local_name': json.loads(row[0]) if row[0] else [],
+                        'range_date': json.loads(row[1]) if row[1] else []
+                    }
+                return {}
+    except Exception:
+        traceback.print_exc()
+        return {}
     
