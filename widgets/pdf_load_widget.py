@@ -43,8 +43,8 @@ class PdfLoadWidget(QWidget):
     def setup_table(self):
         """테이블 위젯 초기 설정"""
         table = self.complement_table_widget
-        table.setColumnCount(4)
-        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '파일여부'])
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '파일여부', 'AI'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -83,10 +83,22 @@ class PdfLoadWidget(QWidget):
                 'name': self._sanitize_text(row.get('name', '')),
                 'special_note': self._sanitize_text(row.get('special_note', '')),
                 'recent_thread_id': self._sanitize_text(row.get('recent_thread_id', '')),  # 추가
-                'file_rendered': row.get('file_rendered', 0)  # file_rendered 상태 추가
+                'file_rendered': row.get('file_rendered', 0),  # file_rendered 상태 추가
+                '구매계약서': row.get('구매계약서', 0), # 추가
+                '초본': row.get('초본', 0), # 추가
+                '공동명의': row.get('공동명의', 0) # 추가
             }
 
-            # 컬럼 순서: ['지역', 'RN', '작업자', '파일여부']
+            # 'AI' 칼럼 값 계산
+            ai_status = 'X'
+            구매계약서 = row_data['구매계약서'] == 1
+            초본 = row_data['초본'] == 1
+            공동명의 = row_data['공동명의'] == 1
+
+            if 구매계약서 and (초본 or 공동명의):
+                ai_status = 'O'
+            
+            # 컬럼 순서: ['지역', 'RN', '작업자', '파일여부', 'AI']
             region_item = QTableWidgetItem(row_data['region'])
             table.setItem(row_index, 0, region_item)
 
@@ -103,6 +115,10 @@ class PdfLoadWidget(QWidget):
             status_item = QTableWidgetItem(status_text)
             status_item.setData(Qt.ItemDataRole.UserRole, file_path)
             table.setItem(row_index, 3, status_item)
+
+            # AI 상태 아이템 추가
+            ai_item = QTableWidgetItem(ai_status)
+            table.setItem(row_index, 4, ai_item)
 
             # --- RN 번호에 따라 하이라이트 및 텍스트 색상 설정 ---
             if row_data['rn'] == "RN126218505":  # 특정 RN 번호와 일치하는지 확인
