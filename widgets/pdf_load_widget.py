@@ -3,6 +3,7 @@ import math
 
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, QPoint, Qt
+from PyQt6.QtGui import QColor # QColor를 추가로 임포트
 from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
@@ -102,6 +103,26 @@ class PdfLoadWidget(QWidget):
             status_item = QTableWidgetItem(status_text)
             status_item.setData(Qt.ItemDataRole.UserRole, file_path)
             table.setItem(row_index, 3, status_item)
+
+            # --- RN 번호에 따라 하이라이트 및 텍스트 색상 설정 ---
+            if row_data['rn'] == "RN126218505":  # 특정 RN 번호와 일치하는지 확인
+                # 연한 주황색 (예: #FFDAB9)
+                highlight_color = QColor(255, 218, 185)  # RGB 값으로 연한 주황색 설정
+                text_color = QColor(255, 255, 255)  # 흰색 텍스트
+            else:
+                # 기본 배경색 (현재 테마의 기본 배경색 사용)
+                # Qt Style Sheet 또는 테마에서 자동으로 처리되므로,
+                # 여기서는 특정 하이라이트가 아닌 경우 배경색을 명시적으로 설정하지 않아도 됨.
+                # 다만, 텍스트 색상은 명시적으로 흰색으로 설정
+                highlight_color = QColor(0, 0, 0, 0)  # 투명한 색 (기본 배경 유지)
+                text_color = QColor(255, 255, 255)  # 흰색 텍스트
+
+            # 해당 행의 모든 아이템에 색상 적용
+            for col in range(table.columnCount()):
+                item = table.item(row_index, col)
+                if item:
+                    item.setBackground(highlight_color)
+                    item.setForeground(text_color)
 
     def show_context_menu(self, pos: QPoint):
         """테이블 컨텍스트 메뉴 표시"""
