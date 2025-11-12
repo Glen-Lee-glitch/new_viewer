@@ -209,7 +209,7 @@ def extract_text_from_payload(payload):
     return ""
 
 def extract_info_from_subject(subject):
-    rn_match = re.search(r'RN\d{9}', subject)
+    rn_match = re.search(r'RN\d{8,10}', subject)
     if not rn_match: return None
     rn_num = rn_match.group()
     
@@ -228,7 +228,7 @@ def extract_info_from_subject(subject):
         except (ValueError, IndexError) as e:
             print(f"⚠️ 날짜 파싱 오류: {e} - None으로 처리")
     
-    region_match = re.search(r'RN\d{9}\s*/\s*([^/]+)', subject)
+    region_match = re.search(r'RN\d{8,10}\s*/\s*([^/]+)', subject)
     region = region_match.group(1).strip() if region_match else None
     if region and any(word in region for word in ['리스', '캐피탈']): region = '한국환경공단'
     applier = None
@@ -838,7 +838,7 @@ def download_worker_thread():
                         # RN을 파일명에서도 보조 추출
                         if not rn_for_gemini:
                             for p in pdf_files:
-                                m = re.search(r'(RN\d{9})', os.path.basename(p))
+                                m = re.search(r'(RN\d{8,10})', os.path.basename(p))
                                 if m:
                                     rn_for_gemini = m.group(1)
                                     break
