@@ -25,6 +25,7 @@ from widgets.login_dialog import LoginDialog
 from widgets.mail_dialog import MailDialog
 from widgets.worker_progress_dialog import WorkerProgressDialog
 from widgets.alarm_widget import AlarmWidget
+from widgets.gemini_results_dialog import GeminiResultsDialog
 
 
 class MainWindow(QMainWindow):
@@ -56,6 +57,7 @@ class MainWindow(QMainWindow):
         self._settings_dialog = SettingsDialog(self)
         self._mail_dialog = MailDialog(self)
         self._pending_basic_info: dict | None = None
+        self._gemini_results_dialog = GeminiResultsDialog(self)
 
         # --- 페이지 순서 관리 ---
         self._page_order: list[int] = []
@@ -198,6 +200,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
         self._pdf_view_widget.toolbar.email_requested.connect(self._open_mail_dialog)
         self._pdf_view_widget.page_delete_requested.connect(self._handle_page_delete_request)
+        self._pdf_load_widget.ai_review_requested.connect(self._show_gemini_results_dialog)
         
         # 정보 패널 업데이트 연결
         self._pdf_view_widget.pdf_loaded.connect(self._info_panel.update_file_info)
@@ -385,6 +388,13 @@ class MainWindow(QMainWindow):
         """작업자 현황 다이얼로그를 연다."""
         worker_progress_dialog = WorkerProgressDialog(self)
         worker_progress_dialog.exec()
+        
+    def _show_gemini_results_dialog(self, rn: str):
+        """Gemini AI 결과 다이얼로그를 표시한다."""
+        self._gemini_results_dialog.load_data(rn)
+        self._gemini_results_dialog.show()
+        self._gemini_results_dialog.raise_()
+        self._gemini_results_dialog.activateWindow()
 
     # === 문서 생명주기 관리 ===
     

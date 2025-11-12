@@ -19,6 +19,7 @@ class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
     pdf_selected = pyqtSignal(list)  # 여러 파일 경로(리스트)를 전달하도록 변경
     work_started = pyqtSignal(list, dict)
+    ai_review_requested = pyqtSignal(str) # AI 검토 요청 시그널
     
     def __init__(self):
         super().__init__()
@@ -52,6 +53,7 @@ class PdfLoadWidget(QWidget):
         table.setAlternatingRowColors(True)
         self.populate_recent_subsidy_rows()
         table.customContextMenuRequested.connect(self.show_context_menu)
+        table.cellDoubleClicked.connect(self._handle_cell_double_clicked)
 
     def populate_recent_subsidy_rows(self):
         """최근 지원금 신청 데이터를 테이블에 채운다."""
@@ -166,6 +168,13 @@ class PdfLoadWidget(QWidget):
 
         row = selected_items[0].row()
         rn_item = table.item(row, 1)  # RN은 이제 1번 컬럼
+
+        # AI 칼럼 값 확인 후 AI 검토 요청
+        ai_item = table.item(row, 4)
+        if ai_item and ai_item.text() == 'O':
+            if rn_item:
+                self.ai_review_requested.emit(rn_item.text())
+
         file_item = table.item(row, 3)
 
         if file_item is None:
@@ -286,3 +295,13 @@ class PdfLoadWidget(QWidget):
             'file_rendered': data.get('file_rendered', 0), # 추가
             'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
         }
+
+    def _handle_cell_double_clicked(self, row, column):
+        """테이블 셀 더블 클릭 시 AI 검토 요청을 emit한다."""
+        # AI 칼럼(5번째)을 클릭했을 때만 동작하도록 수정
+        if column == 4:
+            ai_item = self.complement_table_widget.item(row, column)
+            if ai_item and ai_item.text() == 'O':
+                rn_item = self.complement_table_widget.item(row, 1) # RN은 1번 컬럼
+                if rn_item:
+                    self.ai_review_requested.emit(rn_item.text())

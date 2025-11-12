@@ -280,3 +280,32 @@ if __name__ == "__main__":
     print(get_worker_names())
     # get_mail_content()
     
+def fetch_gemini_contract_results(rn: str) -> dict:
+    """
+    test_ai_구매계약서 테이블에서 RN으로 데이터를 조회한다.
+    """
+    if not rn:
+        return {}
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT ai_계약일자, ai_이름, 전화번호, 이메일
+                FROM test_ai_구매계약서
+                WHERE RN = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'ai_계약일자': row[0],
+                        'ai_이름': row[1],
+                        '전화번호': row[2],
+                        '이메일': row[3]
+                    }
+                return {}
+    except Exception:
+        traceback.print_exc()
+        return {}
+    
