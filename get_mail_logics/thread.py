@@ -1,11 +1,14 @@
 import os
+import json
 import re
 import base64
 import time
 import tempfile
+import pathlib
 import threading
 from queue import Queue
 from datetime import datetime, timedelta
+from email.mime.text import MIMEText
 
 import mysql.connector
 from mysql.connector import Error
@@ -17,6 +20,19 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.auth.transport.requests import Request
+
+# Gemini
+from google import genai
+from google.genai import types
+
+# Gemini utils
+from get_mail_logics.gemini_utils import (
+    parse_response_contract,
+    parse_response_resident_cert,
+    prompt_contract,
+    prompt_resident_cert,
+)
+from get_mail_logics.config import API_KEY
 
 # 주석 손실 감지 유틸 (Stamp/Ink 등)
 from get_mail_logics.pdf_annotation_guard import pdf_will_lose_objects
@@ -38,6 +54,10 @@ ATTACHMENT_SAVE_DIR = "C:\\Users\\HP\\Desktop\\greet_db\\files\\new"
 # 스레드 간 통신을 위한 공유 큐
 download_queue = Queue()
 preprocess_queue = Queue()  # 전처리 큐 추가
+gemini_queue = Queue()  # Gemini 판단 큐 추가
+
+# Gemini 대상 지역
+TARGET_REGIONS = ['서울특별시', '울산광역시', '부산광역시']
 
 # 전처리 임계값 설정
 PREPROCESS_THRESHOLD_MB = 3.0  # 3MB 초과 시에만 전처리
@@ -192,8 +212,22 @@ def extract_info_from_subject(subject):
     rn_match = re.search(r'RN\d{9}', subject)
     if not rn_match: return None
     rn_num = rn_match.group()
+    
+    # 날짜 파싱 및 유효성 검증
     date_match = re.search(r'\[(\d{1,2})/(\d{1,2})\]', subject)
-    date_str = f'2025-{int(date_match.group(1)):02d}-{int(date_match.group(2)):02d}' if date_match else None
+    date_str = None
+    if date_match:
+        try:
+            month = int(date_match.group(1))
+            day = int(date_match.group(2))
+            # 날짜 유효성 검증 (1-12월, 1-31일)
+            if 1 <= month <= 12 and 1 <= day <= 31:
+                date_str = f'2025-{month:02d}-{day:02d}'
+            else:
+                print(f"⚠️ 잘못된 날짜 형식: [{month}/{day}] - None으로 처리")
+        except (ValueError, IndexError) as e:
+            print(f"⚠️ 날짜 파싱 오류: {e} - None으로 처리")
+    
     region_match = re.search(r'RN\d{9}\s*/\s*([^/]+)', subject)
     region = region_match.group(1).strip() if region_match else None
     if region and any(word in region for word in ['리스', '캐피탈']): region = '한국환경공단'
@@ -216,6 +250,222 @@ def extract_special_note_from_content(content):
 
 def parsing_special(text):
     return '' if text.startswith('감사') else text
+
+# --- 최초 실행 검사 함수 ---
+
+def send_summary_email(gmail_service, missing_emails_info):
+    """누락된 메일 정보를 요약하여 이메일 발송"""
+    try:
+        recipients = ['gyeonggoo.lee@greetlounge.com', 'hohyung.lee@greetlounge.com', 'tesla003@greetlounge.com']
+        
+        # 이메일 본문 작성
+        body_lines = [
+            "메일 수집 시스템 초기 검사 결과",
+            "",
+            f"총 {len(missing_emails_info)}개의 누락된 메일 스레드를 발견했습니다.",
+            "",
+            "=" * 50,
+            ""
+        ]
+        
+        for idx, info in enumerate(missing_emails_info, 1):
+            body_lines.extend([
+                f"[{idx}] Thread ID: {info['thread_id']}",
+                f"    제목: {info['subject']}",
+                f"    발신자: {info['from_address']}",
+                f"    수신일: {info['received_date']}",
+                f"    내용 요약: {info['content_preview']}",
+                ""
+            ])
+        
+        body = "\n".join(body_lines)
+        
+        # MIME 메시지 생성
+        message = MIMEText(body, 'plain', 'utf-8')
+        message['To'] = ', '.join(recipients)
+        message['Subject'] = f'[메일 수집 시스템] 누락된 메일 {len(missing_emails_info)}건 발견'
+        
+        # Base64 URL-safe 인코딩
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+        
+        # Gmail API로 발송
+        gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        print(f"✅ 알림 이메일 발송 완료: {len(recipients)}명")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 알림 이메일 발송 실패: {e}")
+        return False
+
+def send_error_notification_email(gmail_service, error_info):
+    """메일 처리 중 발생한 오류 정보를 포함한 알림 이메일 발송"""
+    try:
+        recipients = ['gyeonggoo.lee@greetlounge.com', 'hohyung.lee@greetlounge.com', 'tesla003@greetlounge.com']
+        
+        # 이메일 본문 작성
+        body_lines = [
+            "메일 수집 시스템 오류 알림",
+            "",
+            f"메일 처리 중 오류가 발생했습니다.",
+            "",
+            "=" * 50,
+            "",
+            f"발생 시간: {error_info.get('timestamp', '알 수 없음')}",
+            f"Thread ID: {error_info.get('thread_id', '알 수 없음')}",
+            f"제목: {error_info.get('subject', '알 수 없음')}",
+            f"발신자: {error_info.get('from_address', '알 수 없음')}",
+            "",
+            "오류 내용:",
+            f"{error_info.get('error_message', '알 수 없음')}",
+            "",
+            "=" * 50,
+            "",
+            "이 알림은 최초 오류 발생 시에만 발송됩니다."
+        ]
+        
+        body = "\n".join(body_lines)
+        
+        # MIME 메시지 생성
+        message = MIMEText(body, 'plain', 'utf-8')
+        message['To'] = ', '.join(recipients)
+        message['Subject'] = f'[메일 수집 시스템] 메일 처리 오류 발생 - {error_info.get("thread_id", "알 수 없음")}'
+        
+        # Base64 URL-safe 인코딩
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+        
+        # Gmail API로 발송
+        gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        print(f"✅ 오류 알림 이메일 발송 완료: {len(recipients)}명")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 오류 알림 이메일 발송 실패: {e}")
+        return False
+
+def initial_email_check():
+    """최초 실행 시 최근 500개 메일을 확인하고 DB와 비교하여 누락된 메일 찾기"""
+    print("\n" + "="*50)
+    print("🔍 최초 실행 검사 시작: 최근 500개 메일 확인 중...")
+    print("="*50)
+    
+    gmail_service = get_service(CREDENTIALS_FILE, TOKEN_FILE)
+    if not gmail_service:
+        print("❌ Gmail 서비스 인증 실패. 초기 검사를 건너뜁니다.")
+        return
+    
+    conn = get_database_connection()
+    if not conn:
+        print("❌ 데이터베이스 연결 실패. 초기 검사를 건너뜁니다.")
+        return
+    
+    try:
+        # DB에 저장된 모든 thread_id 가져오기
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT thread_id FROM emails')
+        db_thread_ids = {row[0] for row in cursor.fetchall()}
+        print(f"📊 DB에 저장된 스레드 수: {len(db_thread_ids)}")
+        
+        # 최근 500개 메시지 가져오기
+        all_messages = []
+        page_token = None
+        
+        while len(all_messages) < 500:
+            query_params = {
+                'userId': 'me',
+                'maxResults': min(500 - len(all_messages), 500)
+            }
+            if page_token:
+                query_params['pageToken'] = page_token
+            
+            results = gmail_service.users().messages().list(**query_params).execute()
+            messages = results.get('messages', [])
+            all_messages.extend(messages)
+            
+            page_token = results.get('nextPageToken')
+            if not page_token or len(messages) == 0:
+                break
+        
+        print(f"📬 Gmail에서 가져온 메시지 수: {len(all_messages)}")
+        
+        # 각 메시지의 thread_id 확인 (원본 메시지만)
+        missing_thread_ids = []
+        checked_threads = set()
+        
+        for msg in all_messages:
+            try:
+                msg_detail = gmail_service.users().messages().get(
+                    userId='me', id=msg['id'], format='full'
+                ).execute()
+                
+                thread_id = msg_detail['threadId']
+                msg_id = msg_detail['id']
+                
+                # 원본 메시지만 확인 (스레드의 첫 번째 메시지)
+                if msg_id != thread_id:
+                    continue
+                
+                # 이미 확인한 스레드는 건너뛰기
+                if thread_id in checked_threads:
+                    continue
+                checked_threads.add(thread_id)
+                
+                # DB에 없는 스레드 찾기
+                if thread_id not in db_thread_ids:
+                    payload = msg_detail.get('payload', {})
+                    headers = payload.get('headers', [])
+                    subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), '(제목 없음)')
+                    from_header = next((h['value'] for h in headers if h['name'].lower() == 'from'), '')
+                    from_address = re.search(r'<(.+?)>', from_header).group(1) if re.search(r'<(.+?)>', from_header) else from_header
+                    
+                    ts = int(msg_detail.get('internalDate', 0)) / 1000
+                    received_dt = datetime.fromtimestamp(ts, pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    content = extract_text_from_payload(payload)
+                    content_preview = content[:200] + '...' if len(content) > 200 else content
+                    
+                    missing_thread_ids.append({
+                        'thread_id': thread_id,
+                        'subject': subject,
+                        'from_address': from_address,
+                        'received_date': received_dt,
+                        'content_preview': content_preview if content_preview else '(내용 없음)'
+                    })
+                    
+            except HttpError as e:
+                if e.resp.status == 404:
+                    continue
+                else:
+                    print(f"⚠️ 메시지 조회 실패: {msg['id']} - {e}")
+            except Exception as e:
+                print(f"⚠️ 메시지 처리 중 오류: {msg['id']} - {e}")
+                continue
+        
+        print(f"🔍 누락된 스레드 수: {len(missing_thread_ids)}")
+        
+        # 누락된 메일이 있으면 알림 이메일 발송
+        if missing_thread_ids:
+            print(f"📧 {len(missing_thread_ids)}개의 누락된 메일에 대한 알림 이메일 발송 중...")
+            send_summary_email(gmail_service, missing_thread_ids)
+        else:
+            print("✅ 누락된 메일이 없습니다.")
+        
+    except Exception as e:
+        print(f"❌ 초기 검사 중 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        if conn.is_connected():
+            conn.close()
+    
+    print("="*50 + "\n")
 
 # --- 다운로드 워커 스레드(download_worker_thread)용 함수 ---
 
@@ -331,6 +581,10 @@ def db_mail_thread(poll_interval=20):
         print("❌ 'RN붙임' 라벨을 찾을 수 없습니다. 스레드를 종료합니다.")
         return
 
+    # 오류 알림 발송 여부 확인용 플래그 파일
+    ERROR_NOTIFICATION_FLAG = 'error_notification_sent.flag'
+    error_notification_sent = os.path.exists(ERROR_NOTIFICATION_FLAG)
+
     while True:
         print(f"\n--- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
         print("📬 새 메일 확인 중...")
@@ -399,10 +653,70 @@ def db_mail_thread(poll_interval=20):
                             print(f"📎 다운로드 큐에 추가: {thread_id}")
 
                     except HttpError as e:
-                        if e.resp.status == 404: print(f"⚠️ 404 - 삭제된 메일: {msg['id']}")
-                        else: print(f"❌ HTTP 오류: {e}")
+                        if e.resp.status == 404: 
+                            print(f"⚠️ 404 - 삭제된 메일: {msg['id']}")
+                        else: 
+                            print(f"❌ HTTP 오류: {e}")
+                            # 최초 오류 발생 시 알림 발송
+                            if not error_notification_sent:
+                                try:
+                                    error_info = {
+                                        'timestamp': datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S'),
+                                        'thread_id': msg.get('id', '알 수 없음'),
+                                        'subject': 'HTTP 오류',
+                                        'from_address': '알 수 없음',
+                                        'error_message': str(e)
+                                    }
+                                    send_error_notification_email(gmail_service, error_info)
+                                    error_notification_sent = True
+                                    # 플래그 파일 생성
+                                    try:
+                                        with open(ERROR_NOTIFICATION_FLAG, 'w') as f:
+                                            f.write(f"Error notification sent at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                                    except Exception:
+                                        pass
+                                except Exception as email_err:
+                                    print(f"⚠️ 오류 알림 이메일 발송 실패: {email_err}")
                     except Exception as e:
                         print(f"❌ 메일 처리 중 예외 발생: {e}")
+                        # 최초 오류 발생 시 알림 발송
+                        if not error_notification_sent:
+                            try:
+                                # 오류 발생한 메일 정보 수집 시도
+                                thread_id = '알 수 없음'
+                                subject = '알 수 없음'
+                                from_address = '알 수 없음'
+                                try:
+                                    if 'msg' in locals():
+                                        msg_detail_temp = gmail_service.users().messages().get(
+                                            userId='me', id=msg['id'], format='metadata',
+                                            metadataHeaders=['Subject', 'From']
+                                        ).execute()
+                                        thread_id = msg_detail_temp.get('threadId', '알 수 없음')
+                                        headers_temp = msg_detail_temp.get('payload', {}).get('headers', [])
+                                        subject = next((h['value'] for h in headers_temp if h['name'].lower() == 'subject'), '알 수 없음')
+                                        from_header_temp = next((h['value'] for h in headers_temp if h['name'].lower() == 'from'), '')
+                                        from_address = re.search(r'<(.+?)>', from_header_temp).group(1) if re.search(r'<(.+?)>', from_header_temp) else from_header_temp
+                                except Exception:
+                                    pass
+                                
+                                error_info = {
+                                    'timestamp': datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S'),
+                                    'thread_id': thread_id,
+                                    'subject': subject,
+                                    'from_address': from_address,
+                                    'error_message': str(e)
+                                }
+                                send_error_notification_email(gmail_service, error_info)
+                                error_notification_sent = True
+                                # 플래그 파일 생성
+                                try:
+                                    with open(ERROR_NOTIFICATION_FLAG, 'w') as f:
+                                        f.write(f"Error notification sent at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                                except Exception:
+                                    pass
+                            except Exception as email_err:
+                                print(f"⚠️ 오류 알림 이메일 발송 실패: {email_err}")
                 
                 conn.commit()
                 print("🎉 메일 처리 완료.")
@@ -410,6 +724,26 @@ def db_mail_thread(poll_interval=20):
         except Exception as e:
             print(f"❌ 메인 루프 오류: {e}")
             if conn.is_connected(): conn.rollback()
+            # 최초 오류 발생 시 알림 발송
+            if not error_notification_sent:
+                try:
+                    error_info = {
+                        'timestamp': datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S'),
+                        'thread_id': '메인 루프 오류',
+                        'subject': '메인 루프 오류',
+                        'from_address': '알 수 없음',
+                        'error_message': str(e)
+                    }
+                    send_error_notification_email(gmail_service, error_info)
+                    error_notification_sent = True
+                    # 플래그 파일 생성
+                    try:
+                        with open(ERROR_NOTIFICATION_FLAG, 'w') as f:
+                            f.write(f"Error notification sent at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    except Exception:
+                        pass
+                except Exception as email_err:
+                    print(f"⚠️ 오류 알림 이메일 발송 실패: {email_err}")
         finally:
             if conn.is_connected(): conn.close()
 
@@ -495,6 +829,37 @@ def download_worker_thread():
                     # DB 업데이트: file_rendered = 0 (아직 전처리 안됨)
                     final_paths_str = ';'.join(file_paths)
                     update_email_attachment_path(conn, thread_id, final_paths_str, file_rendered=0)
+
+                    # 🔎 RN/region 확인 후 Gemini 큐에 추가
+                    try:
+                        info = extract_info_from_subject(subject)
+                        rn_for_gemini = info.get('rn_num') if info else None
+
+                        # RN을 파일명에서도 보조 추출
+                        if not rn_for_gemini:
+                            for p in pdf_files:
+                                m = re.search(r'(RN\d{9})', os.path.basename(p))
+                                if m:
+                                    rn_for_gemini = m.group(1)
+                                    break
+
+                        if rn_for_gemini:
+                            cur = conn.cursor()
+                            cur.execute("SELECT region FROM subsidy_applications WHERE RN=%s", (rn_for_gemini,))
+                            row = cur.fetchone()
+                            region = row[0] if row and len(row) > 0 else None
+                            if region in TARGET_REGIONS:
+                                # 원본 PDF 중 첫 번째 경로만 사용하여 Gemini 처리
+                                if pdf_files:
+                                    gemini_queue.put({
+                                        'rn': rn_for_gemini,
+                                        'pdf_path': pdf_files[0],
+                                        'thread_id': thread_id,
+                                        'region': region,
+                                    })
+                                    print(f"  🤖 Gemini 큐 추가: {rn_for_gemini} ({region}) → {pdf_files[0]}")
+                    except Exception as e:
+                        print(f"  ⚠️ Gemini 큐 추가 중 오류: {e}")
                 
                 print(f"✅ 다운로드 완료: {thread_id}")
 
@@ -583,6 +948,180 @@ def preprocess_worker_thread():
             print(f"❌ 전처리 워커 오류: {e}")
             time.sleep(5)
 
+
+def save_contract_to_mysql(rn: str, data: dict) -> bool:
+    """test_ai_구매계약서 테이블 UPSERT"""
+    try:
+        conn = get_database_connection()
+        if not conn:
+            return False
+        cursor = conn.cursor()
+
+        ai_계약일자 = data.get('order_date') if data else None
+        ai_이름 = data.get('customer_name') if data else None
+        전화번호 = data.get('phone_number') if data else None
+        이메일 = data.get('email') if data else None
+        차종 = data.get('vehicle_config') if data else None
+
+        sql = (
+            """
+            INSERT INTO test_ai_구매계약서 (RN, modified_date, ai_계약일자, ai_이름, 전화번호, 이메일, 차종)
+            VALUES (%s, NOW(), %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                modified_date = VALUES(modified_date),
+                ai_계약일자 = VALUES(ai_계약일자),
+                ai_이름 = VALUES(ai_이름),
+                전화번호 = VALUES(전화번호),
+                이메일 = VALUES(이메일),
+                차종 = VALUES(차종)
+            """
+        )
+        cursor.execute(sql, (rn, ai_계약일자, ai_이름, 전화번호, 이메일, 차종))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ MySQL 저장 실패(구매계약서) {rn}: {e}")
+        try:
+            if conn and conn.is_connected():
+                conn.rollback()
+        except Exception:
+            pass
+        return False
+    finally:
+        try:
+            if conn and conn.is_connected():
+                conn.close()
+        except Exception:
+            pass
+
+
+def save_resident_cert_to_mysql(rn: str, data: dict) -> bool:
+    """test_ai_초본 테이블 UPSERT"""
+    try:
+        conn = get_database_connection()
+        if not conn:
+            return False
+        cursor = conn.cursor()
+
+        address_1 = (data or {}).get('address_1')
+        address_2 = (data or {}).get('address_2')
+        at_date = (data or {}).get('at_date')
+        birth_date = (data or {}).get('birth_date')
+        name = (data or {}).get('name')
+        issue_date = (data or {}).get('issue_date')
+        page_number = (data or {}).get('page_number')
+        page_number_json = json.dumps(page_number) if page_number else None
+
+        sql = (
+            """
+            INSERT INTO test_ai_초본 (RN, modified_date, address_1, address_2, at_date, birth_date, name, issue_date, page_number)
+            VALUES (%s, NOW(), %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                modified_date = VALUES(modified_date),
+                address_1 = VALUES(address_1),
+                address_2 = VALUES(address_2),
+                at_date = VALUES(at_date),
+                birth_date = VALUES(birth_date),
+                name = VALUES(name),
+                issue_date = VALUES(issue_date),
+                page_number = VALUES(page_number)
+            """
+        )
+        cursor.execute(sql, (rn, address_1, address_2, at_date, birth_date, name, issue_date, page_number_json))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ MySQL 저장 실패(초본) {rn}: {e}")
+        try:
+            if conn and conn.is_connected():
+                conn.rollback()
+        except Exception:
+            pass
+        return False
+    finally:
+        try:
+            if conn and conn.is_connected():
+                conn.close()
+        except Exception:
+            pass
+
+
+def gemini_worker_thread():
+    """Gemini 큐를 감시하고 문서 판단 수행 (구매계약서/초본)"""
+    print("🚀 Gemini 워커 스레드 시작")
+    try:
+        client = genai.Client(api_key=API_KEY)
+    except Exception as e:
+        print(f"❌ Gemini 클라이언트 초기화 실패: {e}")
+        return
+
+    while True:
+        try:
+            task = gemini_queue.get()
+            rn = task.get('rn')
+            pdf_path = task.get('pdf_path')
+            if not (rn and pdf_path and os.path.exists(pdf_path)):
+                gemini_queue.task_done()
+                continue
+
+            print(f"🤖 Gemini 처리 시작: {rn} → {pdf_path}")
+
+            pdf_bytes = pathlib.Path(pdf_path).read_bytes()
+
+            def _call(prompt_text, parse_func):
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[
+                        types.Part.from_bytes(data=pdf_bytes, mime_type='application/pdf'),
+                        prompt_text,
+                    ],
+                )
+                if parse_func is parse_response_contract:
+                    order_date, vehicle_config, customer_name, extracted_rn, phone_number, email, page_number = parse_func(response.text)
+                    return {
+                        'order_date': order_date,
+                        'vehicle_config': vehicle_config,
+                        'customer_name': customer_name,
+                        'rn': extracted_rn,
+                        'phone_number': phone_number,
+                        'email': email,
+                        'page_number': page_number,
+                    }
+                else:
+                    return parse_func(response.text)
+
+            # 두 작업 병렬 실행 (구매계약서, 초본)
+            from concurrent.futures import ThreadPoolExecutor
+            results = {}
+
+            with ThreadPoolExecutor(max_workers=2) as ex:
+                futures = {
+                    ex.submit(_call, prompt_contract, parse_response_contract): 'contract',
+                    ex.submit(_call, prompt_resident_cert, parse_response_resident_cert): 'resident',
+                }
+                for fut in futures:
+                    key = futures[fut]
+                    try:
+                        results[key] = fut.result()
+                    except Exception as e:
+                        print(f"  ⚠️ Gemini 호출 실패({key}): {e}")
+                        results[key] = None
+
+            # 저장 (덮어쓰기)
+            if results.get('contract') is not None:
+                save_contract_to_mysql(rn, results['contract'])
+            if results.get('resident') is not None:
+                save_resident_cert_to_mysql(rn, results['resident'])
+
+            print(f"✅ Gemini 처리 완료: {rn}")
+
+        except Exception as e:
+            print(f"❌ Gemini 워커 예외: {e}")
+        finally:
+            try:
+                gemini_queue.task_done()
+            except Exception:
+                pass
 
 def merge_and_preprocess_pdfs(pdf_paths: list, processed_dir: str, thread_id: str) -> str | None:
     """여러 PDF 파일을 하나로 병합하고 최적화 (벡터 유지)
@@ -740,6 +1279,17 @@ if __name__ == "__main__":
     print(f" 전처리 임계값: {PREPROCESS_THRESHOLD_MB} MB 초과")
     print("="*50)
 
+    # 최초 실행 검사
+    INITIAL_RUN_FLAG = 'initial_run.flag'
+    if not os.path.exists(INITIAL_RUN_FLAG):
+        initial_email_check()
+        # 플래그 파일 생성
+        try:
+            with open(INITIAL_RUN_FLAG, 'w') as f:
+                f.write(f"Initial run completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        except Exception as e:
+            print(f"⚠️ 플래그 파일 생성 실패: {e}")
+
     # 1. 메일 수집 스레드 (20초 주기)
     mail_collector = threading.Thread(target=db_mail_thread, daemon=True)
     mail_collector.start()
@@ -752,12 +1302,17 @@ if __name__ == "__main__":
     pdf_preprocessor = threading.Thread(target=preprocess_worker_thread, daemon=True)
     pdf_preprocessor.start()
 
+    # 4. Gemini 워커 스레드 (신규)
+    gemini_processor = threading.Thread(target=gemini_worker_thread, daemon=True)
+    gemini_processor.start()
+
     # 메인 스레드는 데몬 스레드가 종료되지 않도록 유지
     try:
         # 스레드가 살아있는지 주기적으로 확인
         while (mail_collector.is_alive() and 
                attachment_downloader.is_alive() and 
-               pdf_preprocessor.is_alive()):
+               pdf_preprocessor.is_alive() and 
+               gemini_processor.is_alive()):
             time.sleep(1)
     except KeyboardInterrupt:
         print("\n🚫 서비스를 종료합니다.")
