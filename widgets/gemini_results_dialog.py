@@ -27,8 +27,7 @@ class GeminiResultsDialog(QDialog):
         self.contract_date_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.phone_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.email_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.local_name_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.range_date_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.youth_data_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
     def load_data(self, rn: str):
         """제공된 RN으로 데이터를 조회하고 UI를 업데이트한다."""
@@ -46,15 +45,25 @@ class GeminiResultsDialog(QDialog):
         if flags.get('청년생애', False):
             youth_data = fetch_gemini_youth_results(rn)
             
-            # JSON 배열을 보기 좋은 문자열로 변환
+            # 같은 인덱스끼리 쌍으로 묶어서 표시
             local_names = youth_data.get('local_name', [])
             range_dates = youth_data.get('range_date', [])
             
-            local_name_text = ', '.join(local_names) if local_names else '데이터 없음'
-            range_date_text = ', '.join(range_dates) if range_dates else '데이터 없음'
+            # 두 배열의 길이 중 최소값만큼만 쌍으로 묶기
+            pairs = []
+            min_length = min(len(local_names), len(range_dates))
+            for i in range(min_length):
+                local_name = local_names[i] if i < len(local_names) else '데이터 없음'
+                range_date = range_dates[i] if i < len(range_dates) else '데이터 없음'
+                pairs.append(f"{local_name}: {range_date}")
             
-            self.local_name_label.setText(local_name_text)
-            self.range_date_label.setText(range_date_text)
+            # 쌍이 없으면 데이터 없음 표시
+            if not pairs:
+                youth_text = '데이터 없음'
+            else:
+                youth_text = '\n'.join(pairs)
+            
+            self.youth_data_label.setText(youth_text)
             self.youth_groupBox.setVisible(True)
         else:
             self.youth_groupBox.setVisible(False)

@@ -114,31 +114,7 @@
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_2">
     <item>
-     <widget class="QLabel" name="label_5">
-      <property name="text">
-       <string>지역명</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="local_name_label">
-      <property name="text">
-       <string/>
-      </property>
-      <property name="wordWrap">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="label_6">
-      <property name="text">
-       <string>기간</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="range_date_label">
+     <widget class="QLabel" name="youth_data_label">
       <property name="text">
        <string/>
       </property>
