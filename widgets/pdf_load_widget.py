@@ -154,15 +154,8 @@ class PdfLoadWidget(QWidget):
             ai_item = QTableWidgetItem(ai_status)
             table.setItem(row_index, 4, ai_item)
 
-            # '이상치' 칼럼 값 계산
-            outlier_status = ''
-            if ai_status == 'O':
-                gemini_result = row.get('gemini_result_json')
-                if pd.isna(gemini_result) or not gemini_result:
-                    outlier_status = 'X'
-                else:
-                    outlier_status = 'O'
-            
+            # '이상치' 칼럼 값 설정 (SQL에서 계산된 값을 그대로 사용)
+            outlier_status = self._sanitize_text(row.get('outlier', ''))
             outlier_item = QTableWidgetItem(outlier_status)
             table.setItem(row_index, 5, outlier_item)
 
