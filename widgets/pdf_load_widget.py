@@ -88,7 +88,8 @@ class PdfLoadWidget(QWidget):
                 'file_rendered': row.get('file_rendered', 0),  # file_rendered 상태 추가
                 '구매계약서': row.get('구매계약서', 0), # 추가
                 '초본': row.get('초본', 0), # 추가
-                '공동명의': row.get('공동명의', 0) # 추가
+                '공동명의': row.get('공동명의', 0),
+                'original_filepath': self._normalize_file_path(row.get('original_filepath')) # 이 줄을 추가
             }
 
             # 'AI' 칼럼 값 계산
@@ -291,8 +292,9 @@ class PdfLoadWidget(QWidget):
             'region': data.get('region', ""),
             'worker': data.get('worker', ""),
             'special_note': data.get('special_note', ""),
-            'recent_thread_id': data.get('recent_thread_id', ""),  # 추가
-            'file_rendered': data.get('file_rendered', 0), # 추가
+            'recent_thread_id': data.get('recent_thread_id', ""),
+            'file_rendered': data.get('file_rendered', 0),
+            'original_filepath': data.get('original_filepath', ""), # 이 줄을 추가
             'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
         }
 
