@@ -88,6 +88,12 @@ class MailDialog(QDialog):
         priority_text = self._get_priority_text()
         rn_value = self.get_rn_value()
         
+        # 이메일 내용이 비어있는지 확인
+        email_content = self.get_content()
+        if not email_content:
+            QMessageBox.warning(self, "입력 오류", "이메일 내용을 입력해주세요.")
+            return # 내용이 없으면 이후 로직 실행하지 않음
+
         if apply_number:
             copied_text = copy_to_clipboard(apply_number, priority_text)
             print(f"클립보드에 복사됨: {copied_text}")
@@ -99,9 +105,9 @@ class MailDialog(QDialog):
             print(f"RN {rn_value}에 대한 recent_thread_id: {recent_thread_id}")
 
             try:
-                success = update_subsidy_status(rn_value, '지원완료')
+                success = update_subsidy_status(rn_value, '이메일 전송')
                 if success:
-                    print(f"RN {rn_value} 상태를 '지원완료'로 업데이트 완료")
+                    print(f"RN {rn_value} 상태를 '이메일 전송'으로 업데이트 완료")
                 else:
                     print(f"RN {rn_value} 상태 업데이트 실패: 해당 RN을 찾을 수 없습니다")
             except Exception as e:
