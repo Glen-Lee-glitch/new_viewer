@@ -4,6 +4,7 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6 import uic
 
 from core.sql_manager import get_today_completed_subsidies
+from widgets.mail_dialog import MailDialog
 
 
 class AlarmWidget(QWidget):
@@ -25,6 +26,10 @@ class AlarmWidget(QWidget):
         # 데이터 로드
         self._load_completed_regions()
         
+        # 이메일 전송 버튼 연결
+        if hasattr(self, 'open_maildialog'):
+            self.open_maildialog.clicked.connect(self._open_mail_dialog)
+
         # # 주기적 업데이트 타이머 (5분마다)
         # self._timer = QTimer()
         # self._timer.timeout.connect(self._load_completed_regions)
@@ -90,4 +95,9 @@ class AlarmWidget(QWidget):
     def refresh_data(self):
         """데이터를 수동으로 새로고침한다."""
         self._load_completed_regions()
+
+    def _open_mail_dialog(self):
+        """메일 전송 다이얼로그를 연다."""
+        dialog = MailDialog(self)
+        dialog.exec()
 
