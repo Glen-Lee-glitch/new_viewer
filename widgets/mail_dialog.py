@@ -93,7 +93,7 @@ class MailDialog(QDialog):
         """기타 텍스트 삽입"""
         if hasattr(self, 'textEdit'):
             self.textEdit.append("기타 사항: ")
-            self._mail_type = "기타" # 메일 타입 설정
+            # self._mail_type = "기타" # '기타'는 mail_type으로 저장하지 않음
     
     def _on_accepted(self):
         """OK 버튼 클릭 시 신청번호와 우선순위를 클립보드에 복사하고 status를 업데이트한다."""
