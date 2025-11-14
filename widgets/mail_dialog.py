@@ -55,11 +55,17 @@ class MailDialog(QDialog):
         
         apply_number = self._get_apply_number()
         priority_text = self._get_priority_text()
+        special_note_text = self._get_special_note_text()
         
         if hasattr(self, 'textEdit'):
-            # 우선순위가 있으면 신청번호 뒤에 추가
+            middle_part = []
             if priority_text:
-                completion_text = f"안녕하세요.\n#{apply_number} {priority_text} 신청이 완료되었습니다.\n감사합니다."
+                middle_part.append(priority_text)
+            if special_note_text:
+                middle_part.append(special_note_text)
+
+            if middle_part:
+                completion_text = f"안녕하세요.\n#{apply_number} {' '.join(middle_part)} 신청이 완료되었습니다.\n감사합니다."
             else:
                 completion_text = f"안녕하세요.\n#{apply_number} 신청이 완료되었습니다.\n감사합니다."
             self.textEdit.append(completion_text)
@@ -227,3 +233,9 @@ class MailDialog(QDialog):
             return ""
         
         return current_text
+
+    def _get_special_note_text(self) -> str:
+        """특이사항 값을 반환한다."""
+        if hasattr(self, 'lineEdit'): # '특이사항' QLineEdit의 objectName이 'lineEdit'으로 가정
+            return self.lineEdit.text().strip()
+        return ""
