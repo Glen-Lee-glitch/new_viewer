@@ -415,4 +415,35 @@ def get_recent_thread_id_by_rn(rn: str) -> str | None:
     except Exception:
         traceback.print_exc()
         return None
+
+def insert_reply_email(
+    thread_id: str | None,
+    rn: str,
+    worker: str,
+    to_address: str,
+    content: str,
+    mail_type: str | None,
+    app_num: int | None
+) -> bool:
+    """
+    reply_emails 테이블에 이메일 답장 데이터를 삽입한다.
+    """
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                query = """
+                    INSERT INTO reply_emails (
+                        thread_id, RN, worker, to_address, content, mail_type, app_num
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s
+                    )
+                """
+                cursor.execute(query, (
+                    thread_id, rn, worker, to_address, content, mail_type, app_num
+                ))
+                connection.commit()
+                return True
+    except Exception:
+        traceback.print_exc()
+        return False
     

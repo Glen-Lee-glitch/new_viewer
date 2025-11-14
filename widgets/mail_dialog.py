@@ -6,13 +6,13 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QStyle
 
 from widgets.unqualified_document_dialog import UnqualifiedDocumentDialog
 from core.mail_utils import copy_to_clipboard
-from core.sql_manager import update_subsidy_status, get_recent_thread_id_by_rn
+from core.sql_manager import update_subsidy_status, get_recent_thread_id_by_rn, insert_reply_email
 
 
 class MailDialog(QDialog):
     """이메일 전송 다이얼로그"""
     
-    def __init__(self, parent=None):
+    def __init__(self, worker_name: str = "", parent=None):
         super().__init__(parent)
         ui_path = Path(__file__).parent.parent / "ui" / "mail_dialog.ui"
         uic.loadUi(str(ui_path), self)
@@ -22,6 +22,7 @@ class MailDialog(QDialog):
         
         # 이메일 타입 변수 초기화
         self._mail_type: str = ""
+        self.worker_name = worker_name # 작업자 이름 저장
     
     def _setup_help_button(self):
         """도움말 버튼 설정"""
@@ -110,11 +111,31 @@ class MailDialog(QDialog):
             copied_text = copy_to_clipboard(apply_number, priority_text)
             print(f"클립보드에 복사됨: {copied_text}")
         
-        # RN 값이 있으면 status를 '지원완료'로 업데이트
+        # RN 값이 있으면 status를 '이메일 전송'으로 업데이트 및 reply_emails에 삽입
         if rn_value:
-            # recent_thread_id 조회 및 디버그 출력
             recent_thread_id = get_recent_thread_id_by_rn(rn_value)
             print(f"RN {rn_value}에 대한 recent_thread_id: {recent_thread_id}")
+
+            # reply_emails 테이블에 데이터 삽입
+            mail_type = self.get_mail_type()
+            app_num = int(apply_number) if apply_number.isdigit() else None
+            content = self.get_content()
+            to_address = "" # to_address는 현재 UI에 없으므로 빈 값으로 처리
+
+            insert_success = insert_reply_email(
+                thread_id=recent_thread_id,
+                rn=rn_value,
+                worker=self.worker_name,
+                to_address=to_address,
+                content=content,
+                mail_type=mail_type,
+                app_num=app_num
+            )
+
+            if insert_success:
+                print(f"RN {rn_value}에 대한 이메일 답장 데이터 reply_emails 테이블에 삽입 완료")
+            else:
+                print(f"RN {rn_value}에 대한 이메일 답장 데이터 reply_emails 테이블에 삽입 실패")
 
             try:
                 success = update_subsidy_status(rn_value, '이메일 전송')
