@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QDialog, QApplication
 from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QTextDocument
 
-from core.sql_manager import fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_youth_results
+from core.sql_manager import fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_youth_results, fetch_gemini_chobon_results
 
 class GeminiResultsDialog(QDialog):
     """Gemini AI 결과 표시 다이얼로그"""
@@ -31,7 +31,11 @@ class GeminiResultsDialog(QDialog):
             self.contract_date_label,
             self.phone_label,
             self.email_label,
-            self.youth_data_label
+            self.youth_data_label,
+            self.chobon_name_label,
+            self.chobon_birth_date_label,
+            self.chobon_address_1_label,
+            self.chobon_address_2_label
         ]
         
         for label in labels_to_make_clickable:
@@ -45,7 +49,11 @@ class GeminiResultsDialog(QDialog):
             self.contract_date_label,
             self.phone_label,
             self.email_label,
-            self.youth_data_label
+            self.youth_data_label,
+            self.chobon_name_label,
+            self.chobon_birth_date_label,
+            self.chobon_address_1_label,
+            self.chobon_address_2_label
         ]
 
         if obj in clickable_labels and event.type() == QEvent.Type.MouseButtonPress:
@@ -69,6 +77,10 @@ class GeminiResultsDialog(QDialog):
         self.phone_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.email_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.youth_data_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.chobon_name_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.chobon_birth_date_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.chobon_address_1_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.chobon_address_2_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
     def load_data(self, rn: str):
         """제공된 RN으로 데이터를 조회하고 UI를 업데이트한다."""
@@ -81,6 +93,31 @@ class GeminiResultsDialog(QDialog):
 
         # gemini_results 테이블에서 플래그 확인
         flags = check_gemini_flags(rn)
+        
+        # 초본 데이터 로드 및 표시
+        if flags.get('초본', False):
+            chobon_data = fetch_gemini_chobon_results(rn)
+            if chobon_data:
+                self.chobon_groupBox.setVisible(True)
+                self.chobon_name_label.setText(str(chobon_data.get('name', '')))
+                
+                # 생년월일 날짜 형식 변환
+                birth_date = chobon_data.get('birth_date')
+                if birth_date:
+                    if isinstance(birth_date, str):
+                        birth_date_str = birth_date
+                    else:
+                        birth_date_str = birth_date.strftime('%Y-%m-%d')
+                else:
+                    birth_date_str = ''
+                self.chobon_birth_date_label.setText(birth_date_str)
+                
+                self.chobon_address_1_label.setText(str(chobon_data.get('address_1', '')))
+                self.chobon_address_2_label.setText(str(chobon_data.get('address_2', '')))
+            else:
+                self.chobon_groupBox.setVisible(False)
+        else:
+            self.chobon_groupBox.setVisible(False)
         
         # 청년생애 데이터 로드 및 표시
         if flags.get('청년생애', False):

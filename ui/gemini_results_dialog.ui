@@ -17,7 +17,7 @@
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_3">
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout" stretch="3,7">
+      <layout class="QHBoxLayout" name="horizontalLayout" stretch="3,3,7">
        <item>
         <widget class="QGroupBox" name="groupBox">
          <property name="title">
@@ -150,6 +150,154 @@
           </item>
           <item>
            <widget class="QLabel" name="email_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="chobon_groupBox">
+         <property name="title">
+          <string>초본</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_chobon">
+          <property name="spacing">
+           <number>6</number>
+          </property>
+          <property name="leftMargin">
+           <number>8</number>
+          </property>
+          <property name="topMargin">
+           <number>8</number>
+          </property>
+          <property name="rightMargin">
+           <number>8</number>
+          </property>
+          <property name="bottomMargin">
+           <number>8</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="label_chobon_name">
+            <property name="styleSheet">
+             <string>QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+            </property>
+            <property name="text">
+             <string>이름</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="chobon_name_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_chobon_birth_date">
+            <property name="styleSheet">
+             <string>QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+            </property>
+            <property name="text">
+             <string>생년월일</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="chobon_birth_date_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_chobon_address_1">
+            <property name="styleSheet">
+             <string>QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+            </property>
+            <property name="text">
+             <string>주소1</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="chobon_address_1_label">
+            <property name="styleSheet">
+             <string>QLabel {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background-color: #1e1e1e;
+}</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_chobon_address_2">
+            <property name="styleSheet">
+             <string>QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+            </property>
+            <property name="text">
+             <string>주소2</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="chobon_address_2_label">
             <property name="styleSheet">
              <string>QLabel {
     border: 1px solid #555555;

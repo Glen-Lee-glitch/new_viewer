@@ -367,4 +367,33 @@ def fetch_gemini_youth_results(rn: str) -> dict:
     except Exception:
         traceback.print_exc()
         return {}
+
+def fetch_gemini_chobon_results(rn: str) -> dict:
+    """
+    test_ai_초본 테이블에서 RN으로 데이터를 조회한다.
+    """
+    if not rn:
+        return {}
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT name, birth_date, address_1, address_2
+                FROM test_ai_초본
+                WHERE RN = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'name': row[0],
+                        'birth_date': row[1],
+                        'address_1': row[2],
+                        'address_2': row[3]
+                    }
+                return {}
+    except Exception:
+        traceback.print_exc()
+        return {}
     
