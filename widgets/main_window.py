@@ -144,6 +144,15 @@ class MainWindow(QMainWindow):
         
         self.menu_file.addSeparator()
         
+        # 원본 불러오기 액션 추가 (초기에는 비활성화)
+        self.load_original_action = QAction("원본 불러오기", self)
+        self.load_original_action.setEnabled(False)
+        # TODO: 실제 기능 연결
+        # self.load_original_action.triggered.connect(self._load_original_document)
+        self.menu_file.addAction(self.load_original_action)
+        
+        self.menu_file.addSeparator()
+        
         save_action = QAction("저장", self)
         save_action.setShortcut(QKeySequence.StandardKey.Save)
         save_action.triggered.connect(self._save_document)
@@ -444,12 +453,19 @@ class MainWindow(QMainWindow):
         # UI가 표시된 다음 틱에 첫 페이지 렌더를 예약하여 초기 크기 기준을 보장한다.
         if self.renderer.get_page_count() > 0:
             QTimer.singleShot(0, lambda: self.go_to_page(0))
+        
+        # 컨텍스트 메뉴를 통한 작업인 경우 '원본 불러오기' 액션 활성화
+        if hasattr(self, 'load_original_action') and self._is_context_menu_work:
+            self.load_original_action.setEnabled(True)
 
     def _handle_pdf_selected(self, pdf_paths: list):
         self._pending_basic_info = None
         self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
         self._is_context_menu_work = False  # 로컬 파일 열기 시 컨텍스트 메뉴 작업 플래그 리셋
         self._info_panel.update_basic_info("", "", "")
+        # 로컬 파일 열기 시 '원본 불러오기' 액션 비활성화
+        if hasattr(self, 'load_original_action'):
+            self.load_original_action.setEnabled(False)
         self.load_document(pdf_paths)
 
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
@@ -568,6 +584,10 @@ class MainWindow(QMainWindow):
         self.current_page = -1
         self._current_rn = ""  # 현재 RN 초기화
         self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
+
+        # 메인화면으로 돌아갈 때 '원본 불러오기' 액션 비활성화
+        if hasattr(self, 'load_original_action'):
+            self.load_original_action.setEnabled(False)
 
         self._pdf_load_widget.show()
         
