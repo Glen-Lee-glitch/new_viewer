@@ -26,6 +26,7 @@ from widgets.mail_dialog import MailDialog
 from widgets.worker_progress_dialog import WorkerProgressDialog
 from widgets.alarm_widget import AlarmWidget
 from widgets.gemini_results_dialog import GeminiResultsDialog
+from widgets.config_dialog import ConfigDialog
 
 
 class MainWindow(QMainWindow):
@@ -60,6 +61,7 @@ class MainWindow(QMainWindow):
         self._mail_dialog = MailDialog(worker_name=self._worker_name, parent=self)
         self._pending_basic_info: dict | None = None
         self._gemini_results_dialog = GeminiResultsDialog(self)
+        self._config_dialog = ConfigDialog(self)
 
         # --- 페이지 순서 관리 ---
         self._page_order: list[int] = []
@@ -196,7 +198,7 @@ class MainWindow(QMainWindow):
 
         # 설정 메뉴
         preferences_action = QAction("환경설정", self)
-        # preferences_action.triggered.connect(self._open_preferences_dialog)  # TODO: 기능 연결
+        preferences_action.triggered.connect(self._open_config_dialog)
         self.menu_settings.addAction(preferences_action)
 
     def _setup_connections(self):
@@ -359,6 +361,10 @@ class MainWindow(QMainWindow):
         if self._settings_dialog.exec():
             # 사용자가 OK를 누르면 변경된 단축키를 다시 적용
             self._apply_shortcuts()
+    
+    def _open_config_dialog(self):
+        """환경설정 다이얼로그를 연다."""
+        self._config_dialog.exec()
     
     def _open_mail_dialog(self):
         """메일 다이얼로그를 연다."""
