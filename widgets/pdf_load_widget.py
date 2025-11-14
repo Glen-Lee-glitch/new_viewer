@@ -3,7 +3,7 @@ import math
 
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, QPoint, Qt
-from PyQt6.QtGui import QColor # QColor를 추가로 임포트
+from PyQt6.QtGui import QColor, QBrush, QPainter
 from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
@@ -11,9 +11,33 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QMenu,
     QHeaderView,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
 )
 
 from core.sql_manager import fetch_recent_subsidy_applications
+
+# 하이라이트를 위한 커스텀 데이터 역할 정의
+HighlightRole = Qt.ItemDataRole.UserRole + 1
+
+class HighlightDelegate(QStyledItemDelegate):
+    """특정 데이터 역할에 따라 배경색을 변경하는 델리게이트"""
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index):
+        # 커스텀 역할(HighlightRole)에 데이터가 있는지 확인
+        highlight_color = index.data(HighlightRole)
+        
+        if highlight_color:
+            # 커스텀 배경색이 있으면 직접 그리기
+            painter.save()
+            painter.fillRect(option.rect, QBrush(QColor(highlight_color)))
+            painter.restore()
+            
+            # 이제 텍스트와 다른 요소들을 그리기 위해 기본 paint 호출
+            super().paint(painter, option, index)
+        else:
+            # 커스텀 배경색이 없으면 기본 동작 수행
+            super().paint(painter, option, index)
+
 
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
@@ -49,8 +73,13 @@ class PdfLoadWidget(QWidget):
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        # 커스텀 배경색이 alternatingRowColors에 의해 덮어씌워지는 것을 방지
+        table.setAlternatingRowColors(False)
+        
+        # 커스텀 델리게이트 적용
+        table.setItemDelegate(HighlightDelegate(table))
 
-        table.setAlternatingRowColors(True)
         self.populate_recent_subsidy_rows()
         table.customContextMenuRequested.connect(self.show_context_menu)
         table.cellDoubleClicked.connect(self._handle_cell_double_clicked)
@@ -123,24 +152,23 @@ class PdfLoadWidget(QWidget):
             ai_item = QTableWidgetItem(ai_status)
             table.setItem(row_index, 4, ai_item)
 
-            # --- RN 번호에 따라 하이라이트 및 텍스트 색상 설정 ---
-            if row_data['rn'] == "RN126218505":  # 특정 RN 번호와 일치하는지 확인
-                # 연한 주황색 (예: #FFDAB9)
-                highlight_color = QColor(255, 218, 185)  # RGB 값으로 연한 주황색 설정
-                text_color = QColor(255, 255, 255)  # 흰색 텍스트
-            else:
-                # 기본 배경색 (현재 테마의 기본 배경색 사용)
-                # Qt Style Sheet 또는 테마에서 자동으로 처리되므로,
-                # 여기서는 특정 하이라이트가 아닌 경우 배경색을 명시적으로 설정하지 않아도 됨.
-                # 다만, 텍스트 색상은 명시적으로 흰색으로 설정
-                highlight_color = QColor(0, 0, 0, 0)  # 투명한 색 (기본 배경 유지)
-                text_color = QColor(255, 255, 255)  # 흰색 텍스트
+            # --- Row Highlighting ---
+            highlight_color = None
+            text_color = QColor("white")
 
-            # 해당 행의 모든 아이템에 색상 적용
+            # 테스트용: 첫 번째 행에만 특별한 하이라이트 적용
+            if row_index == 0:
+                highlight_color = QColor(255, 100, 100, 150)
+            # 특정 RN에 대한 하이라이트
+            elif row_data['rn'] == "RN126218505":
+                highlight_color = QColor(255, 218, 185)
+
+            # 모든 컬럼에 색상 적용
             for col in range(table.columnCount()):
                 item = table.item(row_index, col)
                 if item:
-                    item.setBackground(highlight_color)
+                    if highlight_color:
+                        item.setData(HighlightRole, highlight_color)
                     item.setForeground(text_color)
 
     def show_context_menu(self, pos: QPoint):
