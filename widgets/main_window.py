@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
         self._alarm_widget = AlarmWidget(self._worker_name)
         self._todo_widget = ToDoWidget(self)
         self._settings_dialog = SettingsDialog(self)
-        self._mail_dialog = MailDialog(self)
+        self._mail_dialog = MailDialog(worker_name=self._worker_name, parent=self)
         self._pending_basic_info: dict | None = None
         self._gemini_results_dialog = GeminiResultsDialog(self)
 
