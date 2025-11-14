@@ -27,6 +27,7 @@ from widgets.worker_progress_dialog import WorkerProgressDialog
 from widgets.alarm_widget import AlarmWidget
 from widgets.gemini_results_dialog import GeminiResultsDialog
 from widgets.config_dialog import ConfigDialog
+from widgets.necessary_widget import NecessaryWidget
 
 
 class MainWindow(QMainWindow):
@@ -62,6 +63,7 @@ class MainWindow(QMainWindow):
         self._pending_basic_info: dict | None = None
         self._gemini_results_dialog = GeminiResultsDialog(self)
         self._config_dialog = ConfigDialog(self)
+        self._necessary_widget = NecessaryWidget()
         
         # 새로고침 타이머
         self._refresh_timer = QTimer(self)
@@ -77,6 +79,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.hide()
         self._thumbnail_viewer.hide()
         self._info_panel.hide()
+        self._necessary_widget.show()
         self._alarm_widget.show()  # alarm_widget은 초기에 표시
         self._todo_widget.hide()
 
@@ -112,9 +115,11 @@ class MainWindow(QMainWindow):
             self.ui_main_layout.setContentsMargins(0, 0, 0, 0)
 
         # 썸네일
-        thumbnail_layout = QHBoxLayout(self.ui_thumbnail_container)
+        from PyQt6.QtWidgets import QVBoxLayout
+        thumbnail_layout = QVBoxLayout(self.ui_thumbnail_container)
         thumbnail_layout.setContentsMargins(0, 0, 0, 0)
         thumbnail_layout.setSpacing(0)
+        thumbnail_layout.addWidget(self._necessary_widget)
         thumbnail_layout.addWidget(self._thumbnail_viewer)
         
         # 콘텐츠 영역 (load와 view를 같은 공간에 배치)
@@ -125,7 +130,6 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self._pdf_view_widget)
         
         # 정보 패널 컨테이너에 배치 (VBoxLayout으로 변경하여 alarm_widget과 info_panel을 수직으로 배치)
-        from PyQt6.QtWidgets import QVBoxLayout, QSpacerItem, QSizePolicy
         info_panel_layout = QVBoxLayout(self.ui_info_panel_container)
         info_panel_layout.setContentsMargins(0, 0, 0, 0)
         info_panel_layout.setSpacing(0)
@@ -464,6 +468,7 @@ class MainWindow(QMainWindow):
 
         self._pdf_load_widget.hide()
         self._pdf_view_widget.show()
+        self._necessary_widget.hide()
         self._thumbnail_viewer.show()
         self._alarm_widget.hide()  # PDF 로드 시 alarm_widget 숨김
         self._info_panel.show()  # PDF 로드 시 info_panel 표시
@@ -622,6 +627,7 @@ class MainWindow(QMainWindow):
         # 뷰어 관련 위젯들 숨기기 및 초기화
         self._pdf_view_widget.hide()
         self._pdf_view_widget.set_renderer(None) # 뷰어 내부 상태 초기화
+        self._necessary_widget.show()
         self._thumbnail_viewer.hide()
         self._thumbnail_viewer.clear_thumbnails()
         self._info_panel.hide()
