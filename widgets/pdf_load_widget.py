@@ -1,5 +1,6 @@
 from pathlib import Path
 import math
+import pandas as pd
 
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, QPoint, Qt
@@ -68,8 +69,8 @@ class PdfLoadWidget(QWidget):
     def setup_table(self):
         """테이블 위젯 초기 설정"""
         table = self.complement_table_widget
-        table.setColumnCount(5)
-        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '파일여부', 'AI'])
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '파일여부', 'AI', '이상치'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -131,7 +132,7 @@ class PdfLoadWidget(QWidget):
             if 구매계약서 and (초본 or 공동명의):
                 ai_status = 'O'
             
-            # 컬럼 순서: ['지역', 'RN', '작업자', '파일여부', 'AI']
+            # 컬럼 순서: ['지역', 'RN', '작업자', '파일여부', 'AI', '이상치']
             region_item = QTableWidgetItem(row_data['region'])
             table.setItem(row_index, 0, region_item)
 
@@ -152,6 +153,18 @@ class PdfLoadWidget(QWidget):
             # AI 상태 아이템 추가
             ai_item = QTableWidgetItem(ai_status)
             table.setItem(row_index, 4, ai_item)
+
+            # '이상치' 칼럼 값 계산
+            outlier_status = ''
+            if ai_status == 'O':
+                gemini_result = row.get('gemini_result_json')
+                if pd.isna(gemini_result) or not gemini_result:
+                    outlier_status = 'X'
+                else:
+                    outlier_status = 'O'
+            
+            outlier_item = QTableWidgetItem(outlier_status)
+            table.setItem(row_index, 5, outlier_item)
 
             # --- Row Highlighting ---
             # urgent 칼럼이 1이면 빨간색 하이라이트
