@@ -2,8 +2,9 @@ from pathlib import Path
 import html
 
 from PyQt6 import uic
-from PyQt6.QtWidgets import QDialog
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QDialog, QApplication
+from PyQt6.QtCore import Qt, QEvent
+from PyQt6.QtGui import QTextDocument
 
 from core.sql_manager import fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_youth_results
 
@@ -18,9 +19,48 @@ class GeminiResultsDialog(QDialog):
         
         self.setModal(False)
         self._setup_label_interaction()
+        self._setup_copy_on_click()
         
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
+
+    def _setup_copy_on_click(self):
+        """라벨을 클릭했을 때 클립보드에 복사하는 기능 설정"""
+        labels_to_make_clickable = [
+            self.name_label,
+            self.contract_date_label,
+            self.phone_label,
+            self.email_label,
+            self.youth_data_label
+        ]
+        
+        for label in labels_to_make_clickable:
+            label.setCursor(Qt.CursorShape.PointingHandCursor)
+            label.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        """이벤트 필터. 클릭 시 텍스트를 복사하는 로직을 처리한다."""
+        clickable_labels = [
+            self.name_label,
+            self.contract_date_label,
+            self.phone_label,
+            self.email_label,
+            self.youth_data_label
+        ]
+
+        if obj in clickable_labels and event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.LeftButton:
+                text_to_copy = obj.text()
+                if obj.textFormat() == Qt.TextFormat.RichText:
+                    doc = QTextDocument()
+                    doc.setHtml(text_to_copy)
+                    text_to_copy = doc.toPlainText().strip()
+                
+                if text_to_copy:
+                    QApplication.clipboard().setText(text_to_copy)
+                return True
+        
+        return super().eventFilter(obj, event)
 
     def _setup_label_interaction(self):
         """라벨들이 텍스트 선택 및 복사를 지원하도록 설정한다."""
