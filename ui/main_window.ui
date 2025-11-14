@@ -86,9 +86,15 @@
      <string>보기</string>
     </property>
    </widget>
+   <widget class="QMenu" name="menu_settings">
+    <property name="title">
+     <string>설정</string>
+    </property>
+   </widget>
    <addaction name="menu_file"/>
    <addaction name="menu_edit"/>
    <addaction name="menu_view"/>
+   <addaction name="menu_settings"/>
   </widget>
   <widget class="QStatusBar" name="ui_status_bar">
    <widget class="QWidget" name="ui_nav_widget" native="true">

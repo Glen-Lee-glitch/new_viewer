@@ -194,6 +194,11 @@ class MainWindow(QMainWindow):
         # self.view_saved_pdfs_action.triggered.connect(self._open_saved_pdfs_dialog)
         self.menu_view.addAction(self.view_saved_pdfs_action)
 
+        # 설정 메뉴
+        preferences_action = QAction("환경설정", self)
+        # preferences_action.triggered.connect(self._open_preferences_dialog)  # TODO: 기능 연결
+        self.menu_settings.addAction(preferences_action)
+
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
         self._pdf_load_widget.pdf_selected.connect(self._handle_pdf_selected)
