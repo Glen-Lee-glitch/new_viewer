@@ -46,6 +46,8 @@ class MainWindow(QMainWindow):
         self._initial_resize_done = False  # 초기 크기 조정 완료 플래그
         self._auto_return_to_main_after_save = False
         self._worker_name = ""  # 작업자 이름 저장용 (위젯 생성 전에 초기화)
+        self._original_filepath: str | None = None # 현재 로드된 PDF의 원본 파일 경로
+        self._is_current_file_processed: bool = False # 현재 파일이 전처리된 파일인지 여부
         
         # --- 위젯 인스턴스 생성 ---
         self._thumbnail_viewer = ThumbnailViewWidget()
@@ -147,8 +149,7 @@ class MainWindow(QMainWindow):
         # 원본 불러오기 액션 추가 (초기에는 비활성화)
         self.load_original_action = QAction("원본 불러오기", self)
         self.load_original_action.setEnabled(False)
-        # TODO: 실제 기능 연결
-        # self.load_original_action.triggered.connect(self._load_original_document)
+        self.load_original_action.triggered.connect(self._load_original_document)
         self.menu_file.addAction(self.load_original_action)
         
         self.menu_file.addSeparator()
@@ -472,6 +473,10 @@ class MainWindow(QMainWindow):
         # 컨텍스트 메뉴를 통한 작업 시작 여부 확인 및 저장
         self._is_context_menu_work = metadata.get('is_context_menu_work', False)
         is_preprocessed = metadata.get('file_rendered', 0) == 1
+        
+        # 원본 파일 경로와 전처리 상태 저장
+        self._original_filepath = metadata.get('original_filepath')
+        self._is_current_file_processed = is_preprocessed
         
         if self._is_context_menu_work:
             print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
@@ -901,6 +906,67 @@ class MainWindow(QMainWindow):
         """일괄 테스트 완료 시 호출될 슬롯"""
         self.ui_status_bar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
         QMessageBox.information(self, "테스트 완료", "지정된 모든 PDF 파일의 열기/저장 테스트를 성공적으로 완료했습니다.")
+
+    def _load_original_document(self):
+        """현재 로드된 PDF의 원본 파일을 불러와 다시 렌더링한다."""
+        if not self.renderer:
+            QMessageBox.warning(self, "오류", "현재 로드된 PDF 문서가 없습니다.")
+            return
+
+        if not self._is_current_file_processed:
+            QMessageBox.information(self, "정보", "현재 파일은 이미 원본입니다.")
+            return
+        
+        if not self._original_filepath:
+            QMessageBox.warning(self, "오류", "원본 파일 경로 정보를 찾을 수 없습니다.")
+            return
+
+        try:
+            from pathlib import Path
+            import re
+
+            # RN 추출
+            original_path_obj = Path(self._original_filepath)
+            filename_stem = original_path_obj.stem
+            
+            # RN을 추출하는 정규식: "RN"으로 시작하고 그 뒤에 숫자가 오는 패턴
+            # 파일 이름이 "RN12345_이름_지역.pdf", "RN12345_이름_지역_1.pdf" 형식이라고 가정
+            rn_match = re.match(r"(RN\d+)", filename_stem)
+            if not rn_match:
+                QMessageBox.warning(self, "오류", "원본 파일 경로에서 RN을 추출할 수 없습니다.")
+                return
+            
+            rn = rn_match.group(1)
+            
+            # 원본 파일이 있는 디렉토리
+            new_files_dir = Path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\new')
+            
+            # RN을 포함하는 모든 PDF 파일 찾기 (RN123.pdf, RN123_1.pdf, RN123_2.pdf 등)
+            # glob 패턴 사용: RN123*.pdf
+            # re.escape를 사용하여 RN 자체에 특수문자가 있을 경우를 대비
+            matching_files = sorted(
+                new_files_dir.glob(f"{re.escape(rn)}*.pdf"),
+                key=lambda p: (
+                    p.stem,
+                    # 파일명 끝에 _숫자가 붙은 경우를 위한 정렬 키
+                    int(re.search(r'_(\d+)$', p.stem).group(1)) if re.search(r'_(\d+)$', p.stem) else 0
+                )
+            )
+
+            if not matching_files:
+                QMessageBox.warning(self, "오류", f"원본 파일(RN: {rn})을 찾을 수 없습니다.")
+                return
+
+            original_pdf_paths = [str(f) for f in matching_files]
+            
+            # 기존 뷰어 정리 후 원본 파일 로드
+            self.show_load_view() # 현재 뷰를 닫고 로드 화면으로 전환
+            self.load_document(original_pdf_paths)
+            
+            QMessageBox.information(self, "정보", "원본 파일을 성공적으로 불러왔습니다.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"원본 파일을 불러오는 중 오류가 발생했습니다:\n\n{str(e)}")
 
 # === 모듈 레벨 함수 ===
 def create_app():

@@ -1,0 +1,149 @@
+
+description: This rule file provides comprehensive guidelines for MySQL database operations, specifically for the reply_emails table. It covers table structure, data types, constraints, and best practices for working with this table.
+globs: *.sql, *.py
+---
+### Core Directives
+- **Always respond in Korean.**
+- **After suggesting and applying code modifications, you must provide the corresponding git commit message.**
+- **I will execute terminal commands myself.**
+---
+
+### Table Structure: reply_emails
+
+The `reply_emails` table is designed to store email reply information with tracking capabilities for status, timestamps, and worker assignments.
+
+#### Column Specifications:
+
+- **id** (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - Unique identifier for each email reply record
+  - Automatically increments with each new record
+  - Primary key for the table
+  - *Rationale:* Provides unique identification and efficient indexing for record retrieval
+
+- **thread_id** (VARCHAR(100))
+  - Identifier linking the reply to a specific email thread
+  - Nullable field
+  - *Rationale:* Allows association with parent email threads while maintaining flexibility for standalone replies
+
+- **status** (VARCHAR(20), DEFAULT 'pending', CHECK constraint)
+  - Tracks the processing status of the email reply
+  - Valid values: 'pending', 'error', 'finished'
+  - Default value: 'pending'
+  - *Rationale:* Enables workflow tracking and status monitoring for email processing pipeline
+
+- **created_date** (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+  - Timestamp when the record was created
+  - Automatically set to current timestamp on record insertion
+  - *Rationale:* Provides audit trail and chronological ordering of email replies
+
+- **replied_date** (DATETIME, DEFAULT NULL)
+  - Timestamp when the reply was actually sent
+  - Nullable to accommodate pending replies
+  - *Rationale:* Tracks actual reply completion time, separate from record creation
+
+- **RN** (VARCHAR(100), NOT NULL)
+  - Reference number or identifier for the email
+  - Required field
+  - *Rationale:* Ensures traceability and reference tracking for each email reply
+
+- **worker** (VARCHAR(10), NOT NULL)
+  - Identifier for the worker or system processing the email
+  - Required field, limited to 10 characters
+  - *Rationale:* Enables worker assignment tracking and load balancing
+
+- **to_address** (VARCHAR(100), NOT NULL)
+  - Recipient email address
+  - Required field
+  - *Rationale:* Essential information for email delivery, must be present
+
+- **content** (TEXT, NOT NULL)
+  - Email reply content/body
+  - Supports long text with line breaks
+  - Required field
+  - *Rationale:* Stores the actual email message content, which may be lengthy and include formatting
+
+- **mail_type** (VARCHAR(100))
+  - Classification or type of the email
+  - Nullable field
+  - *Rationale:* Allows categorization for filtering and reporting purposes
+
+- **team** (VARCHAR(50), DEFAULT '3팀')
+  - Team assignment for the email
+  - Default value: '3팀'
+  - *Rationale:* Enables team-based routing and workload distribution
+
+### Best Practices:
+
+- **Data Integrity:**
+  - Always validate status values before insertion ('pending', 'error', 'finished')
+  - Ensure required fields (RN, worker, to_address, content) are populated
+  - Validate email format for to_address field in application code
+
+- **Query Optimization:**
+  - Use indexed columns (id, thread_id) for WHERE clauses when possible
+  - Consider adding indexes on frequently queried columns (status, worker, team) if needed
+  - Use appropriate data types to minimize storage and improve query performance
+
+- **Status Management:**
+  - Update status from 'pending' to 'finished' when reply is successfully sent
+  - Set status to 'error' and log error details when processing fails
+  - Update replied_date when status changes to 'finished'
+
+- **Data Handling:**
+  - Use parameterized queries to prevent SQL injection
+  - Handle NULL values appropriately for nullable fields
+  - Preserve line breaks in content field when displaying or processing
+
+- **Transaction Management:**
+  - Use transactions for operations that modify multiple related records
+  - Ensure atomicity when updating status and replied_date together
+
+- **Error Handling:**
+  - Implement proper error handling for database operations
+  - Log database errors with sufficient context for debugging
+  - Handle connection failures gracefully
+
+### Common Operations:
+
+- **Inserting a new reply email:**
+  - Set required fields: RN, worker, to_address, content
+  - Status defaults to 'pending' if not specified
+  - created_date is automatically set
+  - replied_date remains NULL until reply is sent
+
+- **Updating status:**
+  - Change status to 'finished' when reply is successfully sent
+  - Update replied_date to current timestamp when status becomes 'finished'
+  - Set status to 'error' if processing fails
+
+- **Querying by status:**
+  - Filter by status to find pending, error, or finished replies
+  - Use status for workflow management and monitoring
+
+- **Querying by worker:**
+  - Filter by worker to track individual worker performance
+  - Use for load balancing and assignment tracking
+
+### Security Considerations:
+
+- **SQL Injection Prevention:**
+  - Always use parameterized queries or prepared statements
+  - Never concatenate user input directly into SQL queries
+  - Validate and sanitize all input data
+
+- **Data Privacy:**
+  - Protect email addresses and content according to privacy regulations
+  - Implement access controls based on team or worker assignments
+  - Consider encryption for sensitive email content if required
+
+### Performance Considerations:
+
+- **Indexing:**
+  - Primary key (id) is automatically indexed
+  - Consider adding indexes on thread_id, status, worker, team if these are frequently used in WHERE clauses
+  - Monitor query performance and adjust indexes as needed
+
+- **Data Volume:**
+  - TEXT type for content may grow large; monitor table size
+  - Consider archiving old records if table grows significantly
+  - Implement pagination for queries that return large result sets
