@@ -515,11 +515,6 @@ class MainWindow(QMainWindow):
         if thread_id:
             from core.sql_manager import get_mail_content_by_thread_id
             mail_content = get_mail_content_by_thread_id(thread_id)
-            print(f"\n{'='*80}")
-            print(f"[메일 Content 조회 - thread_id: {thread_id}]")
-            print(f"{'='*80}")  
-            print(mail_content)
-            print(f"{'='*80}\n")
         
         # 기존 로직
         if not metadata:
