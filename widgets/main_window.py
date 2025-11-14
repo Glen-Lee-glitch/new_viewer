@@ -62,6 +62,10 @@ class MainWindow(QMainWindow):
         self._pending_basic_info: dict | None = None
         self._gemini_results_dialog = GeminiResultsDialog(self)
         self._config_dialog = ConfigDialog(self)
+        
+        # 새로고침 타이머
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.timeout.connect(self._refresh_all_data)
 
         # --- 페이지 순서 관리 ---
         self._page_order: list[int] = []
@@ -352,6 +356,10 @@ class MainWindow(QMainWindow):
             if hasattr(self, '_alarm_widget'):
                 self._alarm_widget._worker_name = self._worker_name
                 self._alarm_widget.refresh_data()
+            
+            # 초기 새로고침 타이머 시작
+            refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
+            self._refresh_timer.start(refresh_interval * 1000)  # 초 단위이므로 1000을 곱함
         else:
             # 취소 시 앱 종료
             self.close()
@@ -364,7 +372,11 @@ class MainWindow(QMainWindow):
     
     def _open_config_dialog(self):
         """환경설정 다이얼로그를 연다."""
-        self._config_dialog.exec()
+        if self._config_dialog.exec():
+            # 사용자가 OK를 누르면 변경된 새로고침 주기를 적용
+            refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
+            self._refresh_timer.stop()  # 기존 타이머 중지
+            self._refresh_timer.start(refresh_interval * 1000)  # 새 주기로 시작 (초 단위이므로 1000을 곱함)
     
     def _open_mail_dialog(self):
         """메일 다이얼로그를 연다."""

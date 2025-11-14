@@ -31,13 +31,13 @@ class ConfigDialog(QDialog):
     
     def _load_settings(self):
         """저장된 설정을 불러와 UI에 적용합니다."""
-        # TODO: UI 위젯이 추가되면 여기에 설정 로드 로직 구현
-        pass
+        refresh_interval = self._settings.value("general/refresh_interval", 30, type=int)
+        self.spinBox_refresh_time.setValue(refresh_interval)
     
     def _save_settings(self):
         """UI에 설정된 값을 저장합니다."""
-        # TODO: UI 위젯이 추가되면 여기에 설정 저장 로직 구현
-        pass
+        self._settings.setValue("general/refresh_interval", self.spinBox_refresh_time.value())
+        self.accept()
     
     @property
     def settings(self):
