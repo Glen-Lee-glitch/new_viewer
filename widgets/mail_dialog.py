@@ -122,10 +122,16 @@ class MailDialog(QDialog):
             content = self.get_content()
             to_address = "" # to_address는 현재 UI에 없으므로 빈 값으로 처리
 
+            # worker 이름이 10자를 초과하면 잘라냄 (DB 컬럼 제약)
+            worker_to_insert = self.worker_name
+            if worker_to_insert and len(worker_to_insert) > 10:
+                print(f"경고: 작업자 이름 '{worker_to_insert}'이(가) 10자를 초과하여 잘라냅니다.")
+                worker_to_insert = worker_to_insert[:10]
+
             insert_success = insert_reply_email(
                 thread_id=recent_thread_id,
                 rn=rn_value,
-                worker=self.worker_name,
+                worker=worker_to_insert,
                 to_address=to_address,
                 content=content,
                 mail_type=mail_type,
