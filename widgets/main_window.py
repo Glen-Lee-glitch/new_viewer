@@ -728,10 +728,12 @@ class MainWindow(QMainWindow):
         self.set_splitter_sizes(is_landscape)
 
     def _refresh_all_data(self):
-        """모든 데이터를 새로고침한다 (PDF 로드 위젯과 알람 위젯)."""
-        self._pdf_load_widget.refresh_data()
-        if hasattr(self, '_alarm_widget'):
-            self._alarm_widget.refresh_data()
+        """모든 데이터를 새로고침한다 (메인화면일 때만)."""
+        # PDF가 렌더된 상태가 아닐 때만 새로고침
+        if self.renderer is None:
+            self._pdf_load_widget.refresh_data()
+            if hasattr(self, '_alarm_widget'):
+                self._alarm_widget.refresh_data()
 
     def _update_worker_label(self):
         """worker_label_2에 작업자 이름을 표시하고, 관리자 권한에 따라 버튼 가시성을 설정한다."""
