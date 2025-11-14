@@ -19,6 +19,9 @@ class MailDialog(QDialog):
         
         self._setup_help_button()
         self._setup_connections()
+        
+        # 이메일 타입 변수 초기화
+        self._mail_type: str = ""
     
     def _setup_help_button(self):
         """도움말 버튼 설정"""
@@ -60,6 +63,7 @@ class MailDialog(QDialog):
             else:
                 completion_text = f"안녕하세요.\n#{apply_number} 신청이 완료되었습니다.\n감사합니다."
             self.textEdit.append(completion_text)
+            self._mail_type = "신청완료" # 메일 타입 설정
     
     def _insert_unqualified_text(self):
         """서류미비 텍스트 삽입 (다이얼로그에서 항목 선택)"""
@@ -76,11 +80,13 @@ class MailDialog(QDialog):
                     text = "서류가 미비하여 추가 제출이 필요합니다."
                 
                 self.textEdit.append(text)
+                self._mail_type = "서류미비" # 메일 타입 설정
     
     def _insert_etc_text(self):
         """기타 텍스트 삽입"""
         if hasattr(self, 'textEdit'):
             self.textEdit.append("기타 사항: ")
+            self._mail_type = "기타" # 메일 타입 설정
     
     def _on_accepted(self):
         """OK 버튼 클릭 시 신청번호와 우선순위를 클립보드에 복사하고 status를 업데이트한다."""
@@ -168,6 +174,10 @@ class MailDialog(QDialog):
             return self.textEdit.toPlainText().strip()
         return ""
     
+    def get_mail_type(self) -> str:
+        """현재 설정된 메일 타입을 반환한다."""
+        return self._mail_type
+
     def set_rn_value(self, rn_value: str):
         """RN 값을 설정한다."""
         if hasattr(self, 'RN_lineEdit'):
