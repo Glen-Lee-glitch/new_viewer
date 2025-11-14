@@ -118,6 +118,7 @@ class PdfLoadWidget(QWidget):
                 '구매계약서': row.get('구매계약서', 0), # 추가
                 '초본': row.get('초본', 0), # 추가
                 '공동명의': row.get('공동명의', 0),
+                'urgent': row.get('urgent', 0),  # urgent 상태 추가
                 'original_filepath': self._normalize_file_path(row.get('original_filepath')) # 이 줄을 추가
             }
 
@@ -153,23 +154,17 @@ class PdfLoadWidget(QWidget):
             table.setItem(row_index, 4, ai_item)
 
             # --- Row Highlighting ---
-            highlight_color = None
-            text_color = QColor("white")
-
-            # 테스트용: 첫 번째 행에만 특별한 하이라이트 적용
-            if row_index == 0:
-                highlight_color = QColor(255, 100, 100, 150)
-            # 특정 RN에 대한 하이라이트
-            elif row_data['rn'] == "RN126218505":
-                highlight_color = QColor(255, 218, 185)
-
-            # 모든 컬럼에 색상 적용
-            for col in range(table.columnCount()):
-                item = table.item(row_index, col)
-                if item:
-                    if highlight_color:
+            # urgent 칼럼이 1이면 빨간색 하이라이트
+            if row_data['urgent'] == 1:
+                highlight_color = QColor(220, 53, 69, 180)  # 빨간색 (Bootstrap의 danger 색상과 유사)
+                text_color = QColor("white")
+                
+                # 모든 컬럼에 하이라이트 적용
+                for col in range(table.columnCount()):
+                    item = table.item(row_index, col)
+                    if item:
                         item.setData(HighlightRole, highlight_color)
-                    item.setForeground(text_color)
+                        item.setForeground(text_color)
 
     def show_context_menu(self, pos: QPoint):
         """테이블 컨텍스트 메뉴 표시"""
@@ -310,10 +305,10 @@ class PdfLoadWidget(QWidget):
 
     def _extract_row_metadata(self, rn_item: QTableWidgetItem | None) -> dict:
         if rn_item is None:
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'is_context_menu_work': False}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'urgent': 0, 'is_context_menu_work': False}
         data = rn_item.data(Qt.ItemDataRole.UserRole)
         if not isinstance(data, dict):
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'is_context_menu_work': False}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'urgent': 0, 'is_context_menu_work': False}
         return {
             'rn': data.get('rn', ""),
             'name': data.get('name', ""),
@@ -322,6 +317,7 @@ class PdfLoadWidget(QWidget):
             'special_note': data.get('special_note', ""),
             'recent_thread_id': data.get('recent_thread_id', ""),
             'file_rendered': data.get('file_rendered', 0),
+            'urgent': data.get('urgent', 0),
             'original_filepath': data.get('original_filepath', ""), # 이 줄을 추가
             'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
         }
