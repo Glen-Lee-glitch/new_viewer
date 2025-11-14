@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QStyle
 
 from widgets.unqualified_document_dialog import UnqualifiedDocumentDialog
 from core.mail_utils import copy_to_clipboard
-from core.sql_manager import update_subsidy_status
+from core.sql_manager import update_subsidy_status, get_recent_thread_id_by_rn
 
 
 class MailDialog(QDialog):
@@ -94,6 +94,10 @@ class MailDialog(QDialog):
         
         # RN 값이 있으면 status를 '지원완료'로 업데이트
         if rn_value:
+            # recent_thread_id 조회 및 디버그 출력
+            recent_thread_id = get_recent_thread_id_by_rn(rn_value)
+            print(f"RN {rn_value}에 대한 recent_thread_id: {recent_thread_id}")
+
             try:
                 success = update_subsidy_status(rn_value, '지원완료')
                 if success:

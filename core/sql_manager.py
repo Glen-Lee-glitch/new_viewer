@@ -396,4 +396,23 @@ def fetch_gemini_chobon_results(rn: str) -> dict:
     except Exception:
         traceback.print_exc()
         return {}
+
+
+def get_recent_thread_id_by_rn(rn: str) -> str | None:
+    """
+    RN으로 subsidy_applications 테이블에서 recent_thread_id를 조회한다.
+    """
+    if not rn:
+        return None
+
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT recent_thread_id FROM subsidy_applications WHERE RN = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+    except Exception:
+        traceback.print_exc()
+        return None
     
