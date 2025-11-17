@@ -77,6 +77,7 @@ def fetch_recent_subsidy_applications():
                 "       gr.다자녀, "
                 "       sa.urgent, "
                 "       d.child_birth_date, "
+                "       cb.issue_date, "
                 "       CASE "
                 "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
                 "               CASE "
@@ -142,8 +143,39 @@ def fetch_recent_subsidy_applications():
             except (json.JSONDecodeError, TypeError):
                 return True
 
+        def is_chobon_issue_date_outlier(row) -> bool:
+            """초본 issue_date가 31일 이상 전인지 확인. 이상치이면 True 반환."""
+            # 초본 서류가 있는 경우에만 체크 (gr.초본 = 1)
+            if row.get('초본') != 1:
+                return False
+
+            issue_date = row.get('issue_date')
+            if not issue_date:
+                return False
+
+            try:
+                # 한국 시간 기준으로 오늘 날짜 계산
+                kst = pytz.timezone('Asia/Seoul')
+                today = datetime.now(kst).date()
+                
+                # issue_date가 문자열인 경우 파싱
+                if isinstance(issue_date, str):
+                    issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
+                elif isinstance(issue_date, datetime):
+                    issue_date_obj = issue_date.date()
+                else:
+                    return False
+
+                # 날짜 차이 계산 (오늘 - issue_date)
+                days_diff = (today - issue_date_obj).days
+                
+                # 31일 이상 차이나면 이상치
+                return days_diff >= 31
+            except (ValueError, TypeError, AttributeError):
+                return False
+
         df['outlier'] = df.apply(
-            lambda row: 'O' if row['outlier'] == 'O' or is_multichild_outlier(row) else row['outlier'],
+            lambda row: 'O' if row['outlier'] == 'O' or is_multichild_outlier(row) or is_chobon_issue_date_outlier(row) else row['outlier'],
             axis=1
         )
 
@@ -334,12 +366,6 @@ def get_today_completed_subsidies(worker: str = None) -> list:
         traceback.print_exc()
         return []
 
-if __name__ == "__main__":
-    # fetch_recent_subsidy_applications()
-    # test_fetch_emails()
-    print(get_worker_names())
-    # get_mail_content()
-    
 def fetch_gemini_contract_results(rn: str) -> dict:
     """
     test_ai_구매계약서 테이블에서 RN으로 데이터를 조회한다.
@@ -457,7 +483,6 @@ def fetch_gemini_chobon_results(rn: str) -> dict:
         traceback.print_exc()
         return {}
 
-
 def get_recent_thread_id_by_rn(rn: str) -> str | None:
     """
     RN으로 subsidy_applications 테이블에서 recent_thread_id를 조회한다.
@@ -535,4 +560,10 @@ def is_admin_user(worker_name: str) -> bool:
     except Exception:
         traceback.print_exc()
         return False
+
+if __name__ == "__main__":
+    # fetch_recent_subsidy_applications()
+    # test_fetch_emails()
+    print(get_worker_names())
+    # get_mail_content()
     
