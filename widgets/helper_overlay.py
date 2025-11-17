@@ -52,7 +52,7 @@ class OverlayWindow(QWidget):
 
         self.label = QLabel(display_text, self)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setStyleSheet("color: white; font-size: 28px; background-color: transparent; padding: 20px; font-weight: bold;")
+        self.label.setStyleSheet("color: white; font-size: 28px; background-color: rgba(0,0,0,150); padding: 20px; font-weight: bold; border-radius: 5px;")
         
         self.label.setWordWrap(True)
         self.label.adjustSize()

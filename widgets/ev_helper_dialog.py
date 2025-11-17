@@ -141,8 +141,8 @@ class EVHelperDialog(QDialog):
                                         value = self._format_date_value(value)
                                     lines.append(f"{col}: {value}")
                         
-                        # 줄바꿈으로 연결하여 하나의 문자열로 만듦
-                        self._overlay_texts.append('\n'.join(lines))
+                        # 줄바꿈으로 연결하여 하나의 문자열로 만듦 (항목 간 간격을 위해 빈 줄 추가)
+                        self._overlay_texts.append('\n\n'.join(lines))
                         
                         # 복사 가능한 칼럼 데이터 생성
                         copy_columns = ['성명(대표자)', '주소1', '주소2', '전화', '휴대폰', '이메일']
