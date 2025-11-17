@@ -7,9 +7,13 @@ from pynput import keyboard
 # 단축키 입력을 Qt의 메인 스레드로 전달하기 위한 시그널 클래스
 class HotkeyEmitter(QObject):
     copy_signal = pyqtSignal(str)
+    toggle_overlay_signal = pyqtSignal() # 토글 시그널 추가
 
     def emit_copy(self, index):
         self.copy_signal.emit(index)
+
+    def emit_toggle(self): # 토글 시그널을 보내는 메서드 추가
+        self.toggle_overlay_signal.emit()
 
 # 전역 Emitter 인스턴스
 hotkey_emitter = HotkeyEmitter()
@@ -30,6 +34,8 @@ class OverlayWindow(QWidget):
         
         # 시그널과 클립보드 복사 함수(슬롯) 연결
         hotkey_emitter.copy_signal.connect(self.copy_to_clipboard)
+        # 토글 시그널과 슬롯 연결 추가
+        hotkey_emitter.toggle_overlay_signal.connect(self.toggle_visibility)
         self.original_label_text = self.label.text() # 피드백 후 원래 텍스트로 되돌리기 위해 저장
 
     def initUI(self):
@@ -83,6 +89,13 @@ class OverlayWindow(QWidget):
         """레이블 텍스트를 원래 목록으로 되돌립니다."""
         self.label.setText(self.original_label_text)
 
+    def toggle_visibility(self):
+        """단축키 신호를 받아 오버레이 창의 보이기/숨기기 상태를 토글합니다."""
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -91,6 +104,9 @@ class OverlayWindow(QWidget):
 # --- 단축키가 눌렸을 때 호출될 함수 ---
 def on_hotkey_pressed(index):
     return lambda: hotkey_emitter.emit_copy(str(index))
+
+def on_toggle_pressed(): # 토글 함수 추가
+    hotkey_emitter.emit_toggle()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
@@ -102,6 +118,8 @@ if __name__ == '__main__':
     hotkeys = {
         f'<ctrl>+<alt>+{i+1}': on_hotkey_pressed(i+1) for i in range(len(overlay.texts))
     }
+    # 토글 단축키 추가
+    hotkeys['<ctrl>+<alt>+]'] = on_toggle_pressed
     
     hotkey_listener = keyboard.GlobalHotKeys(hotkeys)
     hotkey_listener.start() # 리스너를 별도 스레드에서 시작
