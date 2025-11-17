@@ -3,10 +3,11 @@ from PyQt6 import uic
 from PyQt6.QtWidgets import QDialog, QApplication, QLineEdit, QFileDialog
 from PyQt6.QtCore import QTimer, Qt
 from core.etc_tools import reverse_text
+from core.sql_manager import is_admin_user
 
 
 class EVHelperDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, worker_name: str = ""):
         super().__init__(parent)
         ui_path = Path(__file__).parent.parent / "ui" / "ev_helper_dialog.ui"
         uic.loadUi(str(ui_path), self)
@@ -15,6 +16,10 @@ class EVHelperDialog(QDialog):
         self._original_stylesheet = self.lineEdit_reverse_tool.styleSheet()
 
         self.pushButton_select_excel.clicked.connect(self._select_excel_file)
+
+        # 관리자 여부 확인 후 '관리자' 그룹 표시/숨김 처리
+        is_admin = is_admin_user(worker_name)
+        self.groupBox_2.setVisible(is_admin)
 
     def _handle_reverse_tool_click(self, event):
         """lineEdit_reverse_tool 클릭 이벤트를 처리합니다."""

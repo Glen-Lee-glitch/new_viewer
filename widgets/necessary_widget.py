@@ -18,7 +18,16 @@ class NecessaryWidget(QWidget):
 
     def _open_ev_helper_dialog(self):
         """오픈 EV 입력 도우미 다이얼로그를 엽니다."""
-        dialog = EVHelperDialog(self)
+        # parent에서 worker_name 가져오기
+        worker_name = ""
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, '_worker_name'):
+                worker_name = parent._worker_name or ""
+                break
+            parent = parent.parent()
+        
+        dialog = EVHelperDialog(self, worker_name=worker_name)
         dialog.exec()
 
     def _handle_reverse_tool_click(self, event):

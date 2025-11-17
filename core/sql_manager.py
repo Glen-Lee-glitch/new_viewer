@@ -506,4 +506,33 @@ def insert_reply_email(
     except Exception:
         traceback.print_exc()
         return False
+
+def is_admin_user(worker_name: str) -> bool:
+    """
+    workers 테이블에서 사용자가 관리자인지 확인한다.
+    affiliation이 '그리트라운지'이고 level이 ['매니저', '팀장', '이사']에 포함되는 경우 True를 반환한다.
+    
+    Args:
+        worker_name: 확인할 작업자 이름
+        
+    Returns:
+        관리자 여부 (True: 관리자, False: 일반 사용자)
+    """
+    if not worker_name:
+        return False
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT name, level, affiliation
+                FROM workers
+                WHERE name = %s AND affiliation = '그리트라운지' AND level IN ('매니저', '팀장', '이사')
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (worker_name,))
+                row = cursor.fetchone()
+                return row is not None
+    except Exception:
+        traceback.print_exc()
+        return False
     
