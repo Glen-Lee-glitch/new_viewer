@@ -45,6 +45,7 @@ class PdfLoadWidget(QWidget):
     pdf_selected = pyqtSignal(list)  # 여러 파일 경로(리스트)를 전달하도록 변경
     work_started = pyqtSignal(list, dict)
     ai_review_requested = pyqtSignal(str) # AI 검토 요청 시그널
+    data_refreshed = pyqtSignal()  # 데이터 새로고침 완료 시그널
     
     def __init__(self):
         super().__init__()
@@ -291,6 +292,7 @@ class PdfLoadWidget(QWidget):
     def refresh_data(self):
         """sql 데이터 새로고침"""
         self.populate_recent_subsidy_rows()
+        self.data_refreshed.emit()  # 새로고침 완료 시그널 emit
 
     @staticmethod
     def _sanitize_text(value) -> str:

@@ -1,6 +1,8 @@
 import sys
 import os
 from pathlib import Path
+from datetime import datetime
+import pytz
 
 from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
@@ -226,6 +228,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.toolbar.email_requested.connect(self._open_mail_dialog)
         self._pdf_view_widget.page_delete_requested.connect(self._handle_page_delete_request)
         self._pdf_load_widget.ai_review_requested.connect(self._show_gemini_results_dialog)
+        self._pdf_load_widget.data_refreshed.connect(self._update_refresh_time)  # 데이터 새로고침 시 시간 업데이트
         
         # 정보 패널 업데이트 연결
         self._pdf_view_widget.pdf_loaded.connect(self._info_panel.update_file_info)
@@ -364,6 +367,9 @@ class MainWindow(QMainWindow):
             # 초기 새로고침 타이머 시작
             refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
             self._refresh_timer.start(refresh_interval * 1000)  # 초 단위이므로 1000을 곱함
+            
+            # 로그인 직후 초기 시간 표시
+            self._refresh_all_data()
         else:
             # 취소 시 앱 종료
             self.close()
@@ -727,8 +733,19 @@ class MainWindow(QMainWindow):
         """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
         self.set_splitter_sizes(is_landscape)
 
+    def _update_refresh_time(self):
+        """한국 시간으로 새로고침 시간을 업데이트한다."""
+        korea_tz = pytz.timezone('Asia/Seoul')
+        korea_time = datetime.now(korea_tz)
+        time_str = korea_time.strftime('%Y-%m-%d %H:%M:%S')
+        if hasattr(self, 'database_updated_time_label'):
+            self.database_updated_time_label.setText(f"새로고침: {time_str}")
+    
     def _refresh_all_data(self):
         """모든 데이터를 새로고침한다 (메인화면일 때만)."""
+        # 한국 시간으로 새로고침 시간 업데이트
+        self._update_refresh_time()
+        
         # PDF가 렌더된 상태가 아닐 때만 새로고침
         if self.renderer is None:
             self._pdf_load_widget.refresh_data()
