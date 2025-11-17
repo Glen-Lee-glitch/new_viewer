@@ -1,5 +1,5 @@
 import pymysql
-from datetime import datetime
+from datetime import datetime, date
 import pytz
 import pandas as pd
 import traceback
@@ -127,43 +127,66 @@ def fetch_recent_subsidy_applications():
 
         def is_multichild_outlier(row) -> bool:
             """다자녀 관련 정보가 이상치인지 확인. 이상치이면 True 반환."""
-            if row.get('다자녀') != 1:
-                return False
-
-            dates_str = row.get('child_birth_date')
-            if not dates_str:
-                return True
-
             try:
+                다자녀값 = row['다자녀']
+                if pd.isna(다자녀값) or 다자녀값 != 1:
+                    return False
+
+                dates_str = row['child_birth_date']
+                if pd.isna(dates_str) or not dates_str:
+                    return True
+
                 dates = json.loads(dates_str)
                 if not isinstance(dates, list) or not dates:
                     return True
 
                 return any(_is_child_over_18(d) for d in dates)
-            except (json.JSONDecodeError, TypeError):
+            except (json.JSONDecodeError, TypeError, KeyError):
                 return True
 
         def is_chobon_issue_date_outlier(row) -> bool:
             """초본 issue_date가 31일 이상 전인지 확인. 이상치이면 True 반환."""
-            # 초본 서류가 있는 경우에만 체크 (gr.초본 = 1)
-            if row.get('초본') != 1:
-                return False
-
-            issue_date = row.get('issue_date')
-            if not issue_date:
-                return False
-
             try:
+                # 초본 서류가 있는 경우에만 체크 (gr.초본 = 1)
+                초본값 = row['초본']
+                if pd.isna(초본값) or 초본값 != 1:
+                    return False
+
+                issue_date = row['issue_date']
+                if pd.isna(issue_date) or issue_date is None:
+                    return False
+
                 # 한국 시간 기준으로 오늘 날짜 계산
                 kst = pytz.timezone('Asia/Seoul')
                 today = datetime.now(kst).date()
                 
-                # issue_date가 문자열인 경우 파싱
+                # issue_date 파싱
+                issue_date_obj = None
                 if isinstance(issue_date, str):
-                    issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
+                    # 문자열인 경우 여러 형식 시도
+                    try:
+                        issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
+                    except ValueError:
+                        # 다른 형식 시도 (예: "2025-10-10 00:00:00")
+                        try:
+                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                        except ValueError:
+                            # ISO 형식 시도 (예: "2025-10-09T15:00:00.000Z")
+                            try:
+                                issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
+                            except ValueError:
+                                return False
                 elif isinstance(issue_date, datetime):
                     issue_date_obj = issue_date.date()
+                elif isinstance(issue_date, date):
+                    # 이미 date 객체인 경우
+                    issue_date_obj = issue_date
+                elif isinstance(issue_date, pd.Timestamp):
+                    issue_date_obj = issue_date.date()
                 else:
+                    return False
+
+                if issue_date_obj is None:
                     return False
 
                 # 날짜 차이 계산 (오늘 - issue_date)
@@ -171,13 +194,37 @@ def fetch_recent_subsidy_applications():
                 
                 # 31일 이상 차이나면 이상치
                 return days_diff >= 31
-            except (ValueError, TypeError, AttributeError):
+            except (ValueError, TypeError, AttributeError, KeyError):
                 return False
 
-        df['outlier'] = df.apply(
-            lambda row: 'O' if row['outlier'] == 'O' or is_multichild_outlier(row) or is_chobon_issue_date_outlier(row) else row['outlier'],
-            axis=1
-        )
+        def update_outlier(row):
+            """outlier 값을 업데이트하는 함수"""
+            # 기존 outlier 값 확인
+            current_outlier = row['outlier']
+            
+            # NaN이나 None 처리
+            if pd.isna(current_outlier):
+                current_outlier = ''
+            
+            # 문자열로 변환하여 비교
+            current_outlier_str = str(current_outlier).strip()
+            
+            # 이미 'O'이면 그대로 반환
+            if current_outlier_str == 'O':
+                return 'O'
+            
+            # 다자녀 이상치 체크
+            if is_multichild_outlier(row):
+                return 'O'
+            
+            # 초본 issue_date 이상치 체크
+            if is_chobon_issue_date_outlier(row):
+                return 'O'
+            
+            # 이상치가 아니면 기존 값 반환 (문자열로 변환)
+            return current_outlier_str if current_outlier_str else ''
+        
+        df['outlier'] = df.apply(update_outlier, axis=1)
 
         # 간단한 한 줄 디버그 출력
         print(f'새로고침 완료: {len(df)}개 데이터 조회됨')
