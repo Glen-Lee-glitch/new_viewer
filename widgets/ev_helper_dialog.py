@@ -6,6 +6,8 @@ from core.etc_tools import reverse_text
 from core.sql_manager import is_admin_user
 import pandas as pd
 
+from widgets.helper_overlay import OverlayWindow
+
 
 class EVHelperDialog(QDialog):
     def __init__(self, parent=None, worker_name: str = ""):
@@ -21,6 +23,11 @@ class EVHelperDialog(QDialog):
         # 관리자 여부 확인 후 '관리자' 그룹 표시/숨김 처리
         is_admin = is_admin_user(worker_name)
         self.groupBox_2.setVisible(is_admin)
+
+        self.overlay = None
+        
+        self.open_helper_overlay.clicked.connect(self.open_overlay)
+        self.close_helper_overlay.clicked.connect(self.close_overlay)
 
     def _handle_reverse_tool_click(self, event):
         """lineEdit_reverse_tool 클릭 이벤트를 처리합니다."""
@@ -70,3 +77,29 @@ class EVHelperDialog(QDialog):
                 print(f"경고: '신청자' 칼럼이 엑셀 파일에 없습니다. 사용 가능한 칼럼: {list(df.columns)}")
         except Exception as e:
             print(f"엑셀 파일 처리 중 오류 발생: {e}")
+
+    def open_overlay(self):
+        """'열기' 버튼을 누르면 오버레이 창을 생성하고 표시합니다."""
+        if self.overlay is None or not self.overlay.isVisible():
+            # TODO: 실제 데이터로 교체해야 합니다.
+            sample_texts = [
+                "이경구",
+                "경기도 고양시 뭐뭐로 31-0",
+                "101동 201호",
+                "010-2888-3555",
+                "gyeonggoo.lee@greetlounge.com",
+                "RN123456789"
+            ]
+            self.overlay = OverlayWindow(texts=sample_texts)
+            self.overlay.show()
+
+    def close_overlay(self):
+        """'닫기' 버튼을 누르면 오버레이 창을 닫습니다."""
+        if self.overlay and self.overlay.isVisible():
+            self.overlay.close()
+            self.overlay = None
+            
+    def closeEvent(self, event):
+        """다이얼로그가 닫힐 때 오버레이 창도 함께 닫히도록 합니다."""
+        self.close_overlay()
+        super().closeEvent(event)
