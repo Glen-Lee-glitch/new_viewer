@@ -5,6 +5,7 @@ from PyQt6.QtCore import QTimer, Qt
 from core.etc_tools import reverse_text
 from core.sql_manager import is_admin_user
 import pandas as pd
+from datetime import datetime
 
 from widgets.helper_overlay import OverlayWindow
 
@@ -64,6 +65,32 @@ class EVHelperDialog(QDialog):
             self.lineEdit_excel_file.setText(file_path)
             self._process_excel_file(file_path)
 
+    def _format_date_value(self, value: str) -> str:
+        """날짜/시간 문자열에서 날짜 부분만 추출합니다."""
+        if not value or value == 'nan':
+            return value
+        
+        # 다양한 날짜 형식 시도
+        date_formats = [
+            '%Y-%m-%d %H:%M:%S',  # 2025-01-01 12:00:00
+            '%Y-%m-%d %H:%M',      # 2025-01-01 12:00
+            '%Y/%m/%d %H:%M:%S',   # 2025/01/01 12:00:00
+            '%Y/%m/%d %H:%M',      # 2025/01/01 12:00
+            '%Y-%m-%d',            # 2025-01-01
+            '%Y/%m/%d',            # 2025/01/01
+            '%Y.%m.%d',            # 2025.01.01
+        ]
+        
+        for fmt in date_formats:
+            try:
+                dt = datetime.strptime(value.strip(), fmt)
+                return dt.strftime('%Y-%m-%d')  # 날짜 부분만 반환
+            except ValueError:
+                continue
+        
+        # 파싱 실패 시 원본 값 반환
+        return value
+
     def _process_excel_file(self, file_path: str):
         """엑셀 파일을 읽고 현재 작업자와 일치하는 신청 건의 정보를 추출합니다."""
         try:
@@ -84,6 +111,9 @@ class EVHelperDialog(QDialog):
                     # 값이 있을 때만 표시할 선택적 칼럼
                     optional_columns = ['사업자번호', '사업자명', '다자녀수', '공동명의자', '공동 생년월일']
                     
+                    # 날짜 형식 칼럼 목록
+                    date_columns = ['주문시간', '출고예정일', '공동 생년월일']
+                    
                     self._overlay_texts = []
                     for index, row in filtered_df.iterrows():
                         lines = []
@@ -93,6 +123,9 @@ class EVHelperDialog(QDialog):
                             if col in df.columns:
                                 value = str(row[col]).strip()
                                 if value and value != 'nan':  # 빈 값이나 NaN이 아닌 경우만
+                                    # 날짜 칼럼인 경우 날짜 부분만 추출
+                                    if col in date_columns:
+                                        value = self._format_date_value(value)
                                     lines.append(f"{col}: {value}")
                         
                         # 선택적 칼럼 처리 (값이 있을 때만)
@@ -100,6 +133,9 @@ class EVHelperDialog(QDialog):
                             if col in df.columns:
                                 value = str(row[col]).strip()
                                 if value and value != 'nan' and value != '':  # 빈 값이 아닌 경우만
+                                    # 날짜 칼럼인 경우 날짜 부분만 추출
+                                    if col in date_columns:
+                                        value = self._format_date_value(value)
                                     lines.append(f"{col}: {value}")
                         
                         # 줄바꿈으로 연결하여 하나의 문자열로 만듦
