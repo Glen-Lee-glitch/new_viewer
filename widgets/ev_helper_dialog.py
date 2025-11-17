@@ -65,26 +65,27 @@ class EVHelperDialog(QDialog):
             self._process_excel_file(file_path)
 
     def _process_excel_file(self, file_path: str):
-        """엑셀 파일을 읽고 현재 작업자와 일치하는 신청 건의 RN을 추출합니다."""
+        """엑셀 파일을 읽고 현재 작업자와 일치하는 신청 건의 순서와 RN을 추출합니다."""
         try:
             df = pd.read_excel(file_path, header=0, dtype=str) # 모든 데이터를 문자열로 읽기
             
-            if '신청자' in df.columns and 'RN번호' in df.columns:
+            required_cols = ['신청자', '순서', 'RN번호']
+            if all(col in df.columns for col in required_cols):
                 # 현재 작업자 이름과 일치하는 행 필터링
                 filtered_df = df[df['신청자'] == self.worker_name]
                 
                 if not filtered_df.empty:
-                    # 'RN번호' 칼럼의 데이터를 리스트로 변환하여 저장
-                    self._overlay_texts = filtered_df['RN번호'].tolist()
+                    # '순서'와 'RN번호'를 "순서\nRN번호" 형태의 문자열로 만들어 리스트에 저장
+                    self._overlay_texts = [
+                        f"{row['순서']}\n{row['RN번호']}" for index, row in filtered_df.iterrows()
+                    ]
                     QMessageBox.information(self, "정보", f"'{self.worker_name}'님의 신청 건 {len(self._overlay_texts)}개를 찾았습니다.")
                 else:
                     self._overlay_texts = []
                     QMessageBox.information(self, "정보", f"'{self.worker_name}'님의 신청 건을 찾을 수 없습니다.")
             else:
                 self._overlay_texts = []
-                missing_cols = []
-                if '신청자' not in df.columns: missing_cols.append("'신청자'")
-                if 'RN번호' not in df.columns: missing_cols.append("'RN번호'")
+                missing_cols = [f"'{col}'" for col in required_cols if col not in df.columns]
                 QMessageBox.warning(self, "오류", f"엑셀 파일에 필요한 칼럼({', '.join(missing_cols)})이 없습니다.")
 
         except Exception as e:
