@@ -1,6 +1,6 @@
 from pathlib import Path
 from PyQt6 import uic
-from PyQt6.QtWidgets import QDialog, QApplication, QLineEdit, QFileDialog
+from PyQt6.QtWidgets import QDialog, QApplication, QLineEdit, QFileDialog, QMessageBox
 from PyQt6.QtCore import QTimer, Qt
 from core.etc_tools import reverse_text
 from core.sql_manager import is_admin_user
@@ -24,7 +24,9 @@ class EVHelperDialog(QDialog):
         is_admin = is_admin_user(worker_name)
         self.groupBox_2.setVisible(is_admin)
 
-        self.overlay = None
+        self.overlay = None # 이 줄을 다시 추가합니다.
+        self.worker_name = worker_name
+        self._overlay_texts = [] # 오버레이에 표시할 텍스트 리스트
         
         self.open_helper_overlay.clicked.connect(self.open_overlay)
         self.close_helper_overlay.clicked.connect(self.close_overlay)
@@ -63,34 +65,40 @@ class EVHelperDialog(QDialog):
             self._process_excel_file(file_path)
 
     def _process_excel_file(self, file_path: str):
-        """엑셀 파일을 읽고 처리합니다."""
+        """엑셀 파일을 읽고 현재 작업자와 일치하는 신청 건의 RN을 추출합니다."""
         try:
-            # pandas로 엑셀 파일을 데이터프레임화 (header=0, 디폴트)
-            df = pd.read_excel(file_path, header=0)
+            df = pd.read_excel(file_path, header=0, dtype=str) # 모든 데이터를 문자열로 읽기
             
-            # '신청자' 칼럼의 value_counts를 디버그로 출력
-            if '신청자' in df.columns:
-                value_counts = df['신청자'].value_counts()
-                print("신청자 칼럼 value_counts:")
-                print(value_counts)
+            if '신청자' in df.columns and 'RN번호' in df.columns:
+                # 현재 작업자 이름과 일치하는 행 필터링
+                filtered_df = df[df['신청자'] == self.worker_name]
+                
+                if not filtered_df.empty:
+                    # 'RN번호' 칼럼의 데이터를 리스트로 변환하여 저장
+                    self._overlay_texts = filtered_df['RN번호'].tolist()
+                    QMessageBox.information(self, "정보", f"'{self.worker_name}'님의 신청 건 {len(self._overlay_texts)}개를 찾았습니다.")
+                else:
+                    self._overlay_texts = []
+                    QMessageBox.information(self, "정보", f"'{self.worker_name}'님의 신청 건을 찾을 수 없습니다.")
             else:
-                print(f"경고: '신청자' 칼럼이 엑셀 파일에 없습니다. 사용 가능한 칼럼: {list(df.columns)}")
+                self._overlay_texts = []
+                missing_cols = []
+                if '신청자' not in df.columns: missing_cols.append("'신청자'")
+                if 'RN번호' not in df.columns: missing_cols.append("'RN번호'")
+                QMessageBox.warning(self, "오류", f"엑셀 파일에 필요한 칼럼({', '.join(missing_cols)})이 없습니다.")
+
         except Exception as e:
-            print(f"엑셀 파일 처리 중 오류 발생: {e}")
+            self._overlay_texts = []
+            QMessageBox.critical(self, "오류", f"엑셀 파일 처리 중 오류가 발생했습니다:\n{e}")
 
     def open_overlay(self):
         """'열기' 버튼을 누르면 오버레이 창을 생성하고 표시합니다."""
+        if not self._overlay_texts:
+            QMessageBox.information(self, "데이터 없음", "표시할 데이터가 없습니다.\n엑셀 파일을 먼저 로드하고, 본인에게 할당된 신청 건이 있는지 확인해주세요.")
+            return
+            
         if self.overlay is None or not self.overlay.isVisible():
-            # TODO: 실제 데이터로 교체해야 합니다.
-            sample_texts = [
-                "이경구",
-                "경기도 고양시 뭐뭐로 31-0",
-                "101동 201호",
-                "010-2888-3555",
-                "gyeonggoo.lee@greetlounge.com",
-                "RN123456789"
-            ]
-            self.overlay = OverlayWindow(texts=sample_texts)
+            self.overlay = OverlayWindow(texts=self._overlay_texts)
             self.overlay.show()
 
     def close_overlay(self):
