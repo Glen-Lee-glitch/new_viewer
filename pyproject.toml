@@ -8,4 +8,5 @@ dependencies = [
     "PyQt6>=6.6.0",
     "PyMuPDF>=1.23.0",
     "Pillow>=10.0.0",
+    "pynput>=1.8.1",
 ]
