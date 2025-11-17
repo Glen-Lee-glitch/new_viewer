@@ -204,6 +204,16 @@ class EVHelperDialog(QDialog):
             self.overlay.close()
             self.overlay = None
             
+    def accept(self):
+        """OK 버튼이 눌렸을 때 오버레이 창을 닫고 다이얼로그를 닫습니다."""
+        self.close_overlay()
+        super().accept()
+    
+    def reject(self):
+        """Cancel 버튼이 눌렸을 때 오버레이 창을 닫고 다이얼로그를 닫습니다."""
+        self.close_overlay()
+        super().reject()
+    
     def closeEvent(self, event):
         """다이얼로그가 닫힐 때 오버레이 창도 함께 닫히도록 합니다."""
         self.close_overlay()
