@@ -3,6 +3,7 @@ from datetime import datetime
 import pytz
 import pandas as pd
 import traceback
+import json
 
 from contextlib import closing
 
@@ -73,7 +74,9 @@ def fetch_recent_subsidy_applications():
                 "       gr.구매계약서, "
                 "       gr.초본, "
                 "       gr.공동명의, "
+                "       gr.다자녀, "
                 "       sa.urgent, "
+                "       d.child_birth_date, "
                 "       CASE "
                 "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
                 "               CASE "
@@ -91,6 +94,7 @@ def fetch_recent_subsidy_applications():
                 "LEFT JOIN test_ai_구매계약서 c ON sa.RN COLLATE utf8mb4_unicode_ci = c.RN COLLATE utf8mb4_unicode_ci "
                 "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
                 "LEFT JOIN test_ai_청년생애 y ON sa.RN COLLATE utf8mb4_unicode_ci = y.RN COLLATE utf8mb4_unicode_ci "
+                "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
                 "WHERE sa.recent_received_date >= %s "
                 "ORDER BY sa.recent_received_date DESC "
                 "LIMIT 20"
@@ -101,6 +105,47 @@ def fetch_recent_subsidy_applications():
         if df.empty:
             print('조회된 데이터가 없습니다.')
             return df
+
+        def _is_child_over_18(birth_date_str: str) -> bool:
+            """생년월일 문자열을 받아 만나이 18세를 초과하는지 (즉, 만 19세 이상인지) 확인한다."""
+            try:
+                birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
+                today = datetime.now().date()
+                
+                age = today.year - birth_date.year
+                
+                if age > 19:
+                    return True
+                if age < 19:
+                    return False
+                
+                return (today.month, today.day) >= (birth_date.month, birth_date.day)
+
+            except (ValueError, TypeError):
+                return True
+
+        def is_multichild_outlier(row) -> bool:
+            """다자녀 관련 정보가 이상치인지 확인. 이상치이면 True 반환."""
+            if row.get('다자녀') != 1:
+                return False
+
+            dates_str = row.get('child_birth_date')
+            if not dates_str:
+                return True
+
+            try:
+                dates = json.loads(dates_str)
+                if not isinstance(dates, list) or not dates:
+                    return True
+
+                return any(_is_child_over_18(d) for d in dates)
+            except (json.JSONDecodeError, TypeError):
+                return True
+
+        df['outlier'] = df.apply(
+            lambda row: 'O' if row['outlier'] == 'O' or is_multichild_outlier(row) else row['outlier'],
+            axis=1
+        )
 
         # 간단한 한 줄 디버그 출력
         print(f'새로고침 완료: {len(df)}개 데이터 조회됨')
