@@ -65,20 +65,46 @@ class EVHelperDialog(QDialog):
             self._process_excel_file(file_path)
 
     def _process_excel_file(self, file_path: str):
-        """엑셀 파일을 읽고 현재 작업자와 일치하는 신청 건의 순서와 RN을 추출합니다."""
+        """엑셀 파일을 읽고 현재 작업자와 일치하는 신청 건의 정보를 추출합니다."""
         try:
             df = pd.read_excel(file_path, header=0, dtype=str) # 모든 데이터를 문자열로 읽기
             
-            required_cols = ['신청자', '순서', 'RN번호']
+            required_cols = ['신청자', 'RN번호']
             if all(col in df.columns for col in required_cols):
                 # 현재 작업자 이름과 일치하는 행 필터링
                 filtered_df = df[df['신청자'] == self.worker_name]
                 
                 if not filtered_df.empty:
-                    # '순서'와 'RN번호'를 "순서\nRN번호" 형태의 문자열로 만들어 리스트에 저장
-                    self._overlay_texts = [
-                        f"{row['순서']}\n{row['RN번호']}" for index, row in filtered_df.iterrows()
+                    # 표시할 칼럼 목록 정의
+                    display_columns = [
+                        '주문시간', '성명(대표자)', '성별', '신청자종', '출고예정일',
+                        '주소1', '주소2', '전화', '휴대폰', '이메일', '신청유형', '우선순위', 'RN번호'
                     ]
+                    
+                    # 값이 있을 때만 표시할 선택적 칼럼
+                    optional_columns = ['사업자번호', '사업자명', '다자녀수', '공동명의자', '공동 생년월일']
+                    
+                    self._overlay_texts = []
+                    for index, row in filtered_df.iterrows():
+                        lines = []
+                        
+                        # 필수 표시 칼럼 처리
+                        for col in display_columns:
+                            if col in df.columns:
+                                value = str(row[col]).strip()
+                                if value and value != 'nan':  # 빈 값이나 NaN이 아닌 경우만
+                                    lines.append(f"{col}: {value}")
+                        
+                        # 선택적 칼럼 처리 (값이 있을 때만)
+                        for col in optional_columns:
+                            if col in df.columns:
+                                value = str(row[col]).strip()
+                                if value and value != 'nan' and value != '':  # 빈 값이 아닌 경우만
+                                    lines.append(f"{col}: {value}")
+                        
+                        # 줄바꿈으로 연결하여 하나의 문자열로 만듦
+                        self._overlay_texts.append('\n'.join(lines))
+                    
                     QMessageBox.information(self, "정보", f"'{self.worker_name}'님의 신청 건 {len(self._overlay_texts)}개를 찾았습니다.")
                 else:
                     self._overlay_texts = []
