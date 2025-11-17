@@ -113,13 +113,30 @@ class EVHelperDialog(QDialog):
                     optional_columns = ['사업자번호', '사업자명', '다자녀수', '공동명의자', '공동 생년월일']
                     
                     # 날짜 형식 칼럼 목록
-                    date_columns = ['주문시간', '출고예정일', '공동 생년월일']
+                    date_columns = ['생년월일(법인번호)', '주문시간', '출고예정일', '공동 생년월일']
                     
                     self._overlay_texts = []
                     self._overlay_copy_data = []  # 복사 가능한 칼럼 데이터 리스트
                     
+                    # 복사 가능한 칼럼과 단축키 매핑
+                    copy_columns = ['성명(대표자)', '주소1', '주소2', '전화', '휴대폰', '이메일']
+                    copy_column_to_shortcut = {col: i+1 for i, col in enumerate(copy_columns)}
+                    copy_column_to_shortcut['공동명의자'] = 7
+                    copy_column_to_shortcut['RN번호'] = 8  # 공동명의자가 있으면 8, 없으면 7
+                    
                     for index, row in filtered_df.iterrows():
                         lines = []
+                        
+                        # 공동명의자 존재 여부 확인 (RN번호 단축키 결정용)
+                        has_joint = False
+                        if '공동명의자' in df.columns:
+                            joint_value = str(row['공동명의자']).strip()
+                            if joint_value and joint_value != 'nan' and joint_value != '':
+                                has_joint = True
+                        
+                        # RN번호 단축키 결정 (공동명의자 유무에 따라)
+                        rn_shortcut = 8 if has_joint else 7
+                        copy_column_to_shortcut['RN번호'] = rn_shortcut
                         
                         # 필수 표시 칼럼 처리
                         for col in display_columns:
@@ -129,7 +146,13 @@ class EVHelperDialog(QDialog):
                                     # 날짜 칼럼인 경우 날짜 부분만 추출
                                     if col in date_columns:
                                         value = self._format_date_value(value)
-                                    lines.append(f"{col}: {value}")
+                                    
+                                    # 복사 가능한 칼럼인 경우 단축키 추가
+                                    if col in copy_column_to_shortcut:
+                                        shortcut_num = copy_column_to_shortcut[col]
+                                        lines.append(f"[Ctrl+Alt+{shortcut_num}] {col}: {value}")
+                                    else:
+                                        lines.append(f"{col}: {value}")
                         
                         # 선택적 칼럼 처리 (값이 있을 때만)
                         for col in optional_columns:
@@ -139,13 +162,18 @@ class EVHelperDialog(QDialog):
                                     # 날짜 칼럼인 경우 날짜 부분만 추출
                                     if col in date_columns:
                                         value = self._format_date_value(value)
-                                    lines.append(f"{col}: {value}")
+                                    
+                                    # 복사 가능한 칼럼인 경우 단축키 추가
+                                    if col in copy_column_to_shortcut:
+                                        shortcut_num = copy_column_to_shortcut[col]
+                                        lines.append(f"[Ctrl+Alt+{shortcut_num}] {col}: {value}")
+                                    else:
+                                        lines.append(f"{col}: {value}")
                         
                         # 줄바꿈으로 연결하여 하나의 문자열로 만듦 (항목 간 간격을 위해 빈 줄 추가)
                         self._overlay_texts.append('\n\n'.join(lines))
                         
                         # 복사 가능한 칼럼 데이터 생성
-                        copy_columns = ['성명(대표자)', '주소1', '주소2', '전화', '휴대폰', '이메일']
                         copy_values = []
                         
                         for col in copy_columns:
@@ -157,12 +185,8 @@ class EVHelperDialog(QDialog):
                                     copy_values.append('')  # 빈 값도 추가하여 인덱스 유지
                         
                         # 공동명의자가 있으면 추가 (RN번호 전에)
-                        has_joint = False
-                        if '공동명의자' in df.columns:
-                            joint_value = str(row['공동명의자']).strip()
-                            if joint_value and joint_value != 'nan' and joint_value != '':
-                                copy_values.append(joint_value)
-                                has_joint = True
+                        if has_joint:
+                            copy_values.append(joint_value)
                         
                         # RN번호 추가 (항상 마지막)
                         if 'RN번호' in df.columns:
