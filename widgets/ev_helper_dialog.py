@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QDialog, QApplication, QLineEdit, QFileDialog
 from PyQt6.QtCore import QTimer, Qt
 from core.etc_tools import reverse_text
 from core.sql_manager import is_admin_user
+import pandas as pd
 
 
 class EVHelperDialog(QDialog):
@@ -52,3 +53,20 @@ class EVHelperDialog(QDialog):
         )
         if file_path:
             self.lineEdit_excel_file.setText(file_path)
+            self._process_excel_file(file_path)
+
+    def _process_excel_file(self, file_path: str):
+        """엑셀 파일을 읽고 처리합니다."""
+        try:
+            # pandas로 엑셀 파일을 데이터프레임화 (header=0, 디폴트)
+            df = pd.read_excel(file_path, header=0)
+            
+            # '신청자' 칼럼의 value_counts를 디버그로 출력
+            if '신청자' in df.columns:
+                value_counts = df['신청자'].value_counts()
+                print("신청자 칼럼 value_counts:")
+                print(value_counts)
+            else:
+                print(f"경고: '신청자' 칼럼이 엑셀 파일에 없습니다. 사용 가능한 칼럼: {list(df.columns)}")
+        except Exception as e:
+            print(f"엑셀 파일 처리 중 오류 발생: {e}")
