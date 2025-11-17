@@ -90,6 +90,10 @@ class MainWindow(QMainWindow):
 
         # --- 상태바에 네비게이션 위젯 추가 ---
         self.ui_status_bar.addPermanentWidget(self.ui_nav_widget)
+        
+        # database_updated_time_label이 HTML을 인식하도록 설정
+        if hasattr(self, 'database_updated_time_label'):
+            self.database_updated_time_label.setTextFormat(Qt.TextFormat.RichText)
 
         # --- 시그널 연결 ---
         self._setup_connections()
@@ -739,7 +743,9 @@ class MainWindow(QMainWindow):
         korea_time = datetime.now(korea_tz)
         time_str = korea_time.strftime('%Y-%m-%d %H:%M:%S')
         if hasattr(self, 'database_updated_time_label'):
-            self.database_updated_time_label.setText(f"새로고침: {time_str}")
+            # 시간 부분을 빨간색 bold로 표시
+            html_text = f"새로고침: <span style='color: red; font-weight: bold;'>{time_str}</span>"
+            self.database_updated_time_label.setText(html_text)
     
     def _refresh_all_data(self):
         """모든 데이터를 새로고침한다 (메인화면일 때만)."""

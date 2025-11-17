@@ -129,6 +129,22 @@
         </widget>
        </item>
        <item>
+        <widget class="QFrame" name="separator_line">
+         <property name="frameShape">
+          <enum>QFrame::Shape::VLine</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Sunken</enum>
+         </property>
+         <property name="lineWidth">
+          <number>1</number>
+         </property>
+         <property name="maximumWidth">
+          <number>1</number>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QLabel" name="worker_label_2">
          <property name="text">
           <string/>
