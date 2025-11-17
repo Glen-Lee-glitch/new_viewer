@@ -28,6 +28,7 @@ class EVHelperDialog(QDialog):
         self.overlay = None # 이 줄을 다시 추가합니다.
         self.worker_name = worker_name
         self._overlay_texts = [] # 오버레이에 표시할 텍스트 리스트
+        self._overlay_copy_data = []  # 오버레이에 복사 가능한 칼럼 데이터 리스트
         
         self.open_helper_overlay.clicked.connect(self.open_overlay)
         self.close_helper_overlay.clicked.connect(self.close_overlay)
@@ -115,6 +116,8 @@ class EVHelperDialog(QDialog):
                     date_columns = ['주문시간', '출고예정일', '공동 생년월일']
                     
                     self._overlay_texts = []
+                    self._overlay_copy_data = []  # 복사 가능한 칼럼 데이터 리스트
+                    
                     for index, row in filtered_df.iterrows():
                         lines = []
                         
@@ -140,18 +143,49 @@ class EVHelperDialog(QDialog):
                         
                         # 줄바꿈으로 연결하여 하나의 문자열로 만듦
                         self._overlay_texts.append('\n'.join(lines))
+                        
+                        # 복사 가능한 칼럼 데이터 생성
+                        copy_columns = ['성명(대표자)', '주소1', '주소2', '전화', '휴대폰', '이메일']
+                        copy_values = []
+                        
+                        for col in copy_columns:
+                            if col in df.columns:
+                                value = str(row[col]).strip()
+                                if value and value != 'nan':
+                                    copy_values.append(value)
+                                else:
+                                    copy_values.append('')  # 빈 값도 추가하여 인덱스 유지
+                        
+                        # 공동명의자가 있으면 추가 (RN번호 전에)
+                        has_joint = False
+                        if '공동명의자' in df.columns:
+                            joint_value = str(row['공동명의자']).strip()
+                            if joint_value and joint_value != 'nan' and joint_value != '':
+                                copy_values.append(joint_value)
+                                has_joint = True
+                        
+                        # RN번호 추가 (항상 마지막)
+                        if 'RN번호' in df.columns:
+                            rn_value = str(row['RN번호']).strip()
+                            if rn_value and rn_value != 'nan':
+                                copy_values.append(rn_value)
+                        
+                        self._overlay_copy_data.append(copy_values)
                     
                     QMessageBox.information(self, "정보", f"'{self.worker_name}'님의 신청 건 {len(self._overlay_texts)}개를 찾았습니다.")
                 else:
                     self._overlay_texts = []
+                    self._overlay_copy_data = []
                     QMessageBox.information(self, "정보", f"'{self.worker_name}'님의 신청 건을 찾을 수 없습니다.")
             else:
                 self._overlay_texts = []
+                self._overlay_copy_data = []
                 missing_cols = [f"'{col}'" for col in required_cols if col not in df.columns]
                 QMessageBox.warning(self, "오류", f"엑셀 파일에 필요한 칼럼({', '.join(missing_cols)})이 없습니다.")
 
         except Exception as e:
             self._overlay_texts = []
+            self._overlay_copy_data = []
             QMessageBox.critical(self, "오류", f"엑셀 파일 처리 중 오류가 발생했습니다:\n{e}")
 
     def open_overlay(self):
@@ -161,7 +195,7 @@ class EVHelperDialog(QDialog):
             return
             
         if self.overlay is None or not self.overlay.isVisible():
-            self.overlay = OverlayWindow(texts=self._overlay_texts)
+            self.overlay = OverlayWindow(texts=self._overlay_texts, copy_data=self._overlay_copy_data)
             self.overlay.show()
 
     def close_overlay(self):
