@@ -15,18 +15,20 @@ class HotkeyEmitter(QObject):
     def emit_toggle(self):
         self.toggle_overlay_signal.emit()
 
-hotkey_emitter = HotkeyEmitter()
+# hotkey_emitter = HotkeyEmitter() # <- 전역 변수 제거
 
 class OverlayWindow(QWidget):
     def __init__(self, texts, parent=None):
         super().__init__(parent)
         self.texts = texts
         self.hotkey_listener = None
+        self.hotkey_emitter = HotkeyEmitter() # 인스턴스 변수로 생성
         
         self.initUI()
         
-        hotkey_emitter.copy_signal.connect(self.copy_to_clipboard)
-        hotkey_emitter.toggle_overlay_signal.connect(self.toggle_visibility)
+        # 인스턴스 변수인 self.hotkey_emitter에 연결
+        self.hotkey_emitter.copy_signal.connect(self.copy_to_clipboard)
+        self.hotkey_emitter.toggle_overlay_signal.connect(self.toggle_visibility)
         self.original_label_text = self.label.text()
 
         self.setup_hotkeys()
@@ -66,10 +68,12 @@ class OverlayWindow(QWidget):
         self.hotkey_listener.start()
 
     def _on_hotkey_pressed(self, index):
-        return lambda: hotkey_emitter.emit_copy(str(index))
+        # self.hotkey_emitter 사용
+        return lambda: self.hotkey_emitter.emit_copy(str(index))
 
     def _on_toggle_pressed(self):
-        hotkey_emitter.emit_toggle()
+        # self.hotkey_emitter 사용
+        self.hotkey_emitter.emit_toggle()
 
     def copy_to_clipboard(self, index_str):
         """단축키 신호를 받아 클립보드에 텍스트를 복사하는 슬롯"""
