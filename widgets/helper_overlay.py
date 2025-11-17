@@ -50,16 +50,22 @@ class OverlayWindow(QWidget):
         if self.texts:
             display_text = self.texts[self.current_index]
 
+        # 기존 정보 레이블 (왼쪽)
         self.label = QLabel(display_text, self)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.label.setStyleSheet("color: white; font-size: 28px; background-color: rgba(0,0,0,150); padding: 20px; font-weight: bold; border-radius: 5px;")
         
         self.label.setWordWrap(True)
         self.label.adjustSize()
-        self.label.move(
-            (self.width() - self.label.width()) // 2,
-            (self.height() - self.label.height()) // 2
-        )
+        
+        # 복사 메시지 레이블 (오른쪽, 초기에는 숨김)
+        self.copy_message_label = QLabel("", self)
+        self.copy_message_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.copy_message_label.setStyleSheet("color: white; font-size: 24px; background-color: rgba(0,0,0,150); padding: 15px; font-weight: bold; border-radius: 5px;")
+        self.copy_message_label.setWordWrap(True)
+        self.copy_message_label.hide()
+        
+        self._update_label_positions()
 
     def setup_hotkeys(self):
         """Initializes and starts the global hotkey listener."""
@@ -98,18 +104,33 @@ class OverlayWindow(QWidget):
             if text_to_copy:  # 빈 값이 아닌 경우만 복사
                 QApplication.clipboard().setText(text_to_copy)
                 
-                # 복사 완료 피드백 (2초간)
-                original_text = self.label.text()
-                self.label.setText(f"{text_to_copy}\n\n클립보드에 복사되었습니다.")
-                QTimer.singleShot(2000, lambda: self.label.setText(original_text))
+                # 복사 완료 피드백을 오른쪽 레이블에 표시 (2초간)
+                self.copy_message_label.setText(f"{text_to_copy}\n\n클립보드에 복사되었습니다.")
+                self.copy_message_label.show()
+                self.copy_message_label.adjustSize()
+                self._update_label_positions()
                 
-                # 텍스트가 바뀌면 라벨 크기와 위치를 다시 조절
-                self.label.adjustSize()
-                self.label.move(
-                    (self.width() - self.label.width()) // 2,
-                    (self.height() - self.label.height()) // 2
-                )
+                # 2초 후 메시지 숨김
+                QTimer.singleShot(2000, self._hide_copy_message)
 
+    def _update_label_positions(self):
+        """레이블들의 위치를 업데이트합니다."""
+        # 기존 정보 레이블을 왼쪽에 배치
+        label_x = 50  # 왼쪽 여백
+        label_y = (self.height() - self.label.height()) // 2
+        self.label.move(label_x, label_y)
+        
+        # 복사 메시지 레이블을 오른쪽에 배치
+        if self.copy_message_label.isVisible():
+            copy_label_x = self.width() - self.copy_message_label.width() - 50  # 오른쪽 여백
+            copy_label_y = (self.height() - self.copy_message_label.height()) // 2
+            self.copy_message_label.move(copy_label_x, copy_label_y)
+    
+    def _hide_copy_message(self):
+        """복사 메시지를 숨깁니다."""
+        self.copy_message_label.hide()
+        self._update_label_positions()
+    
     def navigate_text(self, direction):
         """방향키 신호를 받아 텍스트를 변경합니다."""
         if not self.texts:
@@ -123,10 +144,7 @@ class OverlayWindow(QWidget):
         self.label.setText(self.texts[self.current_index])
         # 텍스트가 바뀌면 라벨 크기와 위치를 다시 조절
         self.label.adjustSize()
-        self.label.move(
-            (self.width() - self.label.width()) // 2,
-            (self.height() - self.label.height()) // 2
-        )
+        self._update_label_positions()
 
     def toggle_visibility(self):
         """단축키 신호를 받아 오버레이 창의 보이기/숨기기 상태를 토글합니다."""
