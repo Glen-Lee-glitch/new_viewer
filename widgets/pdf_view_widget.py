@@ -25,7 +25,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     page_change_requested = pyqtSignal(int)
     page_aspect_ratio_changed = pyqtSignal(bool)  # is_landscape: 가로가 긴 페이지 여부
     save_completed = pyqtSignal()  # 저장 완료 후 화면 전환을 위한 신호
-    page_delete_requested = pyqtSignal(int, dict) # '보이는' 페이지 번호와 삭제 정보로 삭제를 요청하는 신호
+    page_delete_requested = pyqtSignal(object, dict) # '보이는' 페이지 번호(단일 int 또는 리스트)와 삭제 정보로 삭제를 요청하는 신호
 
     # --- 정보 패널 연동을 위한 신호 ---
     pdf_loaded = pyqtSignal(str, float, int)  # file_path, file_size_mb, total_pages

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Union
 
 from PyQt6 import uic
 from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
@@ -13,7 +14,7 @@ class ThumbnailViewWidget(QWidget):
     page_change_requested = pyqtSignal(int)
     page_order_changed = pyqtSignal(list) # 변경된 페이지 순서를 전달하는 새 시그널
     undo_requested = pyqtSignal()
-    page_delete_requested = pyqtSignal(int, dict) # '보이는' 페이지 번호와 삭제 정보로 삭제 요청
+    page_delete_requested = pyqtSignal(object, dict) # '보이는' 페이지 번호(단일 int 또는 리스트)와 삭제 정보로 삭제 요청
     
     def __init__(self):
         super().__init__()
@@ -50,14 +51,23 @@ class ThumbnailViewWidget(QWidget):
         if not selected_items:
             return
 
-        item = selected_items[0]
-        page_to_delete = self.thumbnail_list_widget.row(item)
-        visual_page_num = page_to_delete + 1
-
+        # 선택된 모든 페이지의 row 번호를 수집 (1부터 시작하는 시각적 번호)
+        visual_page_nums = [self.thumbnail_list_widget.row(item) + 1 for item in selected_items]
+        # row 번호는 0부터 시작하므로 +1을 해서 시각적 번호로 변환
+        
+        # 정렬하여 일관성 유지
+        visual_page_nums.sort()
+        
         # 공통 삭제 확인 함수 사용
         from core.delete_utils import prompt_page_delete
         
-        delete_result = prompt_page_delete(self, visual_page_num)
+        # 단일 페이지인 경우 int로, 여러 페이지인 경우 리스트로 전달
+        if len(visual_page_nums) == 1:
+            page_input = visual_page_nums[0]
+        else:
+            page_input = visual_page_nums
+        
+        delete_result = prompt_page_delete(self, page_input)
         if delete_result and delete_result.get("confirmed"):
             # 삭제 정보 가져오기 (나중에 활용 예정)
             print(f"삭제 사유: {delete_result['reason']}")
@@ -65,7 +75,14 @@ class ThumbnailViewWidget(QWidget):
                 print(f"기타 사유: {delete_result['custom_text']}")
             
             # MainWindow에 선택된 '보이는' 페이지의 삭제를 요청한다.
-            self.page_delete_requested.emit(page_to_delete, delete_result)
+            # 단일 페이지인 경우 int, 여러 페이지인 경우 리스트를 전달
+            # row 번호(0부터 시작)로 변환
+            if len(visual_page_nums) == 1:
+                pages_to_delete = visual_page_nums[0] - 1  # 다시 0부터 시작하는 인덱스로
+            else:
+                pages_to_delete = [num - 1 for num in visual_page_nums]  # 0부터 시작하는 인덱스 리스트
+            
+            self.page_delete_requested.emit(pages_to_delete, delete_result)
 
     def _show_context_menu(self, position):
         """컨텍스트 메뉴를 표시한다."""

@@ -1,3 +1,4 @@
+from typing import Union
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -8,9 +9,15 @@ from PyQt6.QtWidgets import (
 class PageDeleteDialog(QDialog):
     """페이지 삭제 확인 및 사유 선택 다이얼로그"""
     
-    def __init__(self, page_number: int, parent=None):
+    def __init__(self, page_number: Union[int, list[int]], parent=None):
         super().__init__(parent)
-        self._page_number = page_number
+        # 단일 페이지 번호 또는 페이지 번호 리스트를 받을 수 있음
+        if isinstance(page_number, int):
+            self._page_numbers = [page_number]
+            self._is_multiple = False
+        else:
+            self._page_numbers = sorted(page_number)  # 정렬된 복사본 저장
+            self._is_multiple = len(page_number) > 1
         self._selected_reason = ""
         self._custom_text = ""
         self._setup_ui()
@@ -25,11 +32,23 @@ class PageDeleteDialog(QDialog):
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(15)
         
-        # 확인 메시지
-        message_label = QLabel(
-            f"{self._page_number} 페이지를 정말로 삭제하시겠습니까?\n\n"
-            "이 작업은 되돌릴 수 없습니다."
-        )
+        # 확인 메시지 생성
+        if self._is_multiple:
+            # 여러 페이지인 경우: "N개의 페이지(2, 3, 5)를 정말로 삭제하시겠습니까?"
+            page_count = len(self._page_numbers)
+            page_list_str = ", ".join(str(p) for p in self._page_numbers)
+            message_text = (
+                f"{page_count}개의 페이지({page_list_str})를 정말로 삭제하시겠습니까?\n\n"
+                "이 작업은 되돌릴 수 없습니다."
+            )
+        else:
+            # 단일 페이지인 경우
+            message_text = (
+                f"{self._page_numbers[0]} 페이지를 정말로 삭제하시겠습니까?\n\n"
+                "이 작업은 되돌릴 수 없습니다."
+            )
+        
+        message_label = QLabel(message_text)
         message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(message_label)
         

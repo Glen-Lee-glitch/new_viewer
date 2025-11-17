@@ -679,35 +679,64 @@ class MainWindow(QMainWindow):
         self.ui_push_button_prev.setEnabled(total_pages > 0 and current_visual_page > 0)
         self.ui_push_button_next.setEnabled(total_pages > 0 and current_visual_page < total_pages - 1)
 
-    def _handle_page_delete_request(self, visual_page_num: int, delete_info: dict):
-        """페이지 삭제 요청을 처리하는 중앙 슬롯"""
-        if not self.renderer or not (0 <= visual_page_num < len(self._page_order)):
+    def _handle_page_delete_request(self, visual_page_num, delete_info: dict):
+        """페이지 삭제 요청을 처리하는 중앙 슬롯
+        
+        Args:
+            visual_page_num: 단일 int 또는 int 리스트. '보이는' 페이지 번호(0부터 시작)
+            delete_info: 삭제 정보 딕셔너리
+        """
+        if not self.renderer:
             return
-
+        
+        # 단일 페이지인지 여러 페이지인지 확인
+        if isinstance(visual_page_num, int):
+            visual_pages_to_delete = [visual_page_num]
+        else:
+            visual_pages_to_delete = list(visual_page_num)
+        
+        # 유효성 검사
+        if not visual_pages_to_delete:
+            return
+        for vp in visual_pages_to_delete:
+            if not (0 <= vp < len(self._page_order)):
+                return
+        
         # 1. '보이는' 순서를 '실제' 페이지 번호로 변환
-        actual_page_to_delete = self._page_order[visual_page_num]
-
-        # 2. PdfViewWidget에 실제 페이지 번호를 전달하여 삭제 실행
-        self._pdf_view_widget.delete_pages([actual_page_to_delete], worker_name=self._worker_name, delete_info=delete_info)
+        actual_pages_to_delete = [self._page_order[vp] for vp in visual_pages_to_delete]
         
-        # 3. 페이지 순서 목록 업데이트
-        self._page_order.pop(visual_page_num)
-        # 삭제된 페이지 뒤의 페이지들의 순서 값도 갱신해야 함 (실제 파일 인덱스가 바뀌었으므로)
-        for i in range(len(self._page_order)):
-            if self._page_order[i] > actual_page_to_delete:
-                self._page_order[i] -= 1
+        # 2. 실제 페이지 번호를 내림차순으로 정렬 (뒤에서부터 삭제하여 인덱스 변동 최소화)
+        actual_pages_to_delete.sort(reverse=True)
         
-        # 4. 썸네일 뷰 갱신
+        # 3. PdfViewWidget에 실제 페이지 번호 리스트를 전달하여 삭제 실행
+        self._pdf_view_widget.delete_pages(actual_pages_to_delete, worker_name=self._worker_name, delete_info=delete_info)
+        
+        # 4. 페이지 순서 목록 업데이트
+        # visual_pages_to_delete도 내림차순으로 정렬하여 뒤에서부터 제거
+        visual_pages_to_delete_sorted = sorted(visual_pages_to_delete, reverse=True)
+        for vp in visual_pages_to_delete_sorted:
+            self._page_order.pop(vp)
+        
+        # 5. 삭제된 페이지 뒤의 페이지들의 순서 값 갱신 (실제 파일 인덱스가 바뀌었으므로)
+        # 각 실제 페이지가 삭제될 때마다 그보다 큰 인덱스를 가진 페이지들의 값을 1씩 감소
+        for actual_page in actual_pages_to_delete:
+            for i in range(len(self._page_order)):
+                if self._page_order[i] > actual_page:
+                    self._page_order[i] -= 1
+        
+        # 6. 썸네일 뷰 갱신
         self._thumbnail_viewer.set_renderer(self.renderer)
 
-        # 5. 뷰어 및 네비게이션 갱신
+        # 7. 뷰어 및 네비게이션 갱신
         new_total_pages = len(self._page_order)
         if new_total_pages == 0:
             self.show_load_view() # 모든 페이지 삭제 시 로드 화면으로
             return                # 로드 화면으로 전환했으므로 여기서 함수 종료
         else:
-            # 삭제 후 현재 위치 또는 그 앞으로 포커스 이동
-            next_visual_page = min(visual_page_num, new_total_pages - 1)
+            # 삭제 후 적절한 페이지로 포커스 이동
+            # 삭제된 페이지들 중 가장 작은 위치 또는 그 앞
+            first_deleted_visual = min(visual_pages_to_delete) if visual_pages_to_delete else 0
+            next_visual_page = min(first_deleted_visual, new_total_pages - 1)
             self.go_to_page(next_visual_page)
         
         # 파일 정보 패널 업데이트
