@@ -21,7 +21,7 @@
        <property name="title">
         <string>로그인</string>
        </property>
-       <widget class="QWidget" name="">
+       <widget class="QWidget" name="layoutWidget">
         <property name="geometry">
          <rect>
           <x>20</x>
@@ -48,7 +48,7 @@
      <item>
       <widget class="QGroupBox" name="groupBox_2">
        <property name="title">
-        <string>임시</string>
+        <string>리마인더</string>
        </property>
        <widget class="QLabel" name="label_2">
         <property name="geometry">

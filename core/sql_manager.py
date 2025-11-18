@@ -82,7 +82,7 @@ def fetch_recent_subsidy_applications():
                 "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
                 "               CASE "
                 "                   WHEN (gr.구매계약서 = 1 AND (c.ai_계약일자 IS NULL OR c.ai_이름 IS NULL OR c.전화번호 IS NULL OR c.이메일 IS NULL)) "
-                "                   OR (gr.초본 = 1 AND (cb.name IS NULL OR cb.birth_date IS NULL OR cb.address_1 IS NULL OR cb.address_2 IS NULL)) "
+                "                   OR (gr.초본 = 1 AND (cb.name IS NULL OR cb.birth_date IS NULL OR cb.address_1 IS NULL)) "
                 "                   OR (gr.청년생애 = 1 AND (y.local_name IS NULL OR y.range_date IS NULL)) "
                 "                   THEN 'O' "
                 "                   ELSE 'X' "

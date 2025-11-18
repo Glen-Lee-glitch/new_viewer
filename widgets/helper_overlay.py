@@ -48,19 +48,19 @@ class OverlayWindow(QWidget):
         # 기존 정보 레이블 (col1 - 왼쪽)
         self.col1_label = QLabel("", self)
         self.col1_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.col1_label.setStyleSheet("color: white; font-size: 25px; background-color: rgba(0,0,0,150); padding: 20px; font-weight: bold; border-radius: 5px;")
+        self.col1_label.setStyleSheet("color: white; font-size: 20px; background-color: rgba(0,0,0,100); padding: 20px; font-weight: bold; border-radius: 5px;")
         self.col1_label.setWordWrap(True)
         
         # 기존 정보 레이블 (col2 - 오른쪽)
         self.col2_label = QLabel("", self)
         self.col2_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.col2_label.setStyleSheet("color: white; font-size: 25px; background-color: rgba(0,0,0,150); padding: 20px; font-weight: bold; border-radius: 5px;")
+        self.col2_label.setStyleSheet("color: white; font-size: 20px; background-color: rgba(0,0,0,100); padding: 20px; font-weight: bold; border-radius: 5px;")
         self.col2_label.setWordWrap(True)
         
         # 복사 메시지 레이블 (오른쪽, 초기에는 숨김)
         self.copy_message_label = QLabel("", self)
         self.copy_message_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.copy_message_label.setStyleSheet("color: white; font-size: 24px; background-color: rgba(0,0,0,150); padding: 15px; font-weight: bold; border-radius: 5px;")
+        self.copy_message_label.setStyleSheet("color: white; font-size: 20spx; background-color: rgba(0,0,0,100); padding: 15px; font-weight: bold; border-radius: 5px;")
         self.copy_message_label.setWordWrap(True)
         self.copy_message_label.hide()
         
@@ -155,27 +155,27 @@ class OverlayWindow(QWidget):
     
     def _update_label_positions(self):
         """레이블들의 위치를 업데이트합니다."""
-        # 화면 중앙 기준으로 배치
-        center_x = self.width() // 2
-        margin = 20  # 두 레이블 사이 간격
+        margin = 50  # 화면 끝 여백
         
-        # col1 레이블 (왼쪽)
-        col1_width = self.col1_label.width()
-        col1_x = center_x - col1_width - margin // 2
-        col1_y = (self.height() - self.col1_label.height()) // 2
+        # col1 레이블 (복사 가능) - 좌측 상단
+        self.col1_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        col1_x = margin
+        col1_y = margin
         self.col1_label.move(col1_x, col1_y)
         
-        # col2 레이블 (오른쪽)
-        col2_x = center_x + margin // 2
-        col2_y = (self.height() - self.col2_label.height()) // 2
+        # col2 레이블 (나머지) - 우측 하단
+        self.col2_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        col2_x = self.width() - self.col2_label.width() - margin
+        col2_y = self.height() - self.col2_label.height() - margin
         self.col2_label.move(col2_x, col2_y)
         
-        # 복사 메시지 레이블을 오른쪽에 배치
+        # 복사 메시지 레이블을 우측 하단 (col2 근처)에 배치
         if self.copy_message_label.isVisible():
-            copy_label_x = self.width() - self.copy_message_label.width() - 50  # 오른쪽 여백
-            copy_label_y = (self.height() - self.copy_message_label.height()) // 2
+            copy_label_x = self.width() - self.copy_message_label.width() - margin
+            # col2의 바로 위에 표시
+            copy_label_y = col2_y - self.copy_message_label.height() - 20
             self.copy_message_label.move(copy_label_x, copy_label_y)
-    
+
     def _hide_copy_message(self):
         """복사 메시지를 숨깁니다."""
         self.copy_message_label.hide()
@@ -204,19 +204,9 @@ class OverlayWindow(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.fillRect(event.rect(), QColor(0, 0, 0, 60))
+        painter.fillRect(event.rect(), QColor(0, 0, 0, 30))
         
-        # col1과 col2 사이에 구분선 그리기
-        if self.col1_label.isVisible() and self.col2_label.isVisible():
-            center_x = self.width() // 2
-            line_y_start = min(self.col1_label.y(), self.col2_label.y())
-            line_y_end = max(
-                self.col1_label.y() + self.col1_label.height(),
-                self.col2_label.y() + self.col2_label.height()
-            )
-            
-            painter.setPen(QColor(255, 255, 255, 100))  # 반투명 흰색 선
-            painter.drawLine(center_x, line_y_start, center_x, line_y_end)
+        # col1과 col2 사이에 구분선 그리기 (이제 필요 없으므로 제거)
 
     def closeEvent(self, event):
         """Stops the hotkey listener when the window is closed."""
