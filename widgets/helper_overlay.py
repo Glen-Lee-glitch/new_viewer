@@ -202,11 +202,15 @@ class OverlayWindow(QWidget):
             self.show()
 
     def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.fillRect(event.rect(), QColor(0, 0, 0, 30))
-        
-        # col1과 col2 사이에 구분선 그리기 (이제 필요 없으므로 제거)
+        """
+        배경을 그리는 paintEvent를 오버라이드합니다.
+        이제 전체 화면을 어둡게 하지 않고 완전히 투명하게 둡니다.
+        """
+        # 중앙 영역을 투명하게 하기 위해 전체 배경을 칠하는 코드를 제거합니다.
+        # painter = QPainter(self)
+        # painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # painter.fillRect(event.rect(), QColor(0, 0, 0, 10))
+        pass
 
     def closeEvent(self, event):
         """Stops the hotkey listener when the window is closed."""
