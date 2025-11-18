@@ -146,10 +146,11 @@ class PdfLoadWidget(QWidget):
             table.setItem(row_index, 2, worker_item)
 
             file_path = self._normalize_file_path(row.get('original_filepath'))
-            status_text = str(row.get('file_status', '부'))
-            status_item = QTableWidgetItem(status_text)
-            status_item.setData(Qt.ItemDataRole.UserRole, file_path)
-            table.setItem(row_index, 3, status_item)
+            # '결과' 칼럼 데이터 표시
+            result_text = self._sanitize_text(row.get('result', ''))
+            result_item = QTableWidgetItem(result_text)
+            result_item.setData(Qt.ItemDataRole.UserRole, file_path)  # 파일 경로는 UserRole에 유지
+            table.setItem(row_index, 3, result_item)
 
             # AI 상태 아이템 추가
             ai_item = QTableWidgetItem(ai_status)
