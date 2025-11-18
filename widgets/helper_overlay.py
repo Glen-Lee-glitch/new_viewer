@@ -45,18 +45,17 @@ class OverlayWindow(QWidget):
         screen = QApplication.primaryScreen().geometry()
         self.setGeometry(screen)
 
-        # 초기 텍스트 설정
-        display_text = ""
-        if self.texts:
-            display_text = self.texts[self.current_index]
-
-        # 기존 정보 레이블 (왼쪽)
-        self.label = QLabel(display_text, self)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.label.setStyleSheet("color: white; font-size: 28px; background-color: rgba(0,0,0,150); padding: 20px; font-weight: bold; border-radius: 5px;")
+        # 기존 정보 레이블 (col1 - 왼쪽)
+        self.col1_label = QLabel("", self)
+        self.col1_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.col1_label.setStyleSheet("color: white; font-size: 25px; background-color: rgba(0,0,0,150); padding: 20px; font-weight: bold; border-radius: 5px;")
+        self.col1_label.setWordWrap(True)
         
-        self.label.setWordWrap(True)
-        self.label.adjustSize()
+        # 기존 정보 레이블 (col2 - 오른쪽)
+        self.col2_label = QLabel("", self)
+        self.col2_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.col2_label.setStyleSheet("color: white; font-size: 25px; background-color: rgba(0,0,0,150); padding: 20px; font-weight: bold; border-radius: 5px;")
+        self.col2_label.setWordWrap(True)
         
         # 복사 메시지 레이블 (오른쪽, 초기에는 숨김)
         self.copy_message_label = QLabel("", self)
@@ -65,7 +64,8 @@ class OverlayWindow(QWidget):
         self.copy_message_label.setWordWrap(True)
         self.copy_message_label.hide()
         
-        self._update_label_positions()
+        # 초기 텍스트 설정
+        self._update_display_text()
 
     def setup_hotkeys(self):
         """Initializes and starts the global hotkey listener."""
@@ -113,12 +113,62 @@ class OverlayWindow(QWidget):
                 # 2초 후 메시지 숨김
                 QTimer.singleShot(2000, self._hide_copy_message)
 
+    def _split_text_into_columns(self, text):
+        """텍스트를 항목 리스트로 파싱하고 두 열로 나눕니다.
+        col1: 복사 가능한 항목들 (단축키가 있는 항목)
+        col2: 나머지 항목들
+        """
+        if not text:
+            return "", ""
+        
+        # 빈 줄로 구분된 항목들을 추출
+        items = [item.strip() for item in text.split('\n\n') if item.strip()]
+        
+        # 항목들을 두 그룹으로 나누기
+        col1_items = []  # 복사 가능한 항목들
+        col2_items = []  # 나머지 항목들
+        
+        for item in items:
+            # [Ctrl+Alt+숫자] 패턴이 있으면 복사 가능한 항목
+            if '[Ctrl+Alt+' in item:
+                col1_items.append(item)
+            else:
+                col2_items.append(item)
+        
+        return '\n\n'.join(col1_items), '\n\n'.join(col2_items)
+    
+    def _update_display_text(self):
+        """현재 인덱스의 텍스트를 두 열로 나누어 표시합니다."""
+        display_text = ""
+        if self.texts:
+            display_text = self.texts[self.current_index]
+        
+        col1_text, col2_text = self._split_text_into_columns(display_text)
+        
+        self.col1_label.setText(col1_text)
+        self.col2_label.setText(col2_text)
+        
+        self.col1_label.adjustSize()
+        self.col2_label.adjustSize()
+        
+        self._update_label_positions()
+    
     def _update_label_positions(self):
         """레이블들의 위치를 업데이트합니다."""
-        # 기존 정보 레이블을 왼쪽에 배치
-        label_x = 50  # 왼쪽 여백
-        label_y = (self.height() - self.label.height()) // 2
-        self.label.move(label_x, label_y)
+        # 화면 중앙 기준으로 배치
+        center_x = self.width() // 2
+        margin = 20  # 두 레이블 사이 간격
+        
+        # col1 레이블 (왼쪽)
+        col1_width = self.col1_label.width()
+        col1_x = center_x - col1_width - margin // 2
+        col1_y = (self.height() - self.col1_label.height()) // 2
+        self.col1_label.move(col1_x, col1_y)
+        
+        # col2 레이블 (오른쪽)
+        col2_x = center_x + margin // 2
+        col2_y = (self.height() - self.col2_label.height()) // 2
+        self.col2_label.move(col2_x, col2_y)
         
         # 복사 메시지 레이블을 오른쪽에 배치
         if self.copy_message_label.isVisible():
@@ -141,10 +191,8 @@ class OverlayWindow(QWidget):
         elif direction == 'prev':
             self.current_index = (self.current_index - 1 + len(self.texts)) % len(self.texts)
         
-        self.label.setText(self.texts[self.current_index])
-        # 텍스트가 바뀌면 라벨 크기와 위치를 다시 조절
-        self.label.adjustSize()
-        self._update_label_positions()
+        # 텍스트를 두 열로 나누어 업데이트
+        self._update_display_text()
 
     def toggle_visibility(self):
         """단축키 신호를 받아 오버레이 창의 보이기/숨기기 상태를 토글합니다."""
@@ -157,6 +205,18 @@ class OverlayWindow(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(event.rect(), QColor(0, 0, 0, 60))
+        
+        # col1과 col2 사이에 구분선 그리기
+        if self.col1_label.isVisible() and self.col2_label.isVisible():
+            center_x = self.width() // 2
+            line_y_start = min(self.col1_label.y(), self.col2_label.y())
+            line_y_end = max(
+                self.col1_label.y() + self.col1_label.height(),
+                self.col2_label.y() + self.col2_label.height()
+            )
+            
+            painter.setPen(QColor(255, 255, 255, 100))  # 반투명 흰색 선
+            painter.drawLine(center_x, line_y_start, center_x, line_y_end)
 
     def closeEvent(self, event):
         """Stops the hotkey listener when the window is closed."""
