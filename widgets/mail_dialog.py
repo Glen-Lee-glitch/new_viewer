@@ -12,7 +12,7 @@ from core.sql_manager import update_subsidy_status, get_recent_thread_id_by_rn, 
 class MailDialog(QDialog):
     """이메일 전송 다이얼로그"""
     
-    def __init__(self, worker_name: str = "", parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         ui_path = Path(__file__).parent.parent / "ui" / "mail_dialog.ui"
         uic.loadUi(str(ui_path), self)
@@ -22,7 +22,7 @@ class MailDialog(QDialog):
         
         # 이메일 타입 변수 초기화
         self._mail_type: str = ""
-        self.worker_name = worker_name # 작업자 이름 저장
+        self.worker_name = "" # 작업자 이름 저장
     
     def _setup_help_button(self):
         """도움말 버튼 설정"""
@@ -215,6 +215,10 @@ class MailDialog(QDialog):
         """RN 값을 설정한다."""
         if hasattr(self, 'RN_lineEdit'):
             self.RN_lineEdit.setText(rn_value)
+    
+    def set_worker_name(self, worker_name: str):
+        """작업자 이름을 설정한다."""
+        self.worker_name = worker_name
     
     def set_content(self, content: str):
         """내용을 설정한다."""

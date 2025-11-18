@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
         self._alarm_widget = AlarmWidget(self._worker_name)
         self._todo_widget = ToDoWidget(self)
         self._settings_dialog = SettingsDialog(self)
-        self._mail_dialog = MailDialog(worker_name=self._worker_name, parent=self)
+        self._mail_dialog = MailDialog(parent=self)
         self._pending_basic_info: dict | None = None
         self._gemini_results_dialog = GeminiResultsDialog(self)
         self._config_dialog = ConfigDialog(self)
@@ -397,6 +397,9 @@ class MainWindow(QMainWindow):
         # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
         if self._current_rn:
             self._mail_dialog.set_rn_value(self._current_rn)
+
+        # 다이얼로그를 열기 직전에 최신 작업자 이름 설정
+        self._mail_dialog.set_worker_name(self._worker_name)
         
         if self._mail_dialog.exec():
             rn_value = self._mail_dialog.get_rn_value()
@@ -409,6 +412,9 @@ class MainWindow(QMainWindow):
         # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
         if self._current_rn:
             self._mail_dialog.set_rn_value(self._current_rn)
+
+        # 다이얼로그를 열기 직전에 최신 작업자 이름 설정
+        self._mail_dialog.set_worker_name(self._worker_name)
         
         # 이메일 다이얼로그를 모달로 실행
         dialog_result = self._mail_dialog.exec()
