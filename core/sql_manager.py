@@ -8,7 +8,7 @@ import json
 from contextlib import closing
 
 FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
-FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id', 'file_rendered']
+FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id', 'file_rendered']  # 'file_status'는 주석 처리됨
 
 # MySQL 연결 정보
 DB_CONFIG = {
@@ -67,7 +67,7 @@ def fetch_recent_subsidy_applications():
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = (
                 "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
-                "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "
+                # "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "  # 주석 처리됨
                 "       e.attached_file_path AS original_filepath, "
                 "       sa.recent_thread_id, "
                 "       e.file_rendered, "

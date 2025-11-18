@@ -71,7 +71,7 @@ class PdfLoadWidget(QWidget):
         """테이블 위젯 초기 설정"""
         table = self.complement_table_widget
         table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '파일여부', 'AI', '이상치'])
+        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '결과', 'AI', '이상치'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -133,7 +133,7 @@ class PdfLoadWidget(QWidget):
             if 구매계약서 and (초본 or 공동명의):
                 ai_status = 'O'
             
-            # 컬럼 순서: ['지역', 'RN', '작업자', '파일여부', 'AI', '이상치']
+            # 컬럼 순서: ['지역', 'RN', '작업자', '결과', 'AI', '이상치']
             region_item = QTableWidgetItem(row_data['region'])
             table.setItem(row_index, 0, region_item)
 
