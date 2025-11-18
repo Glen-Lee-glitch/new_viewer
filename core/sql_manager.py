@@ -623,6 +623,40 @@ def is_admin_user(worker_name: str) -> bool:
         traceback.print_exc()
         return False
 
+def update_finished_file_path(rn: str, file_path: str) -> bool:
+    """
+    subsidy_applications 테이블의 finished_file_path를 업데이트한다.
+    
+    Args:
+        rn: RN 번호
+        file_path: 저장된 PDF 파일 경로
+        
+    Returns:
+        업데이트 성공 여부
+    """
+    if not rn:
+        raise ValueError("rn must be provided")
+    if not file_path:
+        raise ValueError("file_path must be provided")
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                update_query = """
+                    UPDATE subsidy_applications 
+                    SET finished_file_path = %s
+                    WHERE RN = %s
+                """
+                cursor.execute(update_query, (file_path, rn))
+                connection.commit()
+                
+                # 업데이트된 행 수 확인
+                return cursor.rowcount > 0
+                
+    except Exception:
+        traceback.print_exc()
+        return False
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()

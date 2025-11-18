@@ -37,6 +37,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self.pdf_path: str | None = None
         self.scene = QGraphicsScene(self)
         self.current_page_item: QGraphicsPixmapItem | None = None
+        self._current_rn: str = "" # 현재 작업 중인 RN 번호 저장용
 
         # --- 페이지 별 오버레이 아이템 "데이터" 관리 ---
         self._overlay_items: dict[int, list[dict]] = {}
@@ -566,6 +567,10 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         except Exception as e:
             QMessageBox.critical(self, "오류", f"페이지를 삭제하는 중 오류가 발생했습니다:\n{e}")
 
+    def set_current_rn(self, rn: str):
+        """현재 작업 중인 RN 번호를 설정한다."""
+        self._current_rn = rn or ""
+
     def save_pdf(self, page_order: list[int] | None = None, worker_name: str = ""):
         """PDF 저장 프로세스를 시작한다."""
         try:
@@ -646,6 +651,17 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         """PDF 저장이 완료되었을 때 호출된다."""
         if success:
             QMessageBox.information(self, "저장 완료", f"'{output_path}'\n\n파일이 성공적으로 저장되었습니다.")
+            
+            # RN이 있으면 DB에 저장 경로 업데이트
+            if self._current_rn:
+                from core.sql_manager import update_finished_file_path
+                db_success = update_finished_file_path(self._current_rn, output_path)
+                if db_success:
+                    print(f"RN {self._current_rn}의 finished_file_path 업데이트 완료: {output_path}")
+                    # 저장 성공 후 RN 초기화
+                    self._current_rn = ""
+                else:
+                    print(f"RN {self._current_rn}의 finished_file_path 업데이트 실패")
         else:
             QMessageBox.warning(
                 self, "압축 실패",
@@ -685,6 +701,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self.current_page = -1 # 지금 보고 있는 페이지 없음 (존재하지 않는 페이지 번호로 -1로 설정)
         self.page_rotations = {} # 새 파일 로드 시 회전 정보 초기화
         self._overlay_items.clear() # 새 파일 로드 시 오버레이 아이템 초기화
+        # _current_rn은 보존 (set_renderer()에서 초기화하지 않음)
         
         # 메일 오버레이 숨김
         if hasattr(self, 'mail_overlay'):

@@ -456,6 +456,9 @@ class MainWindow(QMainWindow):
         if not pdf_paths:
             return
 
+        # 새 파일 로드 시 RN 초기화
+        self._pdf_view_widget.set_current_rn("")
+
         if self.renderer:
             self.renderer.close()
 
@@ -561,6 +564,10 @@ class MainWindow(QMainWindow):
             self._pending_basic_info = normalize_basic_info(metadata)
             self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
             
+            # PDF 로드 후 RN을 PdfViewWidget에 전달
+            if rn_value:
+                self._pdf_view_widget.set_current_rn(rn_value)
+            
             # PDF 로드 후 메일 content 표시
             if mail_content:
                 self._pdf_view_widget.set_mail_content(mail_content)
@@ -580,6 +587,10 @@ class MainWindow(QMainWindow):
 
         self._pending_basic_info = normalize_basic_info(metadata)
         self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
+        
+        # PDF 로드 후 RN을 PdfViewWidget에 전달 (추가)
+        if rn_value:
+            self._pdf_view_widget.set_current_rn(rn_value)
         
         # PDF 로드 후 메일 content 표시
         if mail_content:
@@ -628,6 +639,7 @@ class MainWindow(QMainWindow):
         self.current_page = -1
         self._current_rn = ""  # 현재 RN 초기화
         self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
+        self._pdf_view_widget.set_current_rn("") # PdfViewWidget의 RN도 초기화
 
         # 메인화면으로 돌아갈 때 '원본 불러오기' 액션 비활성화
         if hasattr(self, 'load_original_action'):
