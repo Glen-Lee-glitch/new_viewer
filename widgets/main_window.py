@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
         self._login_dialog = LoginDialog(self)
         self._current_rn = ""  # 현재 작업 중인 RN 번호 저장용
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 여부
+        self._pending_outlier_check = False  # PDF 렌더 완료 후 이상치 체크 플래그
         
         # 초기 상태에서 작업자 현황 버튼 숨김
         if hasattr(self, 'pushButton_worker_progress'):
@@ -501,6 +502,9 @@ class MainWindow(QMainWindow):
         # UI가 표시된 다음 틱에 첫 페이지 렌더를 예약하여 초기 크기 기준을 보장한다.
         if self.renderer.get_page_count() > 0:
             QTimer.singleShot(0, lambda: self.go_to_page(0))
+            # PDF 렌더 완료 후 이상치 체크 (약간의 지연을 두어 렌더링 완료 보장)
+            if self._pending_outlier_check:
+                QTimer.singleShot(500, self._check_and_show_outlier_reminder)
         
         # 컨텍스트 메뉴를 통한 작업인 경우 '원본 불러오기' 액션 활성화
         if hasattr(self, 'load_original_action') and self._is_context_menu_work:
@@ -510,6 +514,7 @@ class MainWindow(QMainWindow):
         self._pending_basic_info = None
         self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
         self._is_context_menu_work = False  # 로컬 파일 열기 시 컨텍스트 메뉴 작업 플래그 리셋
+        self._pending_outlier_check = False  # 로컬 파일 열기 시 이상치 체크 플래그 리셋
         self._info_panel.update_basic_info("", "", "")
         # 로컬 파일 열기 시 '원본 불러오기' 액션 비활성화
         if hasattr(self, 'load_original_action'):
@@ -571,6 +576,9 @@ class MainWindow(QMainWindow):
             # PDF 로드 후 메일 content 표시
             if mail_content:
                 self._pdf_view_widget.set_mail_content(mail_content)
+            
+            # 관리자 조회 모드에서는 이상치 체크 안 함
+            self._pending_outlier_check = False
             return
 
         if not claim_subsidy_work(rn_value, worker_name):
@@ -586,6 +594,11 @@ class MainWindow(QMainWindow):
             return
 
         self._pending_basic_info = normalize_basic_info(metadata)
+        
+        # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
+        outlier_value = metadata.get('outlier', '')
+        self._pending_outlier_check = (self._is_context_menu_work and outlier_value == 'O')
+        
         self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
         
         # PDF 로드 후 RN을 PdfViewWidget에 전달 (추가)
@@ -639,6 +652,7 @@ class MainWindow(QMainWindow):
         self.current_page = -1
         self._current_rn = ""  # 현재 RN 초기화
         self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
+        self._pending_outlier_check = False  # 이상치 체크 플래그 리셋
         self._pdf_view_widget.set_current_rn("") # PdfViewWidget의 RN도 초기화
 
         # 메인화면으로 돌아갈 때 '원본 불러오기' 액션 비활성화
@@ -784,6 +798,18 @@ class MainWindow(QMainWindow):
         """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
         self.set_splitter_sizes(is_landscape)
 
+    def _check_and_show_outlier_reminder(self):
+        """PDF 렌더 완료 후 이상치가 있는 경우 리마인더 메시지를 표시한다."""
+        if self._pending_outlier_check:
+            self._pending_outlier_check = False  # 플래그 리셋
+            
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("서류 이상")
+            msg_box.setText("서류 이상!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+    
     def _update_refresh_time(self):
         """한국 시간으로 새로고침 시간을 업데이트한다."""
         korea_tz = pytz.timezone('Asia/Seoul')

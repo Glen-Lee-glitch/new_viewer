@@ -70,8 +70,8 @@ class PdfLoadWidget(QWidget):
     def setup_table(self):
         """테이블 위젯 초기 설정"""
         table = self.complement_table_widget
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '결과', 'AI', '이상치'])
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '결과', 'AI'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -121,6 +121,7 @@ class PdfLoadWidget(QWidget):
                 '초본': row.get('초본', 0), # 추가
                 '공동명의': row.get('공동명의', 0),
                 'urgent': row.get('urgent', 0),  # urgent 상태 추가
+                'outlier': self._sanitize_text(row.get('outlier', '')),  # 이상치 정보 추가
                 'original_filepath': self._normalize_file_path(row.get('original_filepath')) # 이 줄을 추가
             }
 
@@ -155,11 +156,6 @@ class PdfLoadWidget(QWidget):
             # AI 상태 아이템 추가
             ai_item = QTableWidgetItem(ai_status)
             table.setItem(row_index, 4, ai_item)
-
-            # '이상치' 칼럼 값 설정 (SQL에서 계산된 값을 그대로 사용)
-            outlier_status = self._sanitize_text(row.get('outlier', ''))
-            outlier_item = QTableWidgetItem(outlier_status)
-            table.setItem(row_index, 5, outlier_item)
 
             # --- Row Highlighting ---
             # urgent 칼럼이 1이면 빨간색 하이라이트
@@ -239,6 +235,9 @@ class PdfLoadWidget(QWidget):
         # file_rendered 상태 추가
         metadata['file_rendered'] = rn_item.data(Qt.ItemDataRole.UserRole).get('file_rendered', 0)
         
+        # 이상치 정보 추가
+        metadata['outlier'] = rn_item.data(Qt.ItemDataRole.UserRole).get('outlier', '')
+        
         # 컨텍스트 메뉴를 통한 작업 시작임을 metadata에 추가
         metadata['is_context_menu_work'] = self._is_context_menu_work
 
@@ -314,10 +313,10 @@ class PdfLoadWidget(QWidget):
 
     def _extract_row_metadata(self, rn_item: QTableWidgetItem | None) -> dict:
         if rn_item is None:
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'urgent': 0, 'is_context_menu_work': False}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'urgent': 0, 'outlier': "", 'is_context_menu_work': False}
         data = rn_item.data(Qt.ItemDataRole.UserRole)
         if not isinstance(data, dict):
-            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'urgent': 0, 'is_context_menu_work': False}
+            return {'rn': "", 'name': "", 'region': "", 'worker': "", 'special_note': "", 'recent_thread_id': "", 'file_rendered': 0, 'urgent': 0, 'outlier': "", 'is_context_menu_work': False}
         return {
             'rn': data.get('rn', ""),
             'name': data.get('name', ""),
@@ -327,6 +326,7 @@ class PdfLoadWidget(QWidget):
             'recent_thread_id': data.get('recent_thread_id', ""),
             'file_rendered': data.get('file_rendered', 0),
             'urgent': data.get('urgent', 0),
+            'outlier': data.get('outlier', ""),
             'original_filepath': data.get('original_filepath', ""), # 이 줄을 추가
             'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
         }
