@@ -168,6 +168,12 @@ class MainWindow(QMainWindow):
         self.load_original_action.setEnabled(False)
         self.load_original_action.triggered.connect(self._load_original_document)
         self.menu_file.addAction(self.load_original_action)
+
+        # 원본 불러오기 액션 추가 (초기에는 비활성화)
+        self.outbound_allocation_action = QAction("출고배정표 불러오기", self)
+        self.outbound_allocation_action.setEnabled(False)
+        self.outbound_allocation_action.triggered.connect(self._load_outbound_allocation_document)
+        self.menu_file.addAction(self.outbound_allocation_action)
         
         self.menu_file.addSeparator()
         
@@ -510,6 +516,10 @@ class MainWindow(QMainWindow):
         # 컨텍스트 메뉴를 통한 작업인 경우 '원본 불러오기' 액션 활성화
         if hasattr(self, 'load_original_action') and self._is_context_menu_work:
             self.load_original_action.setEnabled(True)
+
+        # 성남시인 경우 전용 액션 활성화
+        if hasattr(self, 'outbound_allocation_action') and region == '성남시':
+            self.outbound_allocation_action.setEnabled(True)
 
     def _handle_pdf_selected(self, pdf_paths: list):
         self._pending_basic_info = None
@@ -1090,6 +1100,11 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "오류", f"원본 파일을 불러오는 중 오류가 발생했습니다:\n\n{str(e)}")
+
+    def _load_outbound_allocation_document(self):
+        """성남시 전용 기능 처리 (나중에 구현)"""
+        # TODO: 성남시 전용 기능 구현
+        pass
 
 # === 모듈 레벨 함수 ===
 def create_app():
