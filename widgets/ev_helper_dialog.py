@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QDialog, QApplication, QLineEdit, QFileDialog, QMess
 from PyQt6.QtCore import QTimer, Qt
 from core.etc_tools import reverse_text
 from core.sql_manager import is_admin_user
+from core.ui_helpers import ReverseToolHandler
 import pandas as pd
 from datetime import datetime
 
@@ -16,8 +17,8 @@ class EVHelperDialog(QDialog):
         ui_path = Path(__file__).parent.parent / "ui" / "ev_helper_dialog.ui"
         uic.loadUi(str(ui_path), self)
 
-        self.lineEdit_reverse_tool.mousePressEvent = self._handle_reverse_tool_click
-        self._original_stylesheet = self.lineEdit_reverse_tool.styleSheet()
+        # 역순 도구 핸들러 초기화
+        self.reverse_tool_handler = ReverseToolHandler(self.lineEdit_reverse_tool)
 
         self.pushButton_select_excel.clicked.connect(self._select_excel_file)
 
@@ -32,33 +33,6 @@ class EVHelperDialog(QDialog):
         
         self.open_helper_overlay.clicked.connect(self.open_overlay)
         self.close_helper_overlay.clicked.connect(self.close_overlay)
-
-    def _handle_reverse_tool_click(self, event):
-        """lineEdit_reverse_tool 클릭 이벤트를 처리합니다."""
-        if event.button() == Qt.MouseButton.LeftButton:
-            current_text = self.lineEdit_reverse_tool.text().strip()
-            
-            # 텍스트가 없으면 기본 동작 수행 (붙여넣기 가능)
-            if not current_text:
-                QLineEdit.mousePressEvent(self.lineEdit_reverse_tool, event)
-                return
-            
-            reversed_text = reverse_text(current_text)
-            
-            self.lineEdit_reverse_tool.setText(reversed_text)
-            
-            clipboard = QApplication.clipboard()
-            clipboard.setText(reversed_text)
-            
-            self.lineEdit_reverse_tool.setStyleSheet("border: 2px solid #00FF00;")
-            
-            QTimer.singleShot(5000, self._remove_highlight)
-        else:
-            QLineEdit.mousePressEvent(self.lineEdit_reverse_tool, event)
-        
-    def _remove_highlight(self):
-        """lineEdit_reverse_tool의 하이라이트를 제거합니다."""
-        self.lineEdit_reverse_tool.setStyleSheet(self._original_stylesheet)
 
     def _select_excel_file(self):
         """엑셀 파일을 선택하는 다이얼로그를 엽니다."""
