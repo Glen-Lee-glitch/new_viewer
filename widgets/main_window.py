@@ -452,7 +452,6 @@ class MainWindow(QMainWindow):
         self._gemini_results_dialog.activateWindow()
 
     # === 문서 생명주기 관리 ===
-    
     def load_document(self, pdf_paths: list, is_preprocessed: bool = False):
         """PDF 및 이미지 문서를 로드하고 뷰를 전환한다."""
         if not pdf_paths:
@@ -466,11 +465,11 @@ class MainWindow(QMainWindow):
 
         try:
             self.renderer = PdfRender()
+            # 고속 로딩: 전처리된 단일 파일
             if is_preprocessed and len(pdf_paths) == 1:
-                # 고속 로딩: 전처리된 단일 파일
                 self.renderer.load_preprocessed_pdf(pdf_paths[0])
+            # 일반 로딩: 전처리 안됐거나 여러 파일
             else:
-                # 일반 로딩: 전처리 안됐거나 여러 파일
                 self.renderer.load_pdf(pdf_paths)
                 
         except Exception as e:
@@ -497,8 +496,8 @@ class MainWindow(QMainWindow):
         # 기본 스플리터 사이즈를 즉시 한 번 강제하여 초기 힌트를 통일
         self.set_splitter_sizes(False)
 
-        name, region, special_note = self._collect_pending_basic_info()
-        self._info_panel.update_basic_info(name, region, special_note)
+        name, region, special_note, rn = self._collect_pending_basic_info()
+        self._info_panel.update_basic_info(name, region, special_note, rn)
 
         # UI가 표시된 다음 틱에 첫 페이지 렌더를 예약하여 초기 크기 기준을 보장한다.
         if self.renderer.get_page_count() > 0:
@@ -516,7 +515,7 @@ class MainWindow(QMainWindow):
         self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
         self._is_context_menu_work = False  # 로컬 파일 열기 시 컨텍스트 메뉴 작업 플래그 리셋
         self._pending_outlier_check = False  # 로컬 파일 열기 시 이상치 체크 플래그 리셋
-        self._info_panel.update_basic_info("", "", "")
+        self._info_panel.update_basic_info("", "", "", "")
         # 로컬 파일 열기 시 '원본 불러오기' 액션 비활성화
         if hasattr(self, 'load_original_action'):
             self.load_original_action.setEnabled(False)
@@ -554,6 +553,7 @@ class MainWindow(QMainWindow):
         # 현재 작업 중인 RN 저장
         self._current_rn = rn_value or ""
 
+        # 방어 코드: worker_name(프로그램 작업자) 또는 rn_value(시작건 RN번호)가 없는 경우 초기화
         if not worker_name or not rn_value:
             self._pending_basic_info = normalize_basic_info(metadata)
             self.load_document(pdf_paths)
@@ -567,6 +567,11 @@ class MainWindow(QMainWindow):
         if existing_worker and is_admin:
             print(f"[관리자 조회 모드] 작업자: {existing_worker}, 관리자: {self._worker_name}")
             self._pending_basic_info = normalize_basic_info(metadata)
+            
+            # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
+            outlier_value = metadata.get('outlier', '')
+            self._pending_outlier_check = (self._is_context_menu_work and outlier_value == 'O')
+            
             self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
             
             # PDF 로드 후 RN을 PdfViewWidget에 전달
@@ -579,6 +584,7 @@ class MainWindow(QMainWindow):
             
             return
 
+        # 일반 사용자가 이미 할당된 RN번호를 시작하려고 하는 경우 오류 메시지 표시 및 진행 불가
         if not claim_subsidy_work(rn_value, worker_name):
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
@@ -672,7 +678,6 @@ class MainWindow(QMainWindow):
         self._update_page_navigation()
 
     # === 페이지 네비게이션 ===
-
     def go_to_page(self, visual_page_num: int):
         """'보이는' 페이지 번호로 뷰를 이동시킨다."""
         if self.renderer and 0 <= visual_page_num < len(self._page_order):
@@ -932,14 +937,15 @@ class MainWindow(QMainWindow):
 
     # === 유틸리티 및 헬퍼 ===
 
-    def _collect_pending_basic_info(self) -> tuple[str, str, str]:
+    def _collect_pending_basic_info(self) -> tuple[str, str, str, str]:
         """대기 중인 기본 정보를 추출하여 튜플로 반환한다."""
-        info = self._pending_basic_info or {'name': "", 'region': "", 'special_note': ""}
+        info = self._pending_basic_info or {'name': "", 'region': "", 'special_note': "", 'rn': ""}
         name = info.get('name', "")
         region = info.get('region', "")
         special_note = info.get('special_note', "")
+        rn = info.get('rn', "")
         self._pending_basic_info = info
-        return name, region, special_note
+        return name, region, special_note, rn
 
     
     # === 테스트 관련 함수 ===

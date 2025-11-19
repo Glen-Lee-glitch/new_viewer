@@ -23,6 +23,8 @@ class InfoPanelWidget(QWidget):
         self.lineEdit_name.clear()
         self.lineEdit_region.clear()
         self.lineEdit_special.clear()
+        if hasattr(self, 'lineEdit_rn_num'):
+            self.lineEdit_rn_num.clear()  # RN 필드도 초기화
 
     def update_file_info(self, file_path: str, file_size_mb: float, total_pages: int):
         """파일 관련 정보를 업데이트한다. (UI에서 파일 정보 그룹박스가 제거되어 비활성화됨)"""
@@ -38,11 +40,13 @@ class InfoPanelWidget(QWidget):
         self.label_page_dims.setText(f"{width:.2f} x {height:.2f} (pt)")
         self.label_page_rotation.setText(f"{rotation}°")
 
-    def update_basic_info(self, name: str, region: str, special_note: str):
+    def update_basic_info(self, name: str, region: str, special_note: str, rn: str = ""):
         """기본 정보를 업데이트한다."""
         self.lineEdit_name.setText(name)
         self.lineEdit_region.setText(region)
         self.lineEdit_special.setText(special_note)
+        if hasattr(self, 'lineEdit_rn_num'):
+            self.lineEdit_rn_num.setText(rn)
 
     def _on_insert_text_clicked(self):
         if hasattr(self, 'text_edit') and hasattr(self, 'font_spinBox'):

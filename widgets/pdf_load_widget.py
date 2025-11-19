@@ -223,6 +223,7 @@ class PdfLoadWidget(QWidget):
             self._is_context_menu_work = False
             return
 
+        # 정규화된 파일 경로 -> 추후에 load_document 에서 사용
         resolved_path = Path(file_path)
         if not resolved_path.exists():
             QMessageBox.warning(
