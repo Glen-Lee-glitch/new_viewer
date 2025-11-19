@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import QDialog, QMessageBox
+from PyQt6.QtGui import QCloseEvent
 from PyQt6 import uic
 from pathlib import Path
 from core.sql_manager import get_worker_names
@@ -15,7 +16,21 @@ class LoginDialog(QDialog):
         self.setWindowTitle("로그인")
         self.setModal(True)
         
-        # 버튼 연결
+        # UI 파일에서 자동 연결된 시그널을 끊고 우리가 원하는 동작만 연결
+        # UI 파일의 buttonBox.accepted -> accept() 연결을 끊음
+        try:
+            self.buttonBox.accepted.disconnect()
+        except TypeError:
+            # 연결이 없을 경우 무시
+            pass
+        
+        try:
+            self.buttonBox.rejected.disconnect()
+        except TypeError:
+            # 연결이 없을 경우 무시
+            pass
+        
+        # 버튼 연결 (검증 로직 포함)
         self.buttonBox.accepted.connect(self._validate_and_accept)
         self.buttonBox.rejected.connect(self.reject)
         
@@ -45,6 +60,13 @@ class LoginDialog(QDialog):
         
         # 유효한 경우 다이얼로그 승인
         self.accept()
+    
+    def closeEvent(self, event: QCloseEvent):
+        """X 버튼으로 다이얼로그를 닫을 때 reject()를 명시적으로 호출한다."""
+        # X 버튼으로 닫을 때는 reject()를 호출하여 Rejected 상태로 만듦
+        # reject()를 호출하면 다이얼로그가 닫히고 exec()가 Rejected를 반환함
+        self.reject()
+        event.accept()
     
     def get_worker_name(self) -> str:
         """입력된 작업자 이름을 반환한다."""
