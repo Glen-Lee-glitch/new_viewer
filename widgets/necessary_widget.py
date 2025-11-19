@@ -33,7 +33,13 @@ class NecessaryWidget(QWidget):
     def _handle_reverse_tool_click(self, event):
         """lineEdit_reverse_tool 클릭 이벤트를 처리합니다."""
         if event.button() == Qt.MouseButton.LeftButton:
-            current_text = self.lineEdit_reverse_tool.text()
+            current_text = self.lineEdit_reverse_tool.text().strip()
+            
+            # 텍스트가 없으면 기본 동작 수행 (붙여넣기 가능)
+            if not current_text:
+                QLineEdit.mousePressEvent(self.lineEdit_reverse_tool, event)
+                return
+            
             reversed_text = reverse_text(current_text)
             
             # 1. 텍스트를 역순으로 변경
