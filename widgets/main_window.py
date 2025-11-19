@@ -577,8 +577,6 @@ class MainWindow(QMainWindow):
             if mail_content:
                 self._pdf_view_widget.set_mail_content(mail_content)
             
-            # 관리자 조회 모드에서는 이상치 체크 안 함
-            self._pending_outlier_check = False
             return
 
         if not claim_subsidy_work(rn_value, worker_name):
