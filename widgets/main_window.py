@@ -376,8 +376,9 @@ class MainWindow(QMainWindow):
             # 로그인 직후 초기 시간 표시
             self._refresh_all_data()
         else:
-            # 취소 시 앱 종료
-            self.close()
+            # 취소 시 앱 완전 종료
+            # QApplication.instance().quit()은 이벤트 루프 시작 전에는 즉시 종료되지 않아 window.show()가 실행될 수 있음
+            sys.exit(0)
 
     def _open_settings_dialog(self):
         """설정 다이얼로그를 연다."""
@@ -524,10 +525,10 @@ class MainWindow(QMainWindow):
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
         # 컨텍스트 메뉴를 통한 작업 시작 여부 확인 및 저장
         self._is_context_menu_work = metadata.get('is_context_menu_work', False)
-        is_preprocessed = metadata.get('file_rendered', 0) == 1
         
-        # 원본 파일 경로와 전처리 상태 저장
-        self._original_filepath = metadata.get('original_filepath')
+        self._original_filepath = metadata.get('original_filepath') # 원본 파일 경로 저장
+        # 원본 파일 전처리 상태 확인
+        is_preprocessed = metadata.get('file_rendered', 0) == 1 # 전처리 상태 저장
         self._is_current_file_processed = is_preprocessed
         
         if self._is_context_menu_work:
@@ -540,7 +541,7 @@ class MainWindow(QMainWindow):
             from core.sql_manager import get_mail_content_by_thread_id
             mail_content = get_mail_content_by_thread_id(thread_id)
         
-        # 기존 로직
+        # 방어 코드: metadata가 없는 경우 초기화
         if not metadata:
             self._current_rn = ""  # metadata가 없는 경우 RN 초기화
             self._pending_basic_info = normalize_basic_info(metadata)
@@ -548,9 +549,8 @@ class MainWindow(QMainWindow):
             return
 
         worker_name = self._worker_name or metadata.get('worker', '')
-        rn_value = metadata.get('rn')
+        rn_value = metadata.get('rn') # RN 값 저장
         existing_worker = metadata.get('worker', '').strip()  # 이미 배정된 작업자
-        
         # 현재 작업 중인 RN 저장
         self._current_rn = rn_value or ""
 

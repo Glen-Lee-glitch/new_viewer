@@ -16,6 +16,9 @@ class LoginDialog(QDialog):
         self.setWindowTitle("로그인")
         self.setModal(True)
         
+        # 검증 통과 플래그 (accept()가 호출되어도 검증을 통과한 경우에만 실제로 닫힘)
+        self._validation_passed = False
+        
         # UI 파일에서 자동 연결된 시그널을 끊고 우리가 원하는 동작만 연결
         # UI 파일의 buttonBox.accepted -> accept() 연결을 끊음
         try:
@@ -37,6 +40,12 @@ class LoginDialog(QDialog):
         # 입력 필드 포커스
         self.lineEdit_worker.setFocus()
     
+    def accept(self):
+        """다이얼로그를 승인한다. 검증을 통과한 경우에만 실제로 닫힌다."""
+        if self._validation_passed:
+            super().accept()
+        # 검증을 통과하지 않았으면 아무것도 하지 않음 (다이얼로그 유지)
+    
     def _validate_and_accept(self):
         """작업자 이름을 검증하고 유효하면 다이얼로그를 승인한다."""
         worker_name = self.lineEdit_worker.text().strip()
@@ -45,6 +54,7 @@ class LoginDialog(QDialog):
         if not worker_name:
             QMessageBox.warning(self, "입력 오류", "작업자 이름을 입력해주세요.")
             self.lineEdit_worker.setFocus()
+            self._validation_passed = False
             return
         
         # 유효한 작업자 목록 가져오기
@@ -56,9 +66,11 @@ class LoginDialog(QDialog):
             error_msg += "\n".join(f"• {worker}" for worker in valid_workers)
             QMessageBox.warning(self, "등록되지 않은 작업자", error_msg)
             self.lineEdit_worker.setFocus()
+            self._validation_passed = False
             return
         
-        # 유효한 경우 다이얼로그 승인
+        # 검증 통과 - 이제 accept()를 호출해도 실제로 닫힘
+        self._validation_passed = True
         self.accept()
     
     def closeEvent(self, event: QCloseEvent):
