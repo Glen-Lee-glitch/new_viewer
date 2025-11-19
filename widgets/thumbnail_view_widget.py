@@ -137,22 +137,33 @@ class ThumbnailViewWidget(QWidget):
         if hasattr(self, 'thumbnail_list_widget'):
             self.thumbnail_list_widget.itemClicked.connect(self.on_thumbnail_clicked)
     
-    def set_renderer(self, renderer: PdfRender | None):
-        """PDF 렌더러를 설정하고 썸네일을 생성한다."""
+    def set_renderer(self, renderer: PdfRender | None, page_order: list[int] | None = None):
+        """PDF 렌더러를 설정하고 썸네일을 생성한다. page_order가 있으면 그 순서대로 생성한다."""
         self.renderer = renderer
         self.thumbnail_list_widget.clear()
 
         if not self.renderer or self.renderer.get_page_count() == 0:
             return
 
-        for i in range(self.renderer.get_page_count()):
+        # page_order가 없으면 기본 순서(0, 1, 2...) 사용
+        if page_order is None:
+            page_order = list(range(self.renderer.get_page_count()))
+
+        # page_order 순서대로 썸네일 생성
+        for visual_index, actual_page_num in enumerate(page_order):
             try:
-                icon = self.renderer.create_thumbnail(i, max_width=120)
-                item = QListWidgetItem(icon, f"{i + 1}")
-                item.setData(Qt.ItemDataRole.UserRole, i)
+                # 실제 페이지 번호로 썸네일 이미지 생성
+                icon = self.renderer.create_thumbnail(actual_page_num, max_width=120)
+                
+                # 텍스트는 '보이는 순서' (1부터 시작)
+                item = QListWidgetItem(icon, f"{visual_index + 1}")
+                
+                # UserRole에는 '실제 페이지 번호' 저장
+                item.setData(Qt.ItemDataRole.UserRole, actual_page_num)
+                
                 self.thumbnail_list_widget.addItem(item)
             except (IndexError, RuntimeError) as e:
-                print(f"썸네일 생성 오류 (페이지 {i}): {e}")
+                print(f"썸네일 생성 오류 (실제 페이지 {actual_page_num}): {e}")
 
     def on_thumbnail_clicked(self, item):
         """썸네일 클릭 시 호출"""

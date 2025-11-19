@@ -483,7 +483,7 @@ class MainWindow(QMainWindow):
         # 첫 번째 파일 이름을 기준으로 창 제목 설정
         self.setWindowTitle(f"PDF Viewer - {Path(pdf_paths[0]).name}")
         
-        self._thumbnail_viewer.set_renderer(self.renderer)
+        self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
         self._pdf_view_widget.set_renderer(self.renderer)
 
         self._pdf_load_widget.hide()
@@ -757,7 +757,7 @@ class MainWindow(QMainWindow):
                     self._page_order[i] -= 1
         
         # 6. 썸네일 뷰 갱신
-        self._thumbnail_viewer.set_renderer(self.renderer)
+        self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
 
         # 7. 뷰어 및 네비게이션 갱신
         new_total_pages = len(self._page_order)
