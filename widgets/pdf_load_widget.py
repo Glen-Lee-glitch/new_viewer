@@ -194,27 +194,33 @@ class PdfLoadWidget(QWidget):
             self._is_context_menu_work = False  # 실패 시 플래그 리셋
             return
 
-        row = selected_items[0].row()
+        row = selected_items[0].row() # tablewidget 에서 선택된 행 중 가장 첫 번째 행에 대해서 시작하도록
         rn_item = table.item(row, 1)  # RN은 이제 1번 컬럼
 
-        # AI 칼럼 값 확인 후 AI 검토 요청
+        # AI 결과가 있는 경우 -> AI 결과 창 열기
         ai_item = table.item(row, 4)
         if ai_item and ai_item.text() == 'O':
             if rn_item:
                 self.ai_review_requested.emit(rn_item.text())
 
-        file_item = table.item(row, 3)
-
-        if file_item is None:
-            QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
-            self._is_context_menu_work = False  # 실패 시 플래그 리셋
+        # 파일 경로는 SQL의 original_filepath에서 가져옴
+        row_data = rn_item.data(Qt.ItemDataRole.UserRole)
+        if not row_data or not isinstance(row_data, dict):
+            QMessageBox.warning(self, "파일 없음", "데이터를 불러올 수 없습니다.")
+            self._is_context_menu_work = False
             return
 
-        file_path = self._normalize_file_path(file_item.data(Qt.ItemDataRole.UserRole))
+        file_path = row_data.get('original_filepath')
+        if not file_path:
+            QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
+            self._is_context_menu_work = False
+            return
+
+        file_path = self._normalize_file_path(file_path)
 
         if not file_path:
             QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
-            self._is_context_menu_work = False  # 실패 시 플래그 리셋
+            self._is_context_menu_work = False
             return
 
         resolved_path = Path(file_path)
@@ -224,7 +230,7 @@ class PdfLoadWidget(QWidget):
                 "파일 없음",
                 f"경로를 찾을 수 없습니다.\n{resolved_path}"
             )
-            self._is_context_menu_work = False  # 실패 시 플래그 리셋
+            self._is_context_menu_work = False
             return
 
         metadata = self._extract_row_metadata(rn_item)
