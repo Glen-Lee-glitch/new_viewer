@@ -483,15 +483,16 @@ class MainWindow(QMainWindow):
         # 첫 번째 파일 이름을 기준으로 창 제목 설정
         self.setWindowTitle(f"PDF Viewer - {Path(pdf_paths[0]).name}")
         
-        self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
-        self._pdf_view_widget.set_renderer(self.renderer)
+        self._thumbnail_viewer.set_renderer(self.renderer, self._page_order) # 썸네일 생성
+        self._pdf_view_widget.set_renderer(self.renderer) # PDF 뷰어 사전 작업(준비 작업, 밑에서 펼침)
 
+        # PDF 편집 모드를 위한 필요한 영역 활성화/필요 없는 영역 숨기기
         self._pdf_load_widget.hide()
         self._pdf_view_widget.show()
         self._necessary_widget.hide()
         self._thumbnail_viewer.show()
-        self._alarm_widget.hide()  # PDF 로드 시 alarm_widget 숨김
-        self._info_panel.show()  # PDF 로드 시 info_panel 표시
+        self._alarm_widget.hide()
+        self._info_panel.show()
 
         # 기본 스플리터 사이즈를 즉시 한 번 강제하여 초기 힌트를 통일
         self.set_splitter_sizes(False)
@@ -499,7 +500,7 @@ class MainWindow(QMainWindow):
         name, region, special_note, rn = self._collect_pending_basic_info()
         self._info_panel.update_basic_info(name, region, special_note, rn)
 
-        # UI가 표시된 다음 틱에 첫 페이지 렌더를 예약하여 초기 크기 기준을 보장한다.
+        # PDF 열면 맨 처음 페이지 포커스
         if self.renderer.get_page_count() > 0:
             QTimer.singleShot(0, lambda: self.go_to_page(0))
             # PDF 렌더 완료 후 이상치 체크 (약간의 지연을 두어 렌더링 완료 보장)
@@ -796,10 +797,6 @@ class MainWindow(QMainWindow):
         except Exception:
             # 안전 장치: 실패해도 크래시 방지
             pass
-
-    def adjust_viewer_layout(self, is_landscape: bool):
-        """페이지 비율에 따라 뷰어 레이아웃을 조정한다."""
-        self.set_splitter_sizes(is_landscape)
 
     def _check_and_show_outlier_reminder(self):
         """PDF 렌더 완료 후 이상치가 있는 경우 리마인더 메시지를 표시한다."""
