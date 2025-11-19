@@ -657,9 +657,24 @@ def update_finished_file_path(rn: str, file_path: str) -> bool:
         traceback.print_exc()
         return False
 
+def fetch_preprocessed_data(worker_name: str) -> pd.DataFrame:
+    """
+    preprocessed_data 테이블에서 특정 신청자(worker_name)의 데이터를 조회한다.
+    """
+    if not worker_name:
+        return pd.DataFrame()
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT * FROM preprocessed_data WHERE 신청자 = %s"
+            df = pd.read_sql(query, connection, params=(worker_name,))
+            return df
+    except Exception:
+        traceback.print_exc()
+        return pd.DataFrame()
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
     print(get_worker_names())
     # get_mail_content()
-    
