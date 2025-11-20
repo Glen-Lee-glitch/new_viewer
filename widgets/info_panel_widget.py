@@ -27,6 +27,15 @@ class InfoPanelWidget(QWidget):
         """출고예정일 계산을 위한 day_gap을 설정한다."""
         self._delivery_day_gap = day_gap
 
+    def _adjust_to_weekday(self, target_date: date) -> date:
+        """주말(토요일, 일요일)이면 다음 월요일로 조정한다."""
+        weekday = target_date.weekday()  # 월요일=0, 일요일=6
+        if weekday >= 5:  # 토요일(5) 또는 일요일(6)
+            # 다음 월요일까지의 일수 계산
+            days_to_monday = 7 - weekday
+            target_date = target_date + timedelta(days=days_to_monday)
+        return target_date
+
     def _on_radio_button_2_toggled(self, checked: bool):
         """출고예정일 라디오 버튼 상태 변경 시 호출"""
         if checked and self._delivery_day_gap is not None:
@@ -34,6 +43,9 @@ class InfoPanelWidget(QWidget):
                 # 오늘 날짜 + day_gap 계산
                 today = date.today()
                 target_date = today + timedelta(days=self._delivery_day_gap)
+                
+                # 주말이면 월요일로 조정
+                target_date = self._adjust_to_weekday(target_date)
                 
                 # MM/DD 형식으로 변환
                 formatted_date = target_date.strftime("%m/%d")
@@ -128,8 +140,17 @@ class InfoPanelWidget(QWidget):
                     if input_date < today:
                         input_date = date(current_year + 1, month, day)
                     
+                    # 주말이면 월요일로 조정
+                    input_date = self._adjust_to_weekday(input_date)
+                    
                     # 날짜 차이 계산 (일 단위)
                     date_diff = (input_date - today).days
+                    
+                    # 조정된 날짜로 텍스트 업데이트 (주말이었던 경우)
+                    adjusted_text = input_date.strftime("%m/%d")
+                    if adjusted_text != text:
+                        text = adjusted_text
+                        self.text_edit.setText(text)
                     
                     # 디버그 메시지 출력
                     if region:
