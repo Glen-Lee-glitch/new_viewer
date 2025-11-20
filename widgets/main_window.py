@@ -508,6 +508,8 @@ class MainWindow(QMainWindow):
 
         # 텍스트 삽입 라디오 버튼을 '일반'으로 초기화
         self._info_panel.reset_text_radio_buttons()
+        if hasattr(self._info_panel, 'text_edit'):
+            self._info_panel.text_edit.clear()
 
         # day_gap 조회 및 설정
         if region:
