@@ -117,11 +117,12 @@ class OverlayWindow(QWidget):
     # 오버레이가 완전히 닫힐 때 발생하는 시그널
     closed_signal = pyqtSignal()
     
-    def __init__(self, texts, copy_data=None, order_list=None, parent=None):
+    def __init__(self, texts, copy_data=None, order_list=None, order_per_item=None, parent=None):
         super().__init__(parent)
         self.texts = texts
         self.copy_data = copy_data or []  # 각 신청 건의 복사 가능한 칼럼 값 리스트
-        self.order_list = order_list or []  # 순서 리스트
+        self.order_list = order_list or []  # 순서 리스트 (중복 제거, 정렬된 전체 순서)
+        self.order_per_item = order_per_item or []  # 각 항목별 순서 리스트 (인덱스 매칭)
         self.current_index = 0
         self.hotkey_listener = None
         self.hotkey_emitter = HotkeyEmitter()
@@ -153,6 +154,7 @@ class OverlayWindow(QWidget):
         self.order_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
         self.order_label.setStyleSheet("color: white; font-size: 18px; background-color: rgba(0,0,0,150); padding: 15px; font-weight: bold; border-radius: 5px;")
         self.order_label.setWordWrap(True)
+        self.order_label.setTextFormat(Qt.TextFormat.RichText)  # HTML 렌더링 활성화
 
         # 기존 정보 레이블 (col1 - 왼쪽)
         self.col1_label = QLabel("", self)
@@ -257,10 +259,26 @@ class OverlayWindow(QWidget):
         return '\n\n'.join(col1_items), '\n\n'.join(col2_items)
     
     def _update_order_display(self):
-        """순서 리스트를 표시 형식으로 변환하여 레이블에 설정합니다."""
+        """순서 리스트를 표시 형식으로 변환하여 레이블에 설정합니다. 현재 항목의 순서를 하이라이트합니다."""
         if self.order_list:
-            order_text = " -> ".join(str(order) for order in self.order_list)
-            self.order_label.setText(f"본인 작업의 순서:\n{order_text}")
+            # 현재 인덱스에 해당하는 순서 번호 찾기
+            current_order = None
+            if self.current_index < len(self.order_per_item):
+                current_order = self.order_per_item[self.current_index]
+            
+            # 순서 텍스트 생성 (하이라이트 적용)
+            order_parts = []
+            for order in self.order_list:
+                order_str = str(order)
+                # 현재 순서와 일치하면 하이라이트 적용
+                if current_order is not None and order == current_order:
+                    # 형광 초록색 하이라이트 (#39FF14 또는 #00FF00)
+                    order_str = f'<span style="background-color: #39FF14; color: #000000; font-weight: bold; padding: 2px 6px; border-radius: 3px;">{order_str}</span>'
+                order_parts.append(order_str)
+            
+            order_text = " -> ".join(order_parts)
+            html_text = f"본인 작업의 순서:<br>{order_text}"
+            self.order_label.setText(html_text)
         else:
             self.order_label.setText("")
         self.order_label.adjustSize()
@@ -347,6 +365,8 @@ class OverlayWindow(QWidget):
         
         # 텍스트를 두 열로 나누어 업데이트
         self._update_display_text()
+        # 순서 표시도 업데이트 (하이라이트 변경)
+        self._update_order_display()
 
     def toggle_visibility(self):
         """단축키 신호를 받아 오버레이 창의 보이기/숨기기 상태를 토글합니다."""
