@@ -1,6 +1,7 @@
+import re
 from pathlib import Path
 from PyQt6 import uic
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QWidget, QMessageBox
 from PyQt6.QtCore import pyqtSignal
 
 class InfoPanelWidget(QWidget):
@@ -48,6 +49,12 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.setText(rn)
 
+    def _validate_date_format(self, text: str) -> bool:
+        """날짜 형식(MM/DD 또는 M/D)을 검증한다."""
+        # MM/DD 또는 M/D 형식: 월(1-12), 일(1-31)
+        pattern = r'^(0?[1-9]|1[0-2])/(0?[1-9]|[12][0-9]|3[01])$'
+        return bool(re.match(pattern, text.strip()))
+
     def _on_insert_text_clicked(self):
         if hasattr(self, 'text_edit') and hasattr(self, 'font_spinBox'):
             text = self.text_edit.text()
@@ -55,8 +62,21 @@ class InfoPanelWidget(QWidget):
             
             # 라디오 버튼 상태 확인
             if hasattr(self, 'radioButton_2') and self.radioButton_2.isChecked():
-                # '출고예정일'이 선택된 경우 텍스트 앞에 '출고예정일' 추가
-                text = f"출고예정일 {text}" if text else "출고예정일"
+                # '출고예정일'이 선택된 경우 날짜 형식 검증
+                if not text:
+                    QMessageBox.warning(self, "입력 오류", "날짜를 입력해주세요.\n예: 11/27, 03/05, 3/5")
+                    return
+                
+                if not self._validate_date_format(text):
+                    QMessageBox.warning(
+                        self, 
+                        "입력 오류", 
+                        "날짜 형식이 올바르지 않습니다.\n\n올바른 형식: MM/DD 또는 M/D\n예: 11/27, 03/05, 3/5, 11/04"
+                    )
+                    return
+                
+                # 날짜 형식이 올바르면 텍스트 앞에 '출고예정일' 추가
+                text = f"출고예정일{text}"
             
             if text:
                 self.text_stamp_requested.emit(text, font_size) # 텍스트와 폰트 크기 함께 전달
