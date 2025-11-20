@@ -103,12 +103,12 @@ class PdfLoadWidget(QWidget):
 
         row_count = len(df)
         # 최대 20개 행까지만 표시
-        display_count = min(row_count, 20)
+        display_count = min(row_count, 30)
         table.setRowCount(display_count)
 
         for row_index, (_, row) in enumerate(df.iterrows()):
             # 20개를 초과하면 중단
-            if row_index >= 20:
+            if row_index >= 30:
                 break
             row_data = {
                 'rn': self._sanitize_text(row.get('RN', '')),

@@ -113,7 +113,7 @@ def fetch_recent_subsidy_applications():
                 ") re ON sa.RN COLLATE utf8mb4_unicode_ci = re.RN COLLATE utf8mb4_unicode_ci "
                 "WHERE sa.recent_received_date >= %s "
                 "ORDER BY sa.recent_received_date DESC "
-                "LIMIT 20"
+                "LIMIT 30"
             )
             params = ('2025-09-30 09:00',)
             df = pd.read_sql(query, connection, params=params)
