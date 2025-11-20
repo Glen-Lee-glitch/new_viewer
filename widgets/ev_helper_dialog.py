@@ -34,6 +34,7 @@ class EVHelperDialog(QDialog):
         self.worker_name = worker_name
         self._overlay_texts = [] # 오버레이에 표시할 텍스트 리스트
         self._overlay_copy_data = []  # 오버레이에 복사 가능한 칼럼 데이터 리스트
+        self._overlay_order_list = []  # 순서 리스트
         
         self.open_helper_overlay.clicked.connect(self.open_overlay)
         self.close_helper_overlay.clicked.connect(self.close_overlay)
@@ -91,6 +92,20 @@ class EVHelperDialog(QDialog):
                 
                 self._overlay_texts = []
                 self._overlay_copy_data = []  # 복사 가능한 칼럼 데이터 리스트
+                
+                # 순서 데이터 수집
+                order_list = []
+                if '순서' in df.columns:
+                    for _, row in df.iterrows():
+                        order_value = row['순서']
+                        if pd.notna(order_value) and order_value is not None:
+                            try:
+                                order_int = int(order_value)
+                                if order_int not in order_list:  # 중복 제거
+                                    order_list.append(order_int)
+                            except (ValueError, TypeError):
+                                pass
+                    order_list.sort()  # 정렬
                 
                 # 기본 복사 가능한 칼럼 (사업자번호/사업자명 제외)
                 base_copy_columns = ['성명', '주소1', '주소2', '전화', '휴대폰', '이메일']
@@ -212,15 +227,20 @@ class EVHelperDialog(QDialog):
                     
                     self._overlay_copy_data.append(copy_values)
                 
+                # 순서 리스트 저장
+                self._overlay_order_list = order_list
+                
                 # DB 로드 성공 시 메시지는 띄우지 않음 (자동 로드이므로)
             else:
                 self._overlay_texts = []
                 self._overlay_copy_data = []
+                self._overlay_order_list = []
                 # 데이터가 없어도 조용히 넘어감
 
         except Exception as e:
             self._overlay_texts = []
             self._overlay_copy_data = []
+            self._overlay_order_list = []
             QMessageBox.critical(self, "오류", f"데이터 조회 중 오류가 발생했습니다:\n{e}")
 
     def open_overlay(self):
@@ -234,7 +254,7 @@ class EVHelperDialog(QDialog):
             return
             
         if self.overlay is None or not self.overlay.isVisible():
-            self.overlay = OverlayWindow(texts=self._overlay_texts, copy_data=self._overlay_copy_data)
+            self.overlay = OverlayWindow(texts=self._overlay_texts, copy_data=self._overlay_copy_data, order_list=self._overlay_order_list)
             # 오버레이가 완전히 닫힐 때 다이얼로그를 다시 보이도록 시그널 연결
             self.overlay.closed_signal.connect(self._on_overlay_closed)
             self.overlay.show()

@@ -117,10 +117,11 @@ class OverlayWindow(QWidget):
     # 오버레이가 완전히 닫힐 때 발생하는 시그널
     closed_signal = pyqtSignal()
     
-    def __init__(self, texts, copy_data=None, parent=None):
+    def __init__(self, texts, copy_data=None, order_list=None, parent=None):
         super().__init__(parent)
         self.texts = texts
         self.copy_data = copy_data or []  # 각 신청 건의 복사 가능한 칼럼 값 리스트
+        self.order_list = order_list or []  # 순서 리스트
         self.current_index = 0
         self.hotkey_listener = None
         self.hotkey_emitter = HotkeyEmitter()
@@ -147,6 +148,12 @@ class OverlayWindow(QWidget):
         screen = QApplication.primaryScreen().geometry()
         self.setGeometry(screen)
 
+        # 순서 표시 레이블 (맨 위 상단 중앙)
+        self.order_label = QLabel("", self)
+        self.order_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
+        self.order_label.setStyleSheet("color: white; font-size: 18px; background-color: rgba(0,0,0,150); padding: 15px; font-weight: bold; border-radius: 5px;")
+        self.order_label.setWordWrap(True)
+
         # 기존 정보 레이블 (col1 - 왼쪽)
         self.col1_label = QLabel("", self)
         self.col1_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -165,6 +172,9 @@ class OverlayWindow(QWidget):
         self.copy_message_label.setStyleSheet("color: white; font-size: 20spx; background-color: rgba(0,0,0,100); padding: 15px; font-weight: bold; border-radius: 5px;")
         self.copy_message_label.setWordWrap(True)
         self.copy_message_label.hide()
+        
+        # 순서 표시 업데이트 (모든 레이블 생성 후)
+        self._update_order_display()
         
         # 초기 텍스트 설정
         self._update_display_text()
@@ -246,6 +256,23 @@ class OverlayWindow(QWidget):
         
         return '\n\n'.join(col1_items), '\n\n'.join(col2_items)
     
+    def _update_order_display(self):
+        """순서 리스트를 표시 형식으로 변환하여 레이블에 설정합니다."""
+        if self.order_list:
+            order_text = " -> ".join(str(order) for order in self.order_list)
+            self.order_label.setText(f"본인 작업의 순서: {order_text}")
+        else:
+            self.order_label.setText("")
+        self.order_label.adjustSize()
+        # 순서 레이블 위치만 직접 설정 (다른 레이블들은 아직 생성되지 않았을 수 있음)
+        if self.order_label.text():
+            order_x = (self.width() - self.order_label.width()) // 2
+            order_y = 50  # margin
+            self.order_label.move(order_x, order_y)
+            self.order_label.show()
+        else:
+            self.order_label.hide()
+    
     def _update_display_text(self):
         """현재 인덱스의 텍스트를 두 열로 나누어 표시합니다."""
         display_text = ""
@@ -266,10 +293,19 @@ class OverlayWindow(QWidget):
         """레이블들의 위치를 업데이트합니다."""
         margin = 50  # 화면 끝 여백
         
-        # col1 레이블 (복사 가능) - 좌측 상단
+        # 순서 레이블 (맨 위 상단 중앙)
+        if self.order_label.text():
+            order_x = (self.width() - self.order_label.width()) // 2
+            order_y = margin
+            self.order_label.move(order_x, order_y)
+            self.order_label.show()
+        else:
+            self.order_label.hide()
+        
+        # col1 레이블 (복사 가능) - 좌측 상단 (순서 레이블 아래)
         self.col1_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         col1_x = margin
-        col1_y = margin
+        col1_y = margin + (self.order_label.height() + 20 if self.order_label.text() else 0)
         self.col1_label.move(col1_x, col1_y)
         
         # 역순 변환 위젯 위치 설정 (우측 상단)
