@@ -6,7 +6,7 @@ import pymysql
 from contextlib import closing
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-excel_path = os.path.join(project_root, "순서 - 복사본.xlsx")
+excel_path = os.path.join(project_root, "성남시1121.xlsx")
 
 # MySQL 연결 정보
 DB_CONFIG = {
