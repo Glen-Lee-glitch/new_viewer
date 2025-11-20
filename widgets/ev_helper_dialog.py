@@ -77,14 +77,14 @@ class EVHelperDialog(QDialog):
             df = fetch_preprocessed_data(self.worker_name)
             
             if not df.empty:
-                # 표시할 칼럼 목록 정의
+                # 표시할 칼럼 목록 정의 (사업자번호/사업자명은 복사 가능 항목으로 별도 처리)
                 display_columns = [
-                    '주문시간', '성명', '생년월일', '성별', '사업자번호', '사업자명', '신청차종', '출고예정일',
+                    '주문시간', '성명', '생년월일', '성별', '신청차종', '출고예정일',
                     '주소1', '주소2', '전화', '휴대폰', '이메일', '신청유형', '우선순위', 'RN', '보조금'
                 ]
                 
-                # 값이 있을 때만 표시할 선택적 칼럼
-                optional_columns = ['사업자번호', '사업자명', '다자녀수', '공동명의자', '공동생년월일']
+                # 값이 있을 때만 표시할 선택적 칼럼 (사업자번호/사업자명은 복사 가능 항목으로 별도 처리)
+                optional_columns = ['다자녀수', '공동명의자', '공동생년월일']
                 
                 # 날짜 형식 칼럼 목록
                 date_columns = ['생년월일', '주문시간', '출고예정일', '공동생년월일']
@@ -92,11 +92,8 @@ class EVHelperDialog(QDialog):
                 self._overlay_texts = []
                 self._overlay_copy_data = []  # 복사 가능한 칼럼 데이터 리스트
                 
-                # 복사 가능한 칼럼과 단축키 매핑
-                copy_columns = ['성명', '주소1', '주소2', '전화', '휴대폰', '이메일']
-                copy_column_to_shortcut = {col: i+1 for i, col in enumerate(copy_columns)}
-                copy_column_to_shortcut['공동명의자'] = 7
-                copy_column_to_shortcut['RN'] = 8  # 공동명의자가 있으면 8, 없으면 7
+                # 기본 복사 가능한 칼럼 (사업자번호/사업자명 제외)
+                base_copy_columns = ['성명', '주소1', '주소2', '전화', '휴대폰', '이메일']
                 
                 for index, row in df.iterrows():
                     lines = []
@@ -108,9 +105,43 @@ class EVHelperDialog(QDialog):
                         if joint_value and joint_value != 'nan' and joint_value != 'None' and joint_value != '':
                             has_joint = True
                     
-                    # RN번호 단축키 결정 (공동명의자 유무에 따라)
-                    rn_shortcut = 8 if has_joint else 7
-                    copy_column_to_shortcut['RN'] = rn_shortcut
+                    # 사업자번호/사업자명 존재 여부 확인
+                    has_business_num = False
+                    has_business_name = False
+                    business_num_value = ''
+                    business_name_value = ''
+                    
+                    if '사업자번호' in df.columns:
+                        business_num_value = str(row['사업자번호']).strip()
+                        if business_num_value and business_num_value != 'nan' and business_num_value != 'None' and business_num_value != '':
+                            has_business_num = True
+                    
+                    if '사업자명' in df.columns:
+                        business_name_value = str(row['사업자명']).strip()
+                        if business_name_value and business_name_value != 'nan' and business_name_value != 'None' and business_name_value != '':
+                            has_business_name = True
+                    
+                    # 동적 복사 칼럼 리스트 생성 (성명 다음에 사업자번호/사업자명 추가)
+                    dynamic_copy_columns = ['성명']
+                    if has_business_num:
+                        dynamic_copy_columns.append('사업자번호')
+                    if has_business_name:
+                        dynamic_copy_columns.append('사업자명')
+                    dynamic_copy_columns.extend(['주소1', '주소2', '전화', '휴대폰', '이메일'])
+                    
+                    # 단축키 매핑 생성 (동적으로)
+                    copy_column_to_shortcut = {}
+                    shortcut_num = 1
+                    for col in dynamic_copy_columns:
+                        copy_column_to_shortcut[col] = shortcut_num
+                        shortcut_num += 1
+                    
+                    # 공동명의자와 RN 단축키 결정
+                    if has_joint:
+                        copy_column_to_shortcut['공동명의자'] = shortcut_num
+                        shortcut_num += 1
+                    
+                    copy_column_to_shortcut['RN'] = shortcut_num
                     
                     # 필수 표시 칼럼 처리
                     for col in display_columns:
@@ -127,6 +158,15 @@ class EVHelperDialog(QDialog):
                                     lines.append(f"[Ctrl+Alt+{shortcut_num}] {col}: {value}")
                                 else:
                                     lines.append(f"{col}: {value}")
+                    
+                    # 사업자번호/사업자명 처리 (복사 가능 항목으로 표시)
+                    if has_business_num:
+                        shortcut_num = copy_column_to_shortcut.get('사업자번호', 2)
+                        lines.append(f"[Ctrl+Alt+{shortcut_num}] 사업자번호: {business_num_value}")
+                    
+                    if has_business_name:
+                        shortcut_num = copy_column_to_shortcut.get('사업자명', 3)
+                        lines.append(f"[Ctrl+Alt+{shortcut_num}] 사업자명: {business_name_value}")
                     
                     # 선택적 칼럼 처리 (값이 있을 때만)
                     for col in optional_columns:
@@ -147,16 +187,18 @@ class EVHelperDialog(QDialog):
                     # 줄바꿈으로 연결하여 하나의 문자열로 만듦 (항목 간 간격을 위해 빈 줄 추가)
                     self._overlay_texts.append('\n\n'.join(lines))
                     
-                    # 복사 가능한 칼럼 데이터 생성
+                    # 복사 가능한 칼럼 데이터 생성 (동적 칼럼 리스트 사용)
                     copy_values = []
                     
-                    for col in copy_columns:
+                    for col in dynamic_copy_columns:
                         if col in df.columns:
                             value = str(row[col]).strip()
                             if value and value != 'nan' and value != 'None':
                                 copy_values.append(value)
                             else:
                                 copy_values.append('')  # 빈 값도 추가하여 인덱스 유지
+                        else:
+                            copy_values.append('')  # 칼럼이 없으면 빈 값
                     
                     # 공동명의자가 있으면 추가 (RN번호 전에)
                     if has_joint:
