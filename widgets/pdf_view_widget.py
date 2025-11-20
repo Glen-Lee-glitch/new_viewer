@@ -699,8 +699,13 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self.page_cache.clear() # 이전 PDF 파일 정보를 잊어버리기
         self.rendering_jobs.clear()
         self.current_page = -1 # 지금 보고 있는 페이지 없음 (존재하지 않는 페이지 번호로 -1로 설정)
+        
+        # 새로운 PDF를 로드할 때만 오버레이 아이템과 히스토리 초기화
+        if renderer is not None:
+            self._overlay_items.clear()
+            self._history_stack.clear()
+        
         # self.page_rotations = {} # 새 파일 로드 시 회전 정보 초기화 -> 보존
-        # self._overlay_items.clear() # 새 파일 로드 시 오버레이 아이템 초기화 -> 보존
         # _current_rn은 보존 (set_renderer()에서 초기화하지 않음)
         
         # 메일 오버레이 숨김

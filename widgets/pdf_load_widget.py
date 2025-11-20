@@ -303,6 +303,13 @@ class PdfLoadWidget(QWidget):
             QMessageBox.warning(self, "검색 실패", f"RN 번호 '{rn}'에 해당하는 데이터를 찾을 수 없습니다.")
             return
             
+        # AI 결과가 있는 경우 -> AI 결과 창 열기 (start_selected_work 로직과 동일하게)
+        구매계약서 = data.get('구매계약서') == 1
+        초본 = data.get('초본') == 1
+        공동명의 = data.get('공동명의') == 1
+        if 구매계약서 and (초본 or 공동명의):
+            self.ai_review_requested.emit(rn)
+
         # 파일 경로 확인
         file_path = self._normalize_file_path(data.get('original_filepath'))
         
@@ -327,7 +334,7 @@ class PdfLoadWidget(QWidget):
             'urgent': data.get('urgent', 0),
             'outlier': data.get('outlier', ''),
             'original_filepath': file_path,
-            'is_context_menu_work': False # 직접 열기이므로 False (혹은 별도 구분 필요 시 True)
+            'is_context_menu_work': True # 컨텍스트 메뉴와 동일하게 동작하도록 True로 설정
         }
         
         # 작업 시작 시그널 발생
