@@ -52,6 +52,12 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'text_edit') and hasattr(self, 'font_spinBox'):
             text = self.text_edit.text()
             font_size = self.font_spinBox.value() # 스핀박스에서 폰트 크기 가져오기
+            
+            # 라디오 버튼 상태 확인
+            if hasattr(self, 'radioButton_2') and self.radioButton_2.isChecked():
+                # '출고예정일'이 선택된 경우 텍스트 앞에 '출고예정일' 추가
+                text = f"출고예정일 {text}" if text else "출고예정일"
+            
             if text:
                 self.text_stamp_requested.emit(text, font_size) # 텍스트와 폰트 크기 함께 전달
                 self.text_edit.clear() # 입력창 비우기
