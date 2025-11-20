@@ -246,9 +246,8 @@ class EVHelperDialog(QDialog):
     def _on_overlay_closed(self):
         """오버레이가 완전히 닫혔을 때 호출되는 메서드"""
         self.overlay = None
-        # 다이얼로그를 다시 표시
-        self.show()
-        self.activateWindow()
+        # 다이얼로그도 완전히 닫기 (메인 윈도우에 포커스가 가도록)
+        self.reject()  # 다이얼로그를 닫고 부모 윈도우에 포커스 반환
 
     def close_overlay(self):
         """'닫기' 버튼을 누르면 오버레이 창을 닫습니다."""
