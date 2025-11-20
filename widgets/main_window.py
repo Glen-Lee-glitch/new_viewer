@@ -1092,9 +1092,24 @@ class MainWindow(QMainWindow):
 
             original_pdf_paths = [str(f) for f in matching_files]
             
+            # 기본 정보 보존 (show_load_view()에서 초기화되기 전에 저장)
+            saved_basic_info = self._pending_basic_info.copy() if self._pending_basic_info else None
+            saved_current_rn = self._current_rn
+            
             # 기존 뷰어 정리 후 원본 파일 로드
             self.show_load_view() # 현재 뷰를 닫고 로드 화면으로 전환
             self.load_document(original_pdf_paths)
+            
+            # 보존된 기본 정보 복원
+            if saved_basic_info:
+                self._pending_basic_info = saved_basic_info
+                name, region, special_note, rn = self._collect_pending_basic_info()
+                self._info_panel.update_basic_info(name, region, special_note, rn)
+            
+            # RN 복원
+            if saved_current_rn:
+                self._current_rn = saved_current_rn
+                self._pdf_view_widget.set_current_rn(saved_current_rn)
             
             QMessageBox.information(self, "정보", "원본 파일을 성공적으로 불러왔습니다.")
 
