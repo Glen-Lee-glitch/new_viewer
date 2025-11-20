@@ -688,8 +688,13 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         """사용자가 적용한 페이지별 회전 정보를 반환한다."""
         return self.page_rotations
 
-    def set_renderer(self, renderer: PdfRender | None):
-        """PDF 렌더러를 설정하고 캐시를 초기화한다."""
+    def set_renderer(self, renderer: PdfRender | None, clear_overlay: bool = True):
+        """PDF 렌더러를 설정하고 캐시를 초기화한다.
+        
+        Args:
+            renderer: PdfRender 인스턴스 또는 None
+            clear_overlay: True이면 오버레이 아이템과 히스토리를 초기화, False이면 보존
+        """
         self.renderer = renderer # PdfRender 인스턴스
         self.pdf_path = renderer.pdf_path if renderer else None
 
@@ -701,7 +706,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self.current_page = -1 # 지금 보고 있는 페이지 없음 (존재하지 않는 페이지 번호로 -1로 설정)
         
         # 새로운 PDF를 로드할 때만 오버레이 아이템과 히스토리 초기화
-        if renderer is not None:
+        if renderer is not None and clear_overlay:
             self._overlay_items.clear()
             self._history_stack.clear()
         

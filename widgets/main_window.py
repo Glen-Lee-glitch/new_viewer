@@ -1164,8 +1164,8 @@ class MainWindow(QMainWindow):
             # 썸네일 뷰 갱신
             self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
             
-            # PDF 뷰어 갱신 (렌더러 재설정 및 화면 갱신)
-            self._pdf_view_widget.set_renderer(self.renderer)
+            # PDF 뷰어 갱신 (렌더러 재설정 및 화면 갱신, 오버레이 보존)
+            self._pdf_view_widget.set_renderer(self.renderer, clear_overlay=False)
             
             # 마지막 페이지로 이동
             last_page_index = self.renderer.get_page_count() - 1
