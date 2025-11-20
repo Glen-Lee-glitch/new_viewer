@@ -756,6 +756,24 @@ def fetch_preprocessed_data(worker_name: str) -> pd.DataFrame:
         traceback.print_exc()
         return pd.DataFrame()
 
+def fetch_delivery_day_gap(region: str) -> int | None:
+    """
+    '출고예정일' 테이블에서 지역(region)에 해당하는 day_gap을 조회한다.
+    """
+    if not region:
+        return None
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT day_gap FROM 출고예정일 WHERE region = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (region,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()

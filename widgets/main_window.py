@@ -506,6 +506,14 @@ class MainWindow(QMainWindow):
         name, region, special_note, rn = self._collect_pending_basic_info()
         self._info_panel.update_basic_info(name, region, special_note, rn)
 
+        # day_gap 조회 및 설정
+        if region:
+            from core.sql_manager import fetch_delivery_day_gap
+            day_gap = fetch_delivery_day_gap(region)
+            self._info_panel.set_delivery_day_gap(day_gap)
+        else:
+            self._info_panel.set_delivery_day_gap(None)
+
         # PDF 열면 맨 처음 페이지 포커스
         if self.renderer.get_page_count() > 0:
             QTimer.singleShot(0, lambda: self.go_to_page(0))

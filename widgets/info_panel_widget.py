@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtWidgets import QWidget, QMessageBox
@@ -13,9 +13,33 @@ class InfoPanelWidget(QWidget):
         super().__init__(parent)
         ui_path = Path(__file__).parent.parent / "ui" / "info_panel.ui"
         uic.loadUi(str(ui_path), self)
+        
+        self._delivery_day_gap: int | None = None # day_gap 저장 변수
 
         if hasattr(self, 'pushButton_insert_text'):
             self.pushButton_insert_text.clicked.connect(self._on_insert_text_clicked)
+        
+        # 라디오 버튼 시그널 연결
+        if hasattr(self, 'radioButton_2'):
+            self.radioButton_2.toggled.connect(self._on_radio_button_2_toggled)
+
+    def set_delivery_day_gap(self, day_gap: int | None):
+        """출고예정일 계산을 위한 day_gap을 설정한다."""
+        self._delivery_day_gap = day_gap
+
+    def _on_radio_button_2_toggled(self, checked: bool):
+        """출고예정일 라디오 버튼 상태 변경 시 호출"""
+        if checked and self._delivery_day_gap is not None:
+            if hasattr(self, 'text_edit'):
+                # 오늘 날짜 + day_gap 계산
+                today = date.today()
+                target_date = today + timedelta(days=self._delivery_day_gap)
+                
+                # MM/DD 형식으로 변환
+                formatted_date = target_date.strftime("%m/%d")
+                
+                # 텍스트 에디트에 설정
+                self.text_edit.setText(formatted_date)
 
     def clear_info(self):
         """모든 정보 라벨을 'N/A'로 초기화한다."""
