@@ -558,9 +558,9 @@ class MainWindow(QMainWindow):
             self.load_document(pdf_paths)
             return
 
-        worker_name = self._worker_name or metadata.get('worker', '')
+        worker_name = self._worker_name or metadata.get('worker') or ''
         rn_value = metadata.get('rn') # RN 값 저장
-        existing_worker = metadata.get('worker', '').strip()  # 이미 배정된 작업자
+        existing_worker = (metadata.get('worker') or '').strip()  # 이미 배정된 작업자
         # 현재 작업 중인 RN 저장
         self._current_rn = rn_value or ""
 

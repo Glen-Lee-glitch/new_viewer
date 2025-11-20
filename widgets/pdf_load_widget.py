@@ -14,9 +14,10 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QStyledItemDelegate,
     QStyleOptionViewItem,
+    QInputDialog,
 )
 
-from core.sql_manager import fetch_recent_subsidy_applications
+from core.sql_manager import fetch_recent_subsidy_applications, fetch_application_data_by_rn
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -283,7 +284,55 @@ class PdfLoadWidget(QWidget):
             self.center_open_btn.clicked.connect(self.open_pdf_file)
         if hasattr(self, 'center_refresh_btn'):
             self.center_refresh_btn.clicked.connect(self.refresh_data)
+        if hasattr(self, 'pushButton'):
+            self.pushButton.clicked.connect(self.open_by_rn)
     
+    def open_by_rn(self):
+        """RN 번호를 입력받아 작업을 시작한다."""
+        rn, ok = QInputDialog.getText(self, "RN 검색", "RN 번호를 입력하세요 (예: RN00000):")
+        
+        if not ok or not rn.strip():
+            return
+            
+        rn = rn.strip().upper() # 대문자 변환
+        
+        # DB에서 데이터 조회
+        data = fetch_application_data_by_rn(rn)
+        
+        if not data:
+            QMessageBox.warning(self, "검색 실패", f"RN 번호 '{rn}'에 해당하는 데이터를 찾을 수 없습니다.")
+            return
+            
+        # 파일 경로 확인
+        file_path = self._normalize_file_path(data.get('original_filepath'))
+        
+        if not file_path:
+            QMessageBox.warning(self, "파일 없음", "해당 RN에 연결된 파일 경로가 DB에 없습니다.")
+            return
+            
+        resolved_path = Path(file_path)
+        if not resolved_path.exists():
+            QMessageBox.warning(self, "파일 없음", f"파일을 찾을 수 없습니다.\n{resolved_path}")
+            return
+            
+        # 메타데이터 구성 (start_selected_work와 포맷 통일)
+        metadata = {
+            'rn': data.get('RN', rn),
+            'name': data.get('name', ''),
+            'region': data.get('region', ''),
+            'worker': data.get('worker', ''),
+            'special_note': data.get('special_note', ''),
+            'recent_thread_id': data.get('recent_thread_id', ''),
+            'file_rendered': data.get('file_rendered', 0),
+            'urgent': data.get('urgent', 0),
+            'outlier': data.get('outlier', ''),
+            'original_filepath': file_path,
+            'is_context_menu_work': False # 직접 열기이므로 False (혹은 별도 구분 필요 시 True)
+        }
+        
+        # 작업 시작 시그널 발생
+        self.work_started.emit([str(resolved_path)], metadata)
+
     def open_pdf_file(self):
         """로컬에서 PDF 또는 이미지 파일을 연다 (다중 선택 가능)"""
         paths, _ = QFileDialog.getOpenFileNames(

@@ -249,6 +249,89 @@ def fetch_recent_subsidy_applications():
         traceback.print_exc()
         return pd.DataFrame()
 
+def fetch_application_data_by_rn(rn: str) -> dict | None:
+    """
+    특정 RN 번호로 지원금 신청 및 이메일 정보를 조회하여 딕셔너리로 반환한다.
+    (PdfLoadWidget에서 직접 열기 기능용)
+    """
+    if not rn:
+        return None
+
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = (
+                "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
+                "       e.attached_file_path AS original_filepath, "
+                "       sa.recent_thread_id, "
+                "       e.file_rendered, "
+                "       sa.urgent, "
+                "       gr.구매계약서, gr.초본, gr.공동명의, gr.다자녀, "
+                "       d.child_birth_date, cb.issue_date "
+                "FROM subsidy_applications sa "
+                "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
+                "LEFT JOIN gemini_results gr ON sa.RN COLLATE utf8mb4_unicode_ci = gr.RN COLLATE utf8mb4_unicode_ci "
+                "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
+                "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
+                "WHERE sa.RN = %s"
+            )
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                columns = [col[0] for col in cursor.description]
+                row = cursor.fetchone()
+                
+                if not row:
+                    return None
+                
+                result = dict(zip(columns, row))
+                
+                # 이상치(outlier) 계산 로직 (fetch_recent_subsidy_applications의 로직 간소화 적용)
+                # 필요하다면 여기서 outlier 계산 로직을 추가하거나, 기본값만 설정
+                result['outlier'] = '' 
+                
+                # 1. 다자녀 이상치 체크
+                try:
+                    import json
+                    if result.get('다자녀') == 1 and result.get('child_birth_date'):
+                        dates = json.loads(result['child_birth_date'])
+                        today = datetime.now().date()
+                        for d_str in dates:
+                            try:
+                                birth_date = datetime.strptime(d_str, "%Y-%m-%d").date()
+                                age = today.year - birth_date.year
+                                if age > 19 or (age == 19 and (today.month, today.day) >= (birth_date.month, birth_date.day)):
+                                    result['outlier'] = 'O'
+                                    break
+                            except ValueError:
+                                pass
+                except Exception:
+                    pass
+
+                # 2. 초본 issue_date 체크
+                if result['outlier'] != 'O' and result.get('초본') == 1 and result.get('issue_date'):
+                     try:
+                        issue_date = result['issue_date']
+                        kst = pytz.timezone('Asia/Seoul')
+                        today = datetime.now(kst).date()
+                        
+                        if isinstance(issue_date, str):
+                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                        elif isinstance(issue_date, (datetime, date)):
+                             issue_date_obj = issue_date if isinstance(issue_date, date) else issue_date.date()
+                        else:
+                            issue_date_obj = None
+                            
+                        if issue_date_obj and (today - issue_date_obj).days >= 31:
+                            result['outlier'] = 'O'
+                     except Exception:
+                         pass
+
+                return result
+
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def test_fetch_emails():
     """emails 테이블 테스트 조회"""
     try:
