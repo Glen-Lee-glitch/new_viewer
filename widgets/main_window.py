@@ -1153,11 +1153,13 @@ class MainWindow(QMainWindow):
         try:
             if not self.renderer:
                  self.renderer = PdfRender()
+
+            old_page_count = self.renderer.get_page_count()
             
             self.renderer.append_file(found_file_path)
             
-            # 페이지 순서 업데이트 (전체 페이지 수에 맞게 재설정)
-            self._page_order = list(range(self.renderer.get_page_count()))
+            # 페이지 순서 업데이트 (기존 순서 유지 + 새 페이지 추가)
+            self._page_order.extend(range(old_page_count, self.renderer.get_page_count()))
             
             # 썸네일 뷰 갱신
             self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
