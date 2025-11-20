@@ -1102,9 +1102,61 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "오류", f"원본 파일을 불러오는 중 오류가 발생했습니다:\n\n{str(e)}")
 
     def _load_outbound_allocation_document(self):
-        """성남시 전용 기능 처리 (나중에 구현)"""
-        # TODO: 성남시 전용 기능 구현
-        pass
+        """(성남시 전용) 출고배정표 불러오기 - 서류병합 """
+        import os
+        # PdfRender는 상단에서 이미 import 됨
+
+        base_path = r'\\DESKTOP-R4MM6IR\Users\HP\Desktop\Tesla\24q4\지원\출고배정표'
+        rn_number = self._current_rn 
+
+        if not rn_number:
+            print("디버그: RN 번호가 설정되지 않았습니다.")
+            return
+
+        found_document = False
+        found_file_path = ""
+        for root, _, files in os.walk(base_path):
+            for file in files:
+                if file.startswith(rn_number):
+                    found_file_path = os.path.join(root, file)
+                    print(f"디버그: 서류 발견 - {found_file_path}")
+                    found_document = True
+                    break
+            if found_document:
+                break
+
+        if not found_document:
+            print(f"디버그: RN 번호 {rn_number}에 해당하는 서류를 찾을 수 없습니다.")
+            QMessageBox.information(self, "알림", f"RN 번호 {rn_number}에 해당하는 출고배정표를 찾을 수 없습니다.")
+            return
+
+        # 서류 병합 로직 수행
+        try:
+            if not self.renderer:
+                 self.renderer = PdfRender()
+            
+            self.renderer.append_file(found_file_path)
+            
+            # 페이지 순서 업데이트 (전체 페이지 수에 맞게 재설정)
+            self._page_order = list(range(self.renderer.get_page_count()))
+            
+            # 썸네일 뷰 갱신
+            self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
+            
+            # PDF 뷰어 갱신 (렌더러 재설정 및 화면 갱신)
+            self._pdf_view_widget.set_renderer(self.renderer)
+            
+            # 마지막 페이지로 이동
+            last_page_index = self.renderer.get_page_count() - 1
+            if last_page_index >= 0:
+                # 뷰어 상태가 초기화되었으므로 약간의 지연을 두고 페이지 이동
+                QTimer.singleShot(100, lambda: self.go_to_page(last_page_index))
+            
+            QMessageBox.information(self, "완료", f"출고배정표가 성공적으로 병합되었습니다.\n\n파일: {os.path.basename(found_file_path)}")
+
+        except Exception as e:
+            print(f"출고배정표 병합 중 오류 발생: {e}")
+            QMessageBox.critical(self, "오류", f"출고배정표 병합 중 오류가 발생했습니다:\n{e}")
 
 # === 모듈 레벨 함수 ===
 def create_app():

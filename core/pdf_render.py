@@ -586,3 +586,77 @@ class PdfRender:
         except Exception as e:
             traceback.print_exc()
             raise ValueError(f"페이지 삭제 중 오류 발생: {e}")
+
+    def append_file(self, file_path: str) -> None:
+        """파일(PDF/이미지)을 현재 문서의 끝에 추가한다 (A4 변환 적용)."""
+        if not self.pdf_bytes:
+            # 현재 문서가 없으면 그냥 로드
+            self.load_pdf([file_path])
+            return
+
+        try:
+            # 1. 추가할 파일을 임시 문서로 오픈
+            append_doc = pymupdf.open()
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            if ext == '.pdf':
+                with pymupdf.open(file_path) as f:
+                    append_doc.insert_pdf(f)
+            elif ext in ['.png', '.jpg', '.jpeg']:
+                with Image.open(file_path).convert("RGB") as img:
+                    img_bytes = io.BytesIO()
+                    img.save(img_bytes, format="PDF")
+                    img_bytes.seek(0)
+                    with pymupdf.open("pdf", img_bytes.read()) as img_doc:
+                        append_doc.insert_pdf(img_doc)
+            else:
+                 raise ValueError(f"지원하지 않는 파일 형식입니다: {ext}")
+            
+            # 2. 현재 문서를 수정 가능한 상태로 오픈
+            current_doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
+            
+            # 3. 추가할 문서의 페이지를 A4로 변환하여 현재 문서 끝에 추가
+            TARGET_DPI = 200
+            for page in append_doc:
+                bounds = page.bound()
+                is_landscape = bounds.width > bounds.height
+                
+                if is_landscape: a4_rect = pymupdf.paper_rect("a4-l")
+                else: a4_rect = pymupdf.paper_rect("a4")
+                
+                target_pixel_width = a4_rect.width / 72 * TARGET_DPI
+                target_pixel_height = a4_rect.height / 72 * TARGET_DPI
+
+                zoom_x = target_pixel_width / bounds.width if bounds.width > 0 else 0
+                zoom_y = target_pixel_height / bounds.height if bounds.height > 0 else 0
+                zoom = min(zoom_x, zoom_y)
+
+                matrix = pymupdf.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=matrix, alpha=False, annots=True)
+                
+                new_page = current_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+                
+                margin = 0.98
+                page_rect = new_page.rect
+                margin_x = page_rect.width * (1 - margin) / 2
+                margin_y = page_rect.height * (1 - margin) / 2
+                target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
+
+                new_page.insert_image(target_rect, pixmap=pix)
+
+            # 4. 변경사항 저장 및 상태 업데이트
+            self.pdf_bytes = current_doc.tobytes(garbage=4, deflate=True)
+            
+            if self.doc:
+                self.doc.close()
+            self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
+            self.page_count = len(self.doc)
+            
+            append_doc.close()
+            current_doc.close()
+            
+            print(f"파일 추가 완료: {file_path}. 총 페이지 수: {self.page_count}")
+
+        except Exception as e:
+            traceback.print_exc()
+            raise ValueError(f"파일 추가 중 오류 발생: {e}")
