@@ -29,7 +29,7 @@ DB_CONFIG = {
     'password': '!Qdhdbrclf56',
     'db': 'greetlounge',
     'charset': 'utf8mb4',
-    'connect_timeout': 5 # 연결 타임아웃 5초
+    'connect_timeout': 5
 }
 
 def test_db_connection():
@@ -48,39 +48,122 @@ def fetch_preprocessed_data(worker_name: str) -> pd.DataFrame:
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = "SELECT * FROM preprocessed_data WHERE 신청자 = %s"
-            print(f"Executing query: {query % worker_name}") # 디버깅용 쿼리 출력
+            print(f"Executing query: {query % worker_name}")
             df = pd.read_sql(query, connection, params=(worker_name,))
             return df
     except Exception as e:
-        # 오류를 그냥 출력하는 대신, 예외를 발생시켜 호출한 쪽에서 처리하도록 함
         raise ConnectionError(f"데이터 조회 중 오류 발생:\n{e}")
 
 # ---------------------------------------------------------
-# 2. Overlay Logic (from widgets/helper_overlay.py)
+# 2. 역순 텍스트 변환 위젯
+# ---------------------------------------------------------
+def reverse_text(text: str) -> str:
+    """주어진 텍스트를 역순으로 반환합니다."""
+    return text[::-1]
+
+class ReverseLineEdit(QLineEdit):
+    """클릭 시 텍스트를 역순으로 변환하고 클립보드에 복사하는 QLineEdit"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._original_stylesheet = self.styleSheet()
+        if not self._original_stylesheet:
+            self._original_stylesheet = """
+                QLineEdit { 
+                    border: 2px solid white; 
+                    background-color: rgba(0, 0, 0, 200); 
+                    color: white; 
+                    font-weight: bold;
+                    font-size: 14px;
+                    border-radius: 5px;
+                }
+            """
+        self.setPlaceholderText("텍스트 붙여넣기 (클릭)")
+        self.setStyleSheet(self._original_stylesheet)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFixedHeight(40)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.window():
+                self.window().activateWindow()
+            self.setFocus()
+            
+            current_text = self.text().strip()
+            if not current_text:
+                super().mousePressEvent(event)
+                return
+
+            reversed_text = reverse_text(current_text)
+            self.setText(reversed_text)
+            QApplication.clipboard().setText(reversed_text)
+
+            self.setStyleSheet("border: 2px solid #00FF00; background-color: rgba(0, 255, 0, 100); color: white;")
+            QTimer.singleShot(1000, self._remove_highlight)
+            QTimer.singleShot(5000, self.clear)
+        else:
+            super().mousePressEvent(event)
+
+    def _remove_highlight(self):
+        self.setStyleSheet(self._original_stylesheet)
+
+class InputAwareOverlayWindow(QWidget):
+    """ReverseLineEdit를 담는 작은 오버레이 창"""
+    def __init__(self, parent=None):
+        super().__init__(None)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.reverse_line_edit = ReverseLineEdit(self)
+        self.reverse_line_edit.setFixedSize(250, 40)
+        self.setFixedSize(self.reverse_line_edit.size())
+        self.reverse_line_edit.move(0, 0)
+
+    def show_at_position(self, x, y):
+        self.move(x, y)
+        self.show()
+        self.raise_()
+
+    def paintEvent(self, event):
+        pass
+
+# ---------------------------------------------------------
+# 3. Overlay Logic
 # ---------------------------------------------------------
 class HotkeyEmitter(QObject):
     copy_signal = pyqtSignal(int)
     toggle_overlay_signal = pyqtSignal()
     navigate_signal = pyqtSignal(str)
+    close_overlay_signal = pyqtSignal()
 
     def emit_copy(self, index): self.copy_signal.emit(index)
     def emit_toggle(self): self.toggle_overlay_signal.emit()
     def emit_navigate(self, direction): self.navigate_signal.emit(direction)
+    def emit_close(self): self.close_overlay_signal.emit()
 
 class OverlayWindow(QWidget):
-    def __init__(self, texts, copy_data=None, parent=None):
+    closed_signal = pyqtSignal()
+    
+    def __init__(self, texts, copy_data=None, order_list=None, order_per_item=None, parent=None):
         super().__init__(parent)
         self.texts = texts
         self.copy_data = copy_data or []
+        self.order_list = order_list or []
+        self.order_per_item = order_per_item or []
         self.current_index = 0
         self.hotkey_listener = None
         self.hotkey_emitter = HotkeyEmitter()
+        
+        self.input_aware_overlay = InputAwareOverlayWindow()
         
         self.initUI()
         
         self.hotkey_emitter.copy_signal.connect(self.copy_to_clipboard)
         self.hotkey_emitter.toggle_overlay_signal.connect(self.toggle_visibility)
         self.hotkey_emitter.navigate_signal.connect(self.navigate_text)
+        self.hotkey_emitter.close_overlay_signal.connect(self.close_overlay_completely)
 
         self.setup_hotkeys()
 
@@ -91,7 +174,15 @@ class OverlayWindow(QWidget):
             Qt.WindowType.WindowTransparentForInput
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setGeometry(QApplication.primaryScreen().geometry())
+        screen = QApplication.primaryScreen().geometry()
+        self.setGeometry(screen)
+
+        # 순서 표시 레이블 (맨 위 상단 중앙)
+        self.order_label = QLabel("", self)
+        self.order_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
+        self.order_label.setStyleSheet("color: white; font-size: 18px; background-color: rgba(0,0,0,150); padding: 15px; font-weight: bold; border-radius: 5px;")
+        self.order_label.setWordWrap(True)
+        self.order_label.setTextFormat(Qt.TextFormat.RichText)
 
         label_style = "color: white; font-size: 20px; background-color: rgba(0,0,0,100); padding: 20px; font-weight: bold; border-radius: 5px;"
         
@@ -111,13 +202,16 @@ class OverlayWindow(QWidget):
         self.copy_message_label.setWordWrap(True)
         self.copy_message_label.hide()
         
+        self._update_order_display()
         self._update_display_text()
+        QTimer.singleShot(100, lambda: self.input_aware_overlay.raise_())
 
     def setup_hotkeys(self):
         hotkeys = {
             '<ctrl>+<alt>+<right>': self._on_navigate_pressed('next'),
             '<ctrl>+<alt>+<left>': self._on_navigate_pressed('prev'),
-            '<ctrl>+<alt>+]': self._on_toggle_pressed
+            '<ctrl>+<alt>+]': self._on_toggle_pressed,
+            '<ctrl>+<alt>+/': self._on_close_pressed
         }
         
         if self.copy_data and len(self.copy_data) > 0:
@@ -131,6 +225,7 @@ class OverlayWindow(QWidget):
     def _on_navigate_pressed(self, direction): return lambda: self.hotkey_emitter.emit_navigate(direction)
     def _on_copy_pressed(self, index): return lambda: self.hotkey_emitter.emit_copy(index)
     def _on_toggle_pressed(self): self.hotkey_emitter.emit_toggle()
+    def _on_close_pressed(self): self.hotkey_emitter.emit_close()
 
     def copy_to_clipboard(self, index):
         if not self.copy_data or self.current_index >= len(self.copy_data): return
@@ -140,7 +235,7 @@ class OverlayWindow(QWidget):
             text_to_copy = current_copy_list[index]
             if text_to_copy:
                 QApplication.clipboard().setText(text_to_copy)
-                self.copy_message_label.setText(f"'{text_to_copy}'\n복사 완료")
+                self.copy_message_label.setText(f"{text_to_copy}\n\n클립보드에 복사되었습니다.")
                 self.copy_message_label.show()
                 self.copy_message_label.adjustSize()
                 self._update_label_positions()
@@ -153,6 +248,34 @@ class OverlayWindow(QWidget):
         col2 = '\n\n'.join([item for item in items if '[Ctrl+Alt+' not in item])
         return col1, col2
     
+    def _update_order_display(self):
+        """순서 리스트를 표시 형식으로 변환하여 레이블에 설정합니다. 현재 항목의 순서를 하이라이트합니다."""
+        if self.order_list:
+            current_order = None
+            if self.current_index < len(self.order_per_item):
+                current_order = self.order_per_item[self.current_index]
+            
+            order_parts = []
+            for order in self.order_list:
+                order_str = str(order)
+                if current_order is not None and order == current_order:
+                    order_str = f'<span style="background-color: #39FF14; color: #000000; font-weight: bold; padding: 2px 6px; border-radius: 3px;">{order_str}</span>'
+                order_parts.append(order_str)
+            
+            order_text = " -> ".join(order_parts)
+            html_text = f"본인 작업의 순서:<br>{order_text}"
+            self.order_label.setText(html_text)
+        else:
+            self.order_label.setText("")
+        self.order_label.adjustSize()
+        if self.order_label.text():
+            order_x = (self.width() - self.order_label.width()) // 2
+            order_y = 50
+            self.order_label.move(order_x, order_y)
+            self.order_label.show()
+        else:
+            self.order_label.hide()
+    
     def _update_display_text(self):
         display_text = self.texts[self.current_index] if self.texts else ""
         col1_text, col2_text = self._split_text_into_columns(display_text)
@@ -164,10 +287,28 @@ class OverlayWindow(QWidget):
     
     def _update_label_positions(self):
         margin = 50
-        self.col1_label.move(margin, margin)
+        
+        if self.order_label.text():
+            order_x = (self.width() - self.order_label.width()) // 2
+            order_y = margin
+            self.order_label.move(order_x, order_y)
+            self.order_label.show()
+        else:
+            self.order_label.hide()
+        
+        self.col1_label.move(margin, margin + (self.order_label.height() + 20 if self.order_label.text() else 0))
+        
+        screen = QApplication.primaryScreen().geometry()
+        input_overlay_x = screen.width() - self.input_aware_overlay.width() - margin
+        input_overlay_y = margin
+        self.input_aware_overlay.show_at_position(input_overlay_x, input_overlay_y)
+        self.input_aware_overlay.raise_()
+        self.input_aware_overlay.activateWindow()
+        
         col2_x = self.width() - self.col2_label.width() - margin
         col2_y = self.height() - self.col2_label.height() - margin
         self.col2_label.move(col2_x, col2_y)
+        
         if self.copy_message_label.isVisible():
             copy_x = self.width() - self.copy_message_label.width() - margin
             copy_y = col2_y - self.copy_message_label.height() - 20
@@ -180,16 +321,26 @@ class OverlayWindow(QWidget):
         if direction == 'next': self.current_index = (self.current_index + 1) % len(self.texts)
         else: self.current_index = (self.current_index - 1 + len(self.texts)) % len(self.texts)
         self._update_display_text()
+        self._update_order_display()
 
-    def toggle_visibility(self): self.setVisible(not self.isVisible())
+    def toggle_visibility(self):
+        is_visible = not self.isVisible()
+        self.setVisible(is_visible)
+        self.input_aware_overlay.setVisible(is_visible)
+    
+    def close_overlay_completely(self):
+        self.closed_signal.emit()
+        self.close()
 
     def closeEvent(self, event):
         if self.hotkey_listener:
             self.hotkey_listener.stop()
+            self.hotkey_listener.join()
+        self.input_aware_overlay.close()
         super().closeEvent(event)
 
 # ---------------------------------------------------------
-# 3. Main Tester Dialog
+# 4. Main Tester Dialog
 # ---------------------------------------------------------
 class TestLauncher(QDialog):
     def __init__(self):
@@ -199,6 +350,8 @@ class TestLauncher(QDialog):
         self.overlay = None
         self._overlay_texts = []
         self._overlay_copy_data = []
+        self._overlay_order_list = []
+        self._overlay_order_per_item = []
         self.initUI()
 
     def initUI(self):
@@ -210,7 +363,6 @@ class TestLauncher(QDialog):
         form_layout.addWidget(self.name_input)
         layout.addLayout(form_layout)
 
-        # Buttons
         btn_layout = QHBoxLayout()
         self.test_db_btn = QPushButton("1. DB 연결 테스트")
         self.test_db_btn.clicked.connect(self.check_db)
@@ -221,14 +373,13 @@ class TestLauncher(QDialog):
         btn_layout.addWidget(self.run_btn)
         layout.addLayout(btn_layout)
 
-        info_label = QLabel("단축키:\n- 토글: Ctrl+Alt+]\n- 이동: Ctrl+Alt+방향키(좌/우)\n- 복사: Ctrl+Alt+숫자(1~8)")
+        info_label = QLabel("단축키:\n- 토글: Ctrl+Alt+]\n- 이동: Ctrl+Alt+방향키(좌/우)\n- 복사: Ctrl+Alt+숫자(1~8)\n- 완전히 닫기: Ctrl+Alt+/")
         info_label.setStyleSheet("color: gray; padding-top: 10px;")
         layout.addWidget(info_label)
         
         self.setLayout(layout)
 
     def check_db(self):
-        """DB 연결 테스트 버튼 클릭 시 호출"""
         success, message = test_db_connection()
         if success:
             QMessageBox.information(self, "DB 연결", message)
@@ -246,40 +397,140 @@ class TestLauncher(QDialog):
 
     def process_data(self, df):
         """데이터프레임을 오버레이용 텍스트/데이터로 변환"""
-        self._overlay_texts, self._overlay_copy_data = [], []
+        self._overlay_texts = []
+        self._overlay_copy_data = []
         
-        # ... (기존 로직과 동일, 간결하게 재구성)
-        display_cols = ['주문시간', '성명', '생년월일', '성별', '신청차종', '출고예정일', '주소1', '주소2', '전화', '휴대폰', '이메일', '신청유형', '우선순위', 'RN']
-        optional_cols = ['사업자번호', '사업자명', '다자녀수', '공동명의자', '공동생년월일']
+        # 순서 데이터 수집
+        order_list = []
+        if '순서' in df.columns:
+            for _, row in df.iterrows():
+                order_value = row['순서']
+                if pd.notna(order_value) and order_value is not None:
+                    try:
+                        order_int = int(order_value)
+                        if order_int not in order_list:
+                            order_list.append(order_int)
+                    except (ValueError, TypeError):
+                        pass
+            order_list.sort()
+        
+        display_cols = ['주문시간', '성명', '생년월일', '성별', '신청차종', '출고예정일', '주소1', '주소2', '전화', '휴대폰', '이메일', '신청유형', '우선순위', 'RN', '보조금']
+        optional_cols = ['다자녀수', '공동명의자', '공동생년월일']
         date_cols = ['생년월일', '주문시간', '출고예정일', '공동생년월일']
-        copy_cols = ['성명', '주소1', '주소2', '전화', '휴대폰', '이메일']
+        base_copy_cols = ['성명', '주소1', '주소2', '전화', '휴대폰', '이메일']
 
         for _, row in df.iterrows():
             lines, copy_values = [], []
+            
+            # 현재 항목의 순서 저장
+            item_order = None
+            if '순서' in df.columns:
+                order_value = row['순서']
+                if pd.notna(order_value) and order_value is not None:
+                    try:
+                        item_order = int(order_value)
+                    except (ValueError, TypeError):
+                        pass
+            self._overlay_order_per_item.append(item_order)
+            
             has_joint = '공동명의자' in row and pd.notna(row['공동명의자']) and str(row['공동명의자']).strip() not in ['', 'nan', 'None']
             
-            shortcut_map = {col: i + 1 for i, col in enumerate(copy_cols)}
-            if has_joint: shortcut_map['공동명의자'] = 7
-            shortcut_map['RN'] = 8 if has_joint else 7
-
-            all_cols = display_cols + [c for c in optional_cols if c in row and pd.notna(row[c]) and str(row[c]).strip() not in ['', 'nan', 'None']]
+            # 사업자번호/사업자명 존재 여부 확인
+            has_business_num = False
+            has_business_name = False
+            business_num_value = ''
+            business_name_value = ''
             
-            for col in all_cols:
-                if col in row and pd.notna(row[col]):
-                    val = str(row[col]).strip()
-                    if val in ['', 'nan', 'None']: continue
-                    
-                    val = self._format_date_value(val) if col in date_cols else val
-                    
-                    if col in shortcut_map: lines.append(f"[Ctrl+Alt+{shortcut_map[col]}] {col}: {val}")
-                    else: lines.append(f"{col}: {val}")
-
+            if '사업자번호' in df.columns:
+                business_num_value = str(row['사업자번호']).strip()
+                if business_num_value and business_num_value != 'nan' and business_num_value != 'None' and business_num_value != '':
+                    has_business_num = True
+            
+            if '사업자명' in df.columns:
+                business_name_value = str(row['사업자명']).strip()
+                if business_name_value and business_name_value != 'nan' and business_name_value != 'None' and business_name_value != '':
+                    has_business_name = True
+            
+            # 동적 복사 칼럼 리스트 생성
+            dynamic_copy_columns = ['성명']
+            if has_business_num:
+                dynamic_copy_columns.append('사업자번호')
+            if has_business_name:
+                dynamic_copy_columns.append('사업자명')
+            dynamic_copy_columns.extend(['주소1', '주소2', '전화', '휴대폰', '이메일'])
+            
+            # 단축키 매핑 생성
+            copy_column_to_shortcut = {}
+            shortcut_num = 1
+            for col in dynamic_copy_columns:
+                copy_column_to_shortcut[col] = shortcut_num
+                shortcut_num += 1
+            
+            if has_joint:
+                copy_column_to_shortcut['공동명의자'] = shortcut_num
+                shortcut_num += 1
+            
+            copy_column_to_shortcut['RN'] = shortcut_num
+            
+            # 필수 표시 칼럼 처리
+            for col in display_cols:
+                if col in df.columns:
+                    value = str(row[col]).strip()
+                    if value and value != 'nan' and value != 'None':
+                        if col in date_cols:
+                            value = self._format_date_value(value)
+                        if col in copy_column_to_shortcut:
+                            shortcut_num = copy_column_to_shortcut[col]
+                            lines.append(f"[Ctrl+Alt+{shortcut_num}] {col}: {value}")
+                        else:
+                            lines.append(f"{col}: {value}")
+            
+            # 사업자번호/사업자명 처리
+            if has_business_num:
+                shortcut_num = copy_column_to_shortcut.get('사업자번호', 2)
+                lines.append(f"[Ctrl+Alt+{shortcut_num}] 사업자번호: {business_num_value}")
+            
+            if has_business_name:
+                shortcut_num = copy_column_to_shortcut.get('사업자명', 3)
+                lines.append(f"[Ctrl+Alt+{shortcut_num}] 사업자명: {business_name_value}")
+            
+            # 선택적 칼럼 처리
+            for col in optional_cols:
+                if col in df.columns:
+                    value = str(row[col]).strip()
+                    if value and value != 'nan' and value != 'None' and value != '':
+                        if col in date_cols:
+                            value = self._format_date_value(value)
+                        if col in copy_column_to_shortcut:
+                            shortcut_num = copy_column_to_shortcut[col]
+                            lines.append(f"[Ctrl+Alt+{shortcut_num}] {col}: {value}")
+                        else:
+                            lines.append(f"{col}: {value}")
+            
             self._overlay_texts.append('\n\n'.join(lines))
             
-            copy_values.extend([str(row.get(c, '') or '').strip() for c in copy_cols])
-            if has_joint: copy_values.append(str(row['공동명의자']).strip())
-            copy_values.append(str(row.get('RN', '') or '').strip())
+            # 복사 가능한 칼럼 데이터 생성
+            for col in dynamic_copy_columns:
+                if col in df.columns:
+                    value = str(row[col]).strip()
+                    if value and value != 'nan' and value != 'None':
+                        copy_values.append(value)
+                    else:
+                        copy_values.append('')
+                else:
+                    copy_values.append('')
+            
+            if has_joint:
+                copy_values.append(str(row['공동명의자']).strip())
+            
+            if 'RN' in df.columns:
+                rn_value = str(row['RN']).strip()
+                if rn_value and rn_value != 'nan' and rn_value != 'None':
+                    copy_values.append(rn_value)
+            
             self._overlay_copy_data.append(copy_values)
+        
+        self._overlay_order_list = order_list
 
     def run_overlay(self):
         name = self.name_input.text().strip()
@@ -299,13 +550,26 @@ class TestLauncher(QDialog):
             self.process_data(df)
             
             if self._overlay_texts:
-                self.overlay = OverlayWindow(self._overlay_texts, self._overlay_copy_data)
+                self.overlay = OverlayWindow(
+                    texts=self._overlay_texts, 
+                    copy_data=self._overlay_copy_data,
+                    order_list=self._overlay_order_list,
+                    order_per_item=self._overlay_order_per_item
+                )
+                self.overlay.closed_signal.connect(self._on_overlay_closed)
                 self.overlay.show()
+                self.hide()
             else:
                 QMessageBox.warning(self, "결과", "오버레이에 표시할 유효한 데이터가 없습니다.")
                 
         except Exception as e:
             QMessageBox.critical(self, "실행 오류", f"오버레이 실행 중 오류가 발생했습니다:\n{e}")
+    
+    def _on_overlay_closed(self):
+        """오버레이가 완전히 닫혔을 때 호출되는 메서드"""
+        self.overlay = None
+        self.show()
+        self.activateWindow()
 
     def closeEvent(self, event):
         if self.overlay:
