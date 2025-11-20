@@ -774,6 +774,50 @@ def fetch_delivery_day_gap(region: str) -> int | None:
         traceback.print_exc()
         return None
 
+def insert_delivery_day_gap(region: str, day_gap: int) -> bool:
+    """
+    '출고예정일' 테이블에 새로운 지역 데이터를 추가한다.
+    이미 존재하는 경우 추가하지 않는다.
+    
+    Args:
+        region: 지역명
+        day_gap: 일수 차이
+        
+    Returns:
+        추가 성공 여부 (이미 존재하는 경우 False)
+    """
+    if not region or region == 'X':
+        return False
+    
+    if day_gap is None:
+        return False
+    
+    try:
+        # 한국 시간 (KST) 생성
+        kst = pytz.timezone('Asia/Seoul')
+        current_time = datetime.now(kst)
+        
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                # 이미 존재하는지 확인
+                check_query = "SELECT region FROM 출고예정일 WHERE region = %s"
+                cursor.execute(check_query, (region,))
+                if cursor.fetchone():
+                    # 이미 존재하는 경우 추가하지 않음
+                    return False
+                
+                # 새로 추가
+                insert_query = """
+                    INSERT INTO 출고예정일 (region, day_gap, updated_datetime)
+                    VALUES (%s, %s, %s)
+                """
+                cursor.execute(insert_query, (region, day_gap, current_time))
+                connection.commit()
+                return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()

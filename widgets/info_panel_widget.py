@@ -136,6 +136,14 @@ class InfoPanelWidget(QWidget):
                         print(f"{region}의 출고예정일 {text} (D+{date_diff})")
                     else:
                         print(f"지역 추적 불가 - 출고예정일 {text} (D+{date_diff})")
+                    
+                    # 지역이 있고 'X'가 아니면 DB에 추가 시도
+                    if region and region != 'X' and date_diff >= 0:
+                        from core.sql_manager import insert_delivery_day_gap
+                        success = insert_delivery_day_gap(region, date_diff)
+                        if success:
+                            print(f"출고예정일 테이블에 새 지역 추가: {region} (day_gap={date_diff})")
+                        # 이미 존재하는 경우는 조용히 넘어감
                         
                 except (ValueError, IndexError) as e:
                     # 날짜 파싱 실패 시 기존 메시지만 출력
