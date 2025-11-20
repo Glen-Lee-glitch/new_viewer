@@ -98,6 +98,7 @@ class AlarmWidget(QWidget):
 
     def _open_mail_dialog(self):
         """메일 전송 다이얼로그를 연다."""
-        dialog = MailDialog(worker_name=self._worker_name, parent=self)
+        dialog = MailDialog(parent=self)
+        dialog.set_worker_name(self._worker_name)
         dialog.exec()
 
