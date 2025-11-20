@@ -75,6 +75,17 @@ class InfoPanelWidget(QWidget):
                     )
                     return
                 
+                # 지역 정보 가져오기
+                region = ""
+                if hasattr(self, 'lineEdit_region'):
+                    region = self.lineEdit_region.text().strip()
+                
+                # 디버그 메시지 출력
+                if region:
+                    print(f"{region}의 출고예정일 {text}")
+                else:
+                    print("지역 추적 불가")
+                
                 # 날짜 형식이 올바르면 텍스트 앞에 '출고예정일' 추가
                 text = f"출고예정일 {text}"
             
