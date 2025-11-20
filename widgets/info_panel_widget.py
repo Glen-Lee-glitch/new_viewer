@@ -66,6 +66,11 @@ class InfoPanelWidget(QWidget):
         self.label_page_dims.setText(f"{width:.2f} x {height:.2f} (pt)")
         self.label_page_rotation.setText(f"{rotation}°")
 
+    def reset_text_radio_buttons(self):
+        """텍스트 삽입 라디오 버튼을 '일반'으로 초기화한다."""
+        if hasattr(self, 'radioButton_1'):
+            self.radioButton_1.setChecked(True)
+
     def update_basic_info(self, name: str, region: str, special_note: str, rn: str = ""):
         """기본 정보를 업데이트한다."""
         self.lineEdit_name.setText(name)

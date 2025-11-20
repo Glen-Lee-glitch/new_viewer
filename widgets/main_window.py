@@ -506,6 +506,9 @@ class MainWindow(QMainWindow):
         name, region, special_note, rn = self._collect_pending_basic_info()
         self._info_panel.update_basic_info(name, region, special_note, rn)
 
+        # 텍스트 삽입 라디오 버튼을 '일반'으로 초기화
+        self._info_panel.reset_text_radio_buttons()
+
         # day_gap 조회 및 설정
         if region:
             from core.sql_manager import fetch_delivery_day_gap
