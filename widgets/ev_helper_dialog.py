@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QDialog, QApplication, QLineEdit, QFileDialog, QMess
 from PyQt6.QtCore import QTimer, Qt
 from core.etc_tools import reverse_text
 from core.sql_manager import is_admin_user, fetch_preprocessed_data
-from core.ui_helpers import ReverseToolHandler
+# from core.ui_helpers import ReverseToolHandler # 더 이상 사용하지 않음
 import pandas as pd
 from datetime import datetime
 
@@ -17,8 +17,11 @@ class EVHelperDialog(QDialog):
         ui_path = Path(__file__).parent.parent / "ui" / "ev_helper_dialog.ui"
         uic.loadUi(str(ui_path), self)
 
-        # 역순 도구 핸들러 초기화
-        self.reverse_tool_handler = ReverseToolHandler(self.lineEdit_reverse_tool)
+        # 역순 도구 핸들러 제거
+        # self.reverse_tool_handler = ReverseToolHandler(self.lineEdit_reverse_tool)
+        # lineEdit_reverse_tool 자체도 UI에서 숨기거나 제거하는 것을 고려할 수 있습니다.
+        # 이 예제에서는 Python 코드만 수정합니다.
+        self.lineEdit_reverse_tool.setVisible(False)
 
         self.pushButton_select_excel.clicked.connect(self._select_excel_file)
         self.pushButton_select_excel.setVisible(False) # 엑셀 버튼 숨김
@@ -76,8 +79,8 @@ class EVHelperDialog(QDialog):
             if not df.empty:
                 # 표시할 칼럼 목록 정의
                 display_columns = [
-                    '주문시간', '성명', '생년월일', '성별', '신청차종', '출고예정일',
-                    '주소1', '주소2', '전화', '휴대폰', '이메일', '신청유형', '우선순위', 'RN'
+                    '주문시간', '성명', '생년월일', '성별', '사업자번호', '사업자명', '신청차종', '출고예정일',
+                    '주소1', '주소2', '전화', '휴대폰', '이메일', '신청유형', '우선순위', 'RN', '보조금'
                 ]
                 
                 # 값이 있을 때만 표시할 선택적 칼럼
@@ -191,12 +194,20 @@ class EVHelperDialog(QDialog):
         if self.overlay is None or not self.overlay.isVisible():
             self.overlay = OverlayWindow(texts=self._overlay_texts, copy_data=self._overlay_copy_data)
             self.overlay.show()
+            
+            # 오버레이가 뜰 때 메인 다이얼로그를 숨겨서, 
+            # 오버레이 클릭 시 메인 창이 웹 브라우저를 가리는 것을 방지
+            self.hide()
 
     def close_overlay(self):
         """'닫기' 버튼을 누르면 오버레이 창을 닫습니다."""
         if self.overlay and self.overlay.isVisible():
             self.overlay.close()
             self.overlay = None
+        
+        # 오버레이가 닫히면 메인 다이얼로그를 다시 표시
+        self.show()
+        self.activateWindow()
             
     def accept(self):
         """OK 버튼이 눌렸을 때 오버레이 창을 닫고 다이얼로그를 닫습니다."""
