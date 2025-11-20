@@ -260,7 +260,7 @@ class OverlayWindow(QWidget):
         """순서 리스트를 표시 형식으로 변환하여 레이블에 설정합니다."""
         if self.order_list:
             order_text = " -> ".join(str(order) for order in self.order_list)
-            self.order_label.setText(f"본인 작업의 순서: {order_text}")
+            self.order_label.setText(f"본인 작업의 순서:\n{order_text}")
         else:
             self.order_label.setText("")
         self.order_label.adjustSize()
