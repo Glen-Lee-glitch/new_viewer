@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, date
 from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtWidgets import QWidget, QMessageBox
@@ -80,11 +81,40 @@ class InfoPanelWidget(QWidget):
                 if hasattr(self, 'lineEdit_region'):
                     region = self.lineEdit_region.text().strip()
                 
-                # 디버그 메시지 출력
-                if region:
-                    print(f"{region}의 출고예정일 {text}")
-                else:
-                    print("지역 추적 불가")
+                # 날짜 차이 계산
+                try:
+                    # 입력된 날짜 파싱 (MM/DD 또는 M/D 형식)
+                    date_parts = text.strip().split('/')
+                    month = int(date_parts[0])
+                    day = int(date_parts[1])
+                    
+                    # 현재 날짜 (시간 제외, 날짜만)
+                    today = date.today()
+                    current_year = today.year
+                    
+                    # 입력된 날짜 객체 생성 (현재 연도 기준)
+                    input_date = date(current_year, month, day)
+                    
+                    # 만약 입력된 날짜가 이미 지났다면 다음 해로 처리
+                    if input_date < today:
+                        input_date = date(current_year + 1, month, day)
+                    
+                    # 날짜 차이 계산 (일 단위)
+                    date_diff = (input_date - today).days
+                    
+                    # 디버그 메시지 출력
+                    if region:
+                        print(f"{region}의 출고예정일 {text} (D+{date_diff})")
+                    else:
+                        print(f"지역 추적 불가 - 출고예정일 {text} (D+{date_diff})")
+                        
+                except (ValueError, IndexError) as e:
+                    # 날짜 파싱 실패 시 기존 메시지만 출력
+                    if region:
+                        print(f"{region}의 출고예정일 {text}")
+                    else:
+                        print("지역 추적 불가")
+                    print(f"날짜 차이 계산 실패: {e}")
                 
                 # 날짜 형식이 올바르면 텍스트 앞에 '출고예정일' 추가
                 text = f"출고예정일 {text}"
