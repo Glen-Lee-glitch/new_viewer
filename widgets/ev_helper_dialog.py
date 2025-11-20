@@ -235,11 +235,20 @@ class EVHelperDialog(QDialog):
             
         if self.overlay is None or not self.overlay.isVisible():
             self.overlay = OverlayWindow(texts=self._overlay_texts, copy_data=self._overlay_copy_data)
+            # 오버레이가 완전히 닫힐 때 다이얼로그를 다시 보이도록 시그널 연결
+            self.overlay.closed_signal.connect(self._on_overlay_closed)
             self.overlay.show()
             
             # 오버레이가 뜰 때 메인 다이얼로그를 숨겨서, 
             # 오버레이 클릭 시 메인 창이 웹 브라우저를 가리는 것을 방지
             self.hide()
+    
+    def _on_overlay_closed(self):
+        """오버레이가 완전히 닫혔을 때 호출되는 메서드"""
+        self.overlay = None
+        # 다이얼로그를 다시 표시
+        self.show()
+        self.activateWindow()
 
     def close_overlay(self):
         """'닫기' 버튼을 누르면 오버레이 창을 닫습니다."""

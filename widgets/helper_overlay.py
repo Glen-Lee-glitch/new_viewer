@@ -99,6 +99,7 @@ class HotkeyEmitter(QObject):
     copy_signal = pyqtSignal(int)  # 복사 기능 추가 (인덱스 전달)
     toggle_overlay_signal = pyqtSignal()
     navigate_signal = pyqtSignal(str) # 탐색 시그널 추가
+    close_overlay_signal = pyqtSignal() # 완전히 닫기 시그널 추가
 
     def emit_copy(self, index):
         self.copy_signal.emit(index)
@@ -108,8 +109,14 @@ class HotkeyEmitter(QObject):
         
     def emit_navigate(self, direction): # 탐색 시그널 발생 메서드
         self.navigate_signal.emit(direction)
+    
+    def emit_close(self): # 완전히 닫기 시그널 발생 메서드
+        self.close_overlay_signal.emit()
 
 class OverlayWindow(QWidget):
+    # 오버레이가 완전히 닫힐 때 발생하는 시그널
+    closed_signal = pyqtSignal()
+    
     def __init__(self, texts, copy_data=None, parent=None):
         super().__init__(parent)
         self.texts = texts
@@ -126,6 +133,7 @@ class OverlayWindow(QWidget):
         self.hotkey_emitter.copy_signal.connect(self.copy_to_clipboard)
         self.hotkey_emitter.toggle_overlay_signal.connect(self.toggle_visibility)
         self.hotkey_emitter.navigate_signal.connect(self.navigate_text) # 탐색 시그널 연결
+        self.hotkey_emitter.close_overlay_signal.connect(self.close_overlay_completely) # 완전히 닫기 시그널 연결
 
         self.setup_hotkeys()
 
@@ -169,7 +177,8 @@ class OverlayWindow(QWidget):
         hotkeys = {
             '<ctrl>+<alt>+<right>': self._on_navigate_pressed('next'),
             '<ctrl>+<alt>+<left>': self._on_navigate_pressed('prev'),
-            '<ctrl>+<alt>+]': self._on_toggle_pressed
+            '<ctrl>+<alt>+]': self._on_toggle_pressed,
+            '<ctrl>+<alt>+/': self._on_close_pressed  # 완전히 닫기 단축키 추가
         }
         
         # 현재 신청 건의 복사 가능한 칼럼 개수에 따라 숫자 키 단축키 추가 (최대 8개)
@@ -189,6 +198,9 @@ class OverlayWindow(QWidget):
 
     def _on_toggle_pressed(self):
         self.hotkey_emitter.emit_toggle()
+    
+    def _on_close_pressed(self):
+        self.hotkey_emitter.emit_close()
 
     def copy_to_clipboard(self, index):
         """단축키 신호를 받아 클립보드에 텍스트를 복사하는 슬롯"""
@@ -305,6 +317,13 @@ class OverlayWindow(QWidget):
         is_visible = not self.isVisible()
         self.setVisible(is_visible)
         self.input_aware_overlay.setVisible(is_visible)
+    
+    def close_overlay_completely(self):
+        """단축키 신호를 받아 오버레이를 완전히 닫습니다."""
+        # 시그널 발생하여 EVHelperDialog가 다시 보이도록 함
+        self.closed_signal.emit()
+        # 오버레이 닫기
+        self.close()
 
     def paintEvent(self, event):
         """
