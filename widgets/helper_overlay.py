@@ -56,6 +56,9 @@ class ReverseLineEdit(QLineEdit):
             # 성공 시 시각적 피드백
             self.setStyleSheet("border: 2px solid #00FF00; background-color: rgba(0, 255, 0, 100); color: white;")
             QTimer.singleShot(1000, self._remove_highlight)
+            
+            # 5초 뒤 텍스트 초기화
+            QTimer.singleShot(5000, self.clear)
         else:
             super().mousePressEvent(event)
 
