@@ -1113,19 +1113,23 @@ class MainWindow(QMainWindow):
             print("디버그: RN 번호가 설정되지 않았습니다.")
             return
 
-        found_document = False
         found_file_path = ""
-        for root, _, files in os.walk(base_path):
-            for file in files:
-                if file.startswith(rn_number):
-                    found_file_path = os.path.join(root, file)
-                    print(f"디버그: 서류 발견 - {found_file_path}")
-                    found_document = True
+        # 우선순위: .pdf 먼저 찾기
+        priority_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
+        
+        for ext in priority_extensions:
+            for root, _, files in os.walk(base_path):
+                for file in files:
+                    if file.startswith(rn_number) and file.lower().endswith(ext):
+                        found_file_path = os.path.join(root, file)
+                        print(f"디버그: 서류 발견 ({ext}) - {found_file_path}")
+                        break
+                if found_file_path:
                     break
-            if found_document:
+            if found_file_path:
                 break
 
-        if not found_document:
+        if not found_file_path:
             print(f"디버그: RN 번호 {rn_number}에 해당하는 서류를 찾을 수 없습니다.")
             QMessageBox.information(self, "알림", f"RN 번호 {rn_number}에 해당하는 출고배정표를 찾을 수 없습니다.")
             return
