@@ -76,7 +76,7 @@ class InfoPanelWidget(QWidget):
                     return
                 
                 # 날짜 형식이 올바르면 텍스트 앞에 '출고예정일' 추가
-                text = f"출고예정일{text}"
+                text = f"출고예정일 {text}"
             
             if text:
                 self.text_stamp_requested.emit(text, font_size) # 텍스트와 폰트 크기 함께 전달
