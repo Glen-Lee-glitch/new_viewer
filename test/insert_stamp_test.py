@@ -3,6 +3,17 @@ from pathlib import Path
 import os
 import platform
 from PIL import Image, ImageDraw, ImageFont
+import pymysql
+from contextlib import closing
+
+DB_CONFIG = {
+    'host': '192.168.0.114',
+    'port': 3306,
+    'user': 'my_pc_user',
+    'password': '!Qdhdbrclf56',
+    'db': 'greetlounge',
+    'charset': 'utf8mb4'
+}
 
 # A4 규격 (포인트 단위)
 A4_WIDTH_PT = 595.276
@@ -10,6 +21,38 @@ A4_HEIGHT_PT = 841.890
 
 file_path = 'stamp_test.pdf'
 page_num = 9
+
+
+def fetch_table_data():
+    """
+    데이터베이스에서 3개의 테이블 데이터를 가져옵니다.
+    
+    Returns:
+        dict: {
+            'emails': list[dict],
+            'subsidy_applications': list[dict],
+            'test_ai_구매계약서': list[dict]
+        }
+    """
+    tables = ['emails', 'subsidy_applications', 'test_ai_구매계약서']
+    result = {}
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            for table_name in tables:
+                query = f"SELECT * FROM {table_name}"
+                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                    cursor.execute(query)
+                    result[table_name] = cursor.fetchall()
+                    print(f"✅ {table_name} 테이블에서 {len(result[table_name])}개 행을 가져왔습니다.")
+        
+        return result
+    
+    except Exception as e:
+        print(f"❌ 데이터베이스 조회 중 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
+        return {table: [] for table in tables}
 
 def find_korean_font():
     """시스템에서 한글 폰트 파일 경로를 찾습니다."""
@@ -171,12 +214,16 @@ def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int =
     print(f"   파일 저장 완료: {pdf_path}")
 
 if __name__ == "__main__":
-    text = '출고예정일 11/28'
-    font_size = 16
+
+    # text = '출고예정일 11/28'
+    # font_size = 16
     
-    try:
-        insert_text_to_pdf(file_path, page_num - 1, text, font_size)  # page_num은 1-based이므로 -1
-    except Exception as e:
-        print(f"❌ 오류 발생: {e}")
-        import traceback
-        traceback.print_exc()
+    # try:
+    #     insert_text_to_pdf(file_path, page_num - 1, text, font_size)  # page_num은 1-based이므로 -1
+    # except Exception as e:
+    #     print(f"❌ 오류 발생: {e}")
+    #     import traceback
+    #     traceback.print_exc()
+
+
+    fetch_table_data()
