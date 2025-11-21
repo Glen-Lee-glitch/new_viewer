@@ -9,7 +9,7 @@ A4_WIDTH_PT = 595.276
 A4_HEIGHT_PT = 841.890
 
 file_path = 'stamp_test.pdf'
-page_num = 10
+page_num = 9
 
 def find_korean_font():
     """시스템에서 한글 폰트 파일 경로를 찾습니다."""
@@ -172,7 +172,7 @@ def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int =
 
 if __name__ == "__main__":
     text = '출고예정일 11/28'
-    font_size = 19
+    font_size = 16
     
     try:
         insert_text_to_pdf(file_path, page_num - 1, text, font_size)  # page_num은 1-based이므로 -1
