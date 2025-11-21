@@ -1,5 +1,5 @@
 import pymysql
-from datetime import datetime, date
+from datetime import datetime, date, time, timedelta
 import pytz
 import pandas as pd
 import traceback
@@ -255,22 +255,22 @@ def fetch_recent_subsidy_applications():
         return pd.DataFrame()
 
 def fetch_today_subsidy_applications_by_worker(worker_name: str):
-    """오늘 날짜의 지원금 신청 데이터 중 특정 작업자에게 할당된 데이터를 조회한다."""
+    """이전 영업일 18시 이후의 지원금 신청 데이터 중 특정 작업자에게 할당된 데이터를 조회한다."""
     if not worker_name:
         return pd.DataFrame()
     
     try:
-        kst = pytz.timezone('Asia/Seoul')
-        today = datetime.now(kst).date()
+        # 이전 영업일 18시 이후 시간 계산
+        cutoff_datetime = get_previous_business_day_after_18h()
         
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = _build_subsidy_query_base() + (
-                "WHERE DATE(sa.recent_received_date) = %s "
+                "WHERE sa.recent_received_date >= %s "
                 "AND sa.worker = %s "
                 "ORDER BY sa.recent_received_date DESC "
                 "LIMIT 30"
             )
-            params = (today, worker_name)
+            params = (cutoff_datetime, worker_name)
             df = pd.read_sql(query, connection, params=params)
 
         if df.empty:
@@ -363,19 +363,19 @@ def fetch_today_subsidy_applications_by_worker(worker_name: str):
         return pd.DataFrame()
 
 def fetch_today_unfinished_subsidy_applications():
-    """오늘 날짜의 지원금 신청 데이터 중 작업자가 할당되지 않은 데이터를 조회한다."""
+    """이전 영업일 18시 이후의 지원금 신청 데이터 중 작업자가 할당되지 않은 데이터를 조회한다."""
     try:
-        kst = pytz.timezone('Asia/Seoul')
-        today = datetime.now(kst).date()
+        # 이전 영업일 18시 이후 시간 계산
+        cutoff_datetime = get_previous_business_day_after_18h()
         
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = _build_subsidy_query_base() + (
-                "WHERE DATE(sa.recent_received_date) = %s "
+                "WHERE sa.recent_received_date >= %s "
                 "AND (sa.worker IS NULL OR sa.worker = '') "
                 "ORDER BY sa.recent_received_date DESC "
                 "LIMIT 30"
             )
-            params = (today,)
+            params = (cutoff_datetime,)
             df = pd.read_sql(query, connection, params=params)
 
         if df.empty:
@@ -995,7 +995,8 @@ def fetch_delivery_day_gap(region: str) -> int | None:
 
 def fetch_holidays() -> set[date]:
     """
-    'greetlounge_holidays' 테이블에서 모든 공휴일을 조회하여 set으로 반환한다.
+    'greetlounge_holiday' 테이블에서 모든 공휴일을 조회하여 set으로 반환한다.
+    테이블이 존재하지 않으면 빈 set을 반환한다.
     
     Returns:
         공휴일 date 객체들의 set
@@ -1003,7 +1004,7 @@ def fetch_holidays() -> set[date]:
     holidays = set()
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = "SELECT date FROM greetlounge_holidays"
+            query = "SELECT date FROM greetlounge_holiday"
             with connection.cursor() as cursor:
                 cursor.execute(query)
                 rows = cursor.fetchall()
@@ -1023,9 +1024,57 @@ def fetch_holidays() -> set[date]:
                                 holidays.add(datetime.strptime(holiday_date.split()[0], "%Y-%m-%d").date())
                             except ValueError:
                                 pass
+    except pymysql.err.ProgrammingError as e:
+        # 테이블이 존재하지 않는 경우 빈 set 반환
+        if e.args[0] == 1146:  # Table doesn't exist
+            return set()
+        # 다른 프로그래밍 오류는 재발생
+        raise
     except Exception:
+        # 기타 오류는 로그만 출력하고 빈 set 반환
         traceback.print_exc()
     return holidays
+
+def get_previous_business_day_after_18h() -> datetime:
+    """
+    이전 영업일(주말/공휴일 제외)의 18시 이후 시간을 반환한다.
+    
+    예시:
+    - 오늘이 월요일 → 금요일 18:00:00
+    - 오늘이 월요일이고 금요일이 공휴일 → 목요일 18:00:00
+    
+    Returns:
+        이전 영업일 18시 이후의 datetime 객체 (KST 타임존)
+    """
+    kst = pytz.timezone('Asia/Seoul')
+    today = datetime.now(kst).date()
+    holidays = fetch_holidays()
+    
+    # 최대 30일까지 체크 (무한 루프 방지)
+    max_iterations = 30
+    iteration = 0
+    check_date = today - timedelta(days=1)  # 어제부터 시작
+    
+    while iteration < max_iterations:
+        weekday = check_date.weekday()  # 월요일=0, 일요일=6
+        is_weekend = weekday >= 5  # 토요일(5) 또는 일요일(6)
+        is_holiday = check_date in holidays
+        
+        # 주말이 아니고 공휴일도 아니면 영업일
+        if not is_weekend and not is_holiday:
+            # 해당 날짜의 18시 00분 00초로 datetime 생성
+            result_datetime = datetime.combine(check_date, time(18, 0, 0))
+            return kst.localize(result_datetime)
+        
+        # 주말이거나 공휴일이면 하루 더 전으로 이동
+        check_date = check_date - timedelta(days=1)
+        iteration += 1
+    
+    # 최대 반복 횟수에 도달한 경우 (에러 방지)
+    # 어제 날짜의 18시로 반환
+    fallback_date = today - timedelta(days=1)
+    result_datetime = datetime.combine(fallback_date, time(18, 0, 0))
+    return kst.localize(result_datetime)
 
 def fetch_give_works() -> pd.DataFrame:
     """
