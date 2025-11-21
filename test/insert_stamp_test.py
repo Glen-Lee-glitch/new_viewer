@@ -157,9 +157,14 @@ def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int =
     image_rect = pymupdf.Rect(x, y, x + img_width, y + img_height)
     page.insert_image(image_rect, stream=text_image_bytes)
     
-    # 같은 파일명으로 저장
-    doc.save(pdf_path, incremental=False, encryption=pymupdf.PDF_ENCRYPT_KEEP)
+    # 임시 파일에 저장한 후 원본 파일로 교체
+    temp_path = str(pdf_file.with_suffix('.tmp.pdf'))
+    doc.save(temp_path, incremental=False, encryption=pymupdf.PDF_ENCRYPT_KEEP)
     doc.close()
+    
+    # 원본 파일을 임시 파일로 교체
+    pdf_file.unlink()  # 원본 파일 삭제
+    Path(temp_path).rename(pdf_path)  # 임시 파일을 원본 이름으로 변경
     
     print(f"✅ 텍스트 '{text}'가 페이지 {page_num + 1}에 삽입되었습니다.")
     print(f"   좌표: ({x:.2f}, {y:.2f})")
