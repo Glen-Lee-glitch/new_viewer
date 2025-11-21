@@ -197,10 +197,6 @@ class MainWindow(QMainWindow):
         
         self.menu_edit.addSeparator()
         
-        settings_action = QAction("설정", self)
-        settings_action.triggered.connect(self._open_settings_dialog)
-        self.menu_edit.addAction(settings_action)
-        
         # 보기 메뉴
         todo_action = QAction("할일 목록", self)
         todo_action.setCheckable(True)
@@ -216,8 +212,20 @@ class MainWindow(QMainWindow):
         self.view_saved_pdfs_action = QAction("저장된 PDF 보기", self)
         # self.view_saved_pdfs_action.triggered.connect(self._open_saved_pdfs_dialog)
         self.menu_view.addAction(self.view_saved_pdfs_action)
+        
+        self.menu_view.addSeparator()
+        
+        # AI 결과 보기 액션 추가 (초기에는 비활성화)
+        self.view_ai_results_action = QAction("AI 결과 보기", self)
+        self.view_ai_results_action.setEnabled(False)
+        self.view_ai_results_action.triggered.connect(self._open_ai_results_dialog)
+        self.menu_view.addAction(self.view_ai_results_action)
 
         # 설정 메뉴
+        settings_action = QAction("설정", self)
+        settings_action.triggered.connect(self._open_settings_dialog)
+        self.menu_edit.addAction(settings_action)
+
         preferences_action = QAction("환경설정", self)
         preferences_action.triggered.connect(self._open_config_dialog)
         self.menu_settings.addAction(preferences_action)
@@ -459,6 +467,13 @@ class MainWindow(QMainWindow):
         self._gemini_results_dialog.show()
         self._gemini_results_dialog.raise_()
         self._gemini_results_dialog.activateWindow()
+    
+    def _open_ai_results_dialog(self):
+        """현재 작업 중인 RN으로 AI 결과 다이얼로그를 연다."""
+        if self._current_rn:
+            self._show_gemini_results_dialog(self._current_rn)
+        else:
+            QMessageBox.warning(self, "오류", "현재 작업 중인 RN이 없습니다.")
 
     # === 문서 생명주기 관리 ===
     def load_document(self, pdf_paths: list, is_preprocessed: bool = False):
@@ -536,6 +551,9 @@ class MainWindow(QMainWindow):
         # 성남시인 경우 전용 액션 활성화
         if hasattr(self, 'outbound_allocation_action') and region == '성남시':
             self.outbound_allocation_action.setEnabled(True)
+        
+        # AI 결과 보기 액션 활성화/비활성화
+        self._update_ai_results_action_state(rn)
 
     def _handle_pdf_selected(self, pdf_paths: list):
         self._pending_basic_info = None
@@ -689,6 +707,10 @@ class MainWindow(QMainWindow):
         # 메인화면으로 돌아갈 때 '원본 불러오기' 액션 비활성화
         if hasattr(self, 'load_original_action'):
             self.load_original_action.setEnabled(False)
+        
+        # AI 결과 보기 액션 비활성화
+        if hasattr(self, 'view_ai_results_action'):
+            self.view_ai_results_action.setEnabled(False)
 
         self._pdf_load_widget.show()
         
@@ -877,6 +899,23 @@ class MainWindow(QMainWindow):
                 self.worker_label_2.setText(f"작업자: {self._worker_name}")
             else:
                 self.worker_label_2.setText("작업자: 미로그인")
+    
+    def _update_ai_results_action_state(self, rn: str):
+        """AI 결과 보기 액션의 활성화 상태를 업데이트한다."""
+        if not hasattr(self, 'view_ai_results_action'):
+            return
+        
+        if not rn:
+            self.view_ai_results_action.setEnabled(False)
+            return
+        
+        # AI 결과 플래그 확인
+        from core.sql_manager import check_gemini_flags
+        flags = check_gemini_flags(rn)
+        
+        # 플래그 중 하나라도 True면 활성화
+        has_ai_results = any(flags.values()) if flags else False
+        self.view_ai_results_action.setEnabled(has_ai_results)
 
     # === 이벤트 처리 ===
     
