@@ -2,8 +2,7 @@ import pymupdf
 from pathlib import Path
 import os
 import platform
-from PyQt6.QtGui import QPixmap, QPainter, QFont, QFontMetrics
-from PyQt6.QtCore import Qt, QBuffer, QIODevice
+from PIL import Image, ImageDraw, ImageFont
 
 # A4 규격 (포인트 단위)
 A4_WIDTH_PT = 595.276
@@ -12,52 +11,105 @@ A4_HEIGHT_PT = 841.890
 file_path = 'stamp_test.pdf'
 page_num = 10
 
+def find_korean_font():
+    """시스템에서 한글 폰트 파일 경로를 찾습니다."""
+    system = platform.system()
+    
+    if system == "Windows":
+        font_dirs = [
+            os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts"),
+        ]
+        font_files = [
+            "malgun.ttf",  # 맑은 고딕
+            "malgunbd.ttf",  # 맑은 고딕 Bold
+            "gulim.ttc",  # 굴림
+        ]
+        
+        for font_dir in font_dirs:
+            if os.path.exists(font_dir):
+                for font_file in font_files:
+                    font_path = os.path.join(font_dir, font_file)
+                    if os.path.exists(font_path):
+                        return font_path
+    
+    elif system == "Darwin":  # macOS
+        font_dirs = [
+            "/System/Library/Fonts/Supplemental",
+            "/Library/Fonts",
+        ]
+        font_files = ["AppleGothic.ttf"]
+        
+        for font_dir in font_dirs:
+            if os.path.exists(font_dir):
+                for font_file in font_files:
+                    font_path = os.path.join(font_dir, font_file)
+                    if os.path.exists(font_path):
+                        return font_path
+    
+    elif system == "Linux":
+        font_dirs = [
+            "/usr/share/fonts/truetype/nanum",
+            "/usr/share/fonts/truetype/liberation",
+        ]
+        font_files = ["NanumGothic.ttf"]
+        
+        for font_dir in font_dirs:
+            if os.path.exists(font_dir):
+                for font_file in font_files:
+                    font_path = os.path.join(font_dir, font_file)
+                    if os.path.exists(font_path):
+                        return font_path
+    
+    return None
+
 def create_text_image(text: str, font_size: int = 19) -> bytes:
     """
-    텍스트를 이미지로 변환하여 PNG 바이트를 반환합니다.
-    한글 폰트를 제대로 지원하기 위해 PyQt6를 사용합니다.
+    PIL을 사용하여 텍스트를 이미지로 변환하여 PNG 바이트를 반환합니다.
     """
-    # 한글 폰트 설정 (Windows: 맑은 고딕)
-    system = platform.system()
-    if system == "Windows":
-        font_family = "Malgun Gothic"
-    elif system == "Darwin":  # macOS
-        font_family = "AppleGothic"
-    else:  # Linux
-        font_family = "NanumGothic"
+    # 한글 폰트 찾기
+    font_path = find_korean_font()
     
-    font = QFont(font_family, font_size, QFont.Weight.Normal)
+    try:
+        if font_path:
+            # 폰트 파일 로드 (폰트 크기를 포인트에서 픽셀로 변환, DPI 72 기준)
+            font = ImageFont.truetype(font_path, int(font_size * 1.33))  # pt to px 변환
+        else:
+            # 기본 폰트 사용 (한글 지원 안 될 수 있음)
+            font = ImageFont.load_default()
+            print("⚠️ 한글 폰트를 찾을 수 없습니다. 기본 폰트를 사용합니다.")
+    except Exception as e:
+        print(f"⚠️ 폰트 로드 실패: {e}, 기본 폰트 사용")
+        font = ImageFont.load_default()
     
     # 텍스트 크기 계산
-    fm = QFontMetrics(font)
-    text_width = fm.horizontalAdvance(text)
-    text_height = fm.height()
+    # 임시 이미지로 텍스트 크기 측정
+    temp_img = Image.new('RGB', (1, 1))
+    temp_draw = ImageDraw.Draw(temp_img)
+    bbox = temp_draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
     
-    # 여백 추가하여 Pixmap 생성
+    # 여백 추가하여 이미지 생성
     padding = 10
-    pixmap = QPixmap(text_width + padding * 2, text_height + padding * 2)
-    pixmap.fill(Qt.GlobalColor.transparent)  # 투명 배경
+    img_width = text_width + padding * 2
+    img_height = text_height + padding * 2
     
-    # QPainter로 텍스트 그리기
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setFont(font)
-    painter.setPen(Qt.GlobalColor.black)  # 검정색
+    # 투명 배경 이미지 생성
+    img = Image.new('RGBA', (img_width, img_height), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(img)
     
-    # 텍스트 그리기 (여백 고려)
-    painter.drawText(padding, padding + fm.ascent(), text)
-    painter.end()
+    # 텍스트 그리기 (검정색)
+    draw.text((padding, padding), text, font=font, fill=(0, 0, 0, 255))
     
-    # QPixmap을 PNG 바이트로 변환
-    byte_array = QBuffer()
-    byte_array.open(QIODevice.OpenModeFlag.WriteOnly)
-    pixmap.save(byte_array, "PNG")
-    return bytes(byte_array.data())
+    # PNG 바이트로 변환
+    import io
+    img_bytes = io.BytesIO()
+    img.save(img_bytes, format='PNG')
+    return img_bytes.getvalue()
 
 def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int = 19):
     """
     PDF 파일의 특정 페이지에 텍스트를 중앙에 삽입하고 저장합니다.
-    한글 지원을 위해 텍스트를 이미지로 변환하여 삽입합니다.
     
     Args:
         pdf_path: PDF 파일 경로
@@ -88,13 +140,14 @@ def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int =
     # 텍스트를 이미지로 변환
     text_image_bytes = create_text_image(text, font_size)
     
-    # 이미지 크기 계산 (포인트 단위로 변환)
-    # 폰트 크기를 기준으로 대략적인 이미지 크기 계산
+    # 이미지 크기 계산
     text_image = pymupdf.open(stream=text_image_bytes, filetype="png")
     img_page = text_image[0]
     img_rect = img_page.rect
     img_width = img_rect.width
     img_height = img_rect.height
+    
+    text_image.close()
     
     # 페이지 중앙 좌표 계산
     x = (page_width - img_width) / 2
@@ -103,8 +156,6 @@ def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int =
     # 이미지를 PDF 페이지에 삽입
     image_rect = pymupdf.Rect(x, y, x + img_width, y + img_height)
     page.insert_image(image_rect, stream=text_image_bytes)
-    
-    text_image.close()
     
     # 같은 파일명으로 저장
     doc.save(pdf_path, incremental=False, encryption=pymupdf.PDF_ENCRYPT_KEEP)
