@@ -51,12 +51,12 @@ class PdfLoadWidget(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.init_ui()
-        self.setup_connections()
         self._pdf_view_widget = None
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 시작 여부
         self._filter_mode = 'all'  # 필터 모드: 'all', 'my', 'unfinished'
         self._worker_name = ''  # 현재 로그인한 작업자 이름
+        self.init_ui()
+        self.setup_connections()
     
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
