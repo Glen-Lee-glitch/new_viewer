@@ -18,7 +18,13 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
 )
 
-from core.sql_manager import fetch_recent_subsidy_applications, fetch_application_data_by_rn, fetch_give_works
+from core.sql_manager import (
+    fetch_recent_subsidy_applications, 
+    fetch_application_data_by_rn, 
+    fetch_give_works,
+    fetch_today_subsidy_applications_by_worker,
+    fetch_today_unfinished_subsidy_applications
+)
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -162,8 +168,20 @@ class PdfLoadWidget(QWidget):
     def populate_recent_subsidy_rows(self):
         """최근 지원금 신청 데이터를 테이블에 채운다."""
         table = self.complement_table_widget
+        
+        # 필터 모드에 따라 다른 SQL 함수 호출
         try:
-            df = fetch_recent_subsidy_applications()
+            if self._filter_mode == 'all':
+                df = fetch_recent_subsidy_applications()
+            elif self._filter_mode == 'my':
+                if not self._worker_name:
+                    table.setRowCount(0)
+                    return
+                df = fetch_today_subsidy_applications_by_worker(self._worker_name)
+            elif self._filter_mode == 'unfinished':
+                df = fetch_today_unfinished_subsidy_applications()
+            else:
+                df = fetch_recent_subsidy_applications()
         except Exception as error:  # pragma: no cover - UI 경고용
             QMessageBox.warning(self, "데이터 로드 실패", f"지원금 신청 데이터 조회 중 오류가 발생했습니다.\n{error}")
             table.setRowCount(0)
@@ -173,8 +191,8 @@ class PdfLoadWidget(QWidget):
             table.setRowCount(0)
             return
 
-        # 필터 적용 (필터 내부에서 이미 최대 30개로 제한됨)
-        df = self._apply_filter(df)
+        # 전체보기는 이미 30개로 제한되어 있고, 내신청건/미신청건도 SQL에서 30개로 제한됨
+        # 추가 필터링 불필요
 
         row_count = len(df)
         table.setRowCount(row_count)
@@ -383,26 +401,6 @@ class PdfLoadWidget(QWidget):
         """작업자 이름을 설정한다."""
         self._worker_name = worker_name or ''
     
-    def _apply_filter(self, df: pd.DataFrame) -> pd.DataFrame:
-        """필터 모드에 따라 데이터프레임을 필터링한다."""
-        if df.empty:
-            return df
-        
-        if self._filter_mode == 'all':
-            # 전체보기: 기존 30개의 최근 row 유지 (필터링 없음)
-            return df.head(30)
-        elif self._filter_mode == 'my':
-            # 내신청건: 작업자가 프로그램 사용자와 일치하는 row 최대 30개
-            if not self._worker_name:
-                return pd.DataFrame()  # 작업자 이름이 없으면 빈 데이터프레임 반환
-            filtered_df = df[df['worker'] == self._worker_name]
-            return filtered_df.head(30)
-        elif self._filter_mode == 'unfinished':
-            # 미신청건: 작업자에 빈 값이 들어있는 row 최대 30개
-            filtered_df = df[df['worker'].isna() | (df['worker'] == '')]
-            return filtered_df.head(30)
-        
-        return df
     
     def setup_connections(self):
         """시그널-슬롯 연결"""

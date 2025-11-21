@@ -61,56 +61,61 @@ def claim_subsidy_work(rn: str, worker: str) -> bool:
         traceback.print_exc()
         return False
 
+def _build_subsidy_query_base():
+    """지원금 신청 데이터 조회용 기본 쿼리 문자열을 반환한다."""
+    return (
+        "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
+        # "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "  # 주석 처리됨
+        "       e.attached_file_path AS original_filepath, "
+        "       sa.recent_thread_id, "
+        "       e.file_rendered, "
+        "       gr.구매계약서, "
+        "       gr.초본, "
+        "       gr.공동명의, "
+        "       gr.다자녀, "
+        "       sa.urgent, "
+        "       d.child_birth_date, "
+        "       cb.issue_date, "
+        "       CASE "
+        "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
+        "               CASE "
+        "                   WHEN (gr.구매계약서 = 1 AND (c.ai_계약일자 IS NULL OR c.ai_이름 IS NULL OR c.전화번호 IS NULL OR c.이메일 IS NULL)) "
+        "                   OR (gr.초본 = 1 AND (cb.name IS NULL OR cb.birth_date IS NULL OR cb.address_1 IS NULL)) "
+        "                   OR (gr.청년생애 = 1 AND (y.local_name IS NULL OR y.range_date IS NULL)) "
+        "                   THEN 'O' "
+        "                   ELSE 'X' "
+        "               END "
+        "           ELSE '' "
+        "       END AS outlier, "
+        "       CASE "
+        "           WHEN re.mail_type = '신청완료' THEN CAST(re.app_num AS CHAR) "
+        "           WHEN re.mail_type = '서류미비' AND re.app_num IS NULL THEN '서류미비' "
+        "           WHEN re.mail_type = '서류미비' AND re.app_num IS NOT NULL THEN CONCAT(re.app_num, '_미비') "
+        "           ELSE NULL "
+        "       END AS result "
+        "FROM subsidy_applications sa "
+        "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
+        "LEFT JOIN gemini_results gr ON sa.RN COLLATE utf8mb4_unicode_ci = gr.RN COLLATE utf8mb4_unicode_ci "
+        "LEFT JOIN test_ai_구매계약서 c ON sa.RN COLLATE utf8mb4_unicode_ci = c.RN COLLATE utf8mb4_unicode_ci "
+        "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
+        "LEFT JOIN test_ai_청년생애 y ON sa.RN COLLATE utf8mb4_unicode_ci = y.RN COLLATE utf8mb4_unicode_ci "
+        "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
+        "LEFT JOIN ("
+        "    SELECT re1.RN, re1.mail_type, re1.app_num "
+        "    FROM reply_emails re1 "
+        "    INNER JOIN ("
+        "        SELECT RN, MAX(id) AS max_id "
+        "        FROM reply_emails "
+        "        GROUP BY RN"
+        "    ) re2 ON re1.RN = re2.RN AND re1.id = re2.max_id"
+        ") re ON sa.RN COLLATE utf8mb4_unicode_ci = re.RN COLLATE utf8mb4_unicode_ci "
+    )
+
 def fetch_recent_subsidy_applications():
     """최근 접수된 지원금 신청 데이터를 조회하고 출력한다."""
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = (
-                "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
-                # "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "  # 주석 처리됨
-                "       e.attached_file_path AS original_filepath, "
-                "       sa.recent_thread_id, "
-                "       e.file_rendered, "
-                "       gr.구매계약서, "
-                "       gr.초본, "
-                "       gr.공동명의, "
-                "       gr.다자녀, "
-                "       sa.urgent, "
-                "       d.child_birth_date, "
-                "       cb.issue_date, "
-                "       CASE "
-                "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
-                "               CASE "
-                "                   WHEN (gr.구매계약서 = 1 AND (c.ai_계약일자 IS NULL OR c.ai_이름 IS NULL OR c.전화번호 IS NULL OR c.이메일 IS NULL)) "
-                "                   OR (gr.초본 = 1 AND (cb.name IS NULL OR cb.birth_date IS NULL OR cb.address_1 IS NULL)) "
-                "                   OR (gr.청년생애 = 1 AND (y.local_name IS NULL OR y.range_date IS NULL)) "
-                "                   THEN 'O' "
-                "                   ELSE 'X' "
-                "               END "
-                "           ELSE '' "
-                "       END AS outlier, "
-                "       CASE "
-                "           WHEN re.mail_type = '신청완료' THEN CAST(re.app_num AS CHAR) "
-                "           WHEN re.mail_type = '서류미비' AND re.app_num IS NULL THEN '서류미비' "
-                "           WHEN re.mail_type = '서류미비' AND re.app_num IS NOT NULL THEN CONCAT(re.app_num, '_미비') "
-                "           ELSE NULL "
-                "       END AS result "
-                "FROM subsidy_applications sa "
-                "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
-                "LEFT JOIN gemini_results gr ON sa.RN COLLATE utf8mb4_unicode_ci = gr.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN test_ai_구매계약서 c ON sa.RN COLLATE utf8mb4_unicode_ci = c.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN test_ai_청년생애 y ON sa.RN COLLATE utf8mb4_unicode_ci = y.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN ("
-                "    SELECT re1.RN, re1.mail_type, re1.app_num "
-                "    FROM reply_emails re1 "
-                "    INNER JOIN ("
-                "        SELECT RN, MAX(id) AS max_id "
-                "        FROM reply_emails "
-                "        GROUP BY RN"
-                "    ) re2 ON re1.RN = re2.RN AND re1.id = re2.max_id"
-                ") re ON sa.RN COLLATE utf8mb4_unicode_ci = re.RN COLLATE utf8mb4_unicode_ci "
+            query = _build_subsidy_query_base() + (
                 "WHERE sa.recent_received_date >= %s "
                 "ORDER BY sa.recent_received_date DESC "
                 "LIMIT 30"
@@ -246,6 +251,219 @@ def fetch_recent_subsidy_applications():
         return df
 
     except Exception:  # pragma: no cover - 긴급 디버깅용
+        traceback.print_exc()
+        return pd.DataFrame()
+
+def fetch_today_subsidy_applications_by_worker(worker_name: str):
+    """오늘 날짜의 지원금 신청 데이터 중 특정 작업자에게 할당된 데이터를 조회한다."""
+    if not worker_name:
+        return pd.DataFrame()
+    
+    try:
+        kst = pytz.timezone('Asia/Seoul')
+        today = datetime.now(kst).date()
+        
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = _build_subsidy_query_base() + (
+                "WHERE DATE(sa.recent_received_date) = %s "
+                "AND sa.worker = %s "
+                "ORDER BY sa.recent_received_date DESC "
+                "LIMIT 30"
+            )
+            params = (today, worker_name)
+            df = pd.read_sql(query, connection, params=params)
+
+        if df.empty:
+            return df
+
+        # 이상치 계산 로직 (fetch_recent_subsidy_applications와 동일)
+        def _is_child_over_18(birth_date_str: str) -> bool:
+            try:
+                birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
+                today = datetime.now().date()
+                age = today.year - birth_date.year
+                if age > 19:
+                    return True
+                if age < 19:
+                    return False
+                return (today.month, today.day) >= (birth_date.month, birth_date.day)
+            except (ValueError, TypeError):
+                return True
+
+        def is_multichild_outlier(row) -> bool:
+            try:
+                다자녀값 = row['다자녀']
+                if pd.isna(다자녀값) or 다자녀값 != 1:
+                    return False
+                dates_str = row['child_birth_date']
+                if pd.isna(dates_str) or not dates_str:
+                    return True
+                dates = json.loads(dates_str)
+                if not isinstance(dates, list) or not dates:
+                    return True
+                return any(_is_child_over_18(d) for d in dates)
+            except (json.JSONDecodeError, TypeError, KeyError):
+                return True
+
+        def is_chobon_issue_date_outlier(row) -> bool:
+            try:
+                초본값 = row['초본']
+                if pd.isna(초본값) or 초본값 != 1:
+                    return False
+                issue_date = row['issue_date']
+                if pd.isna(issue_date) or issue_date is None:
+                    return False
+                kst = pytz.timezone('Asia/Seoul')
+                today = datetime.now(kst).date()
+                issue_date_obj = None
+                if isinstance(issue_date, str):
+                    try:
+                        issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
+                    except ValueError:
+                        try:
+                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                        except ValueError:
+                            try:
+                                issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
+                            except ValueError:
+                                return False
+                elif isinstance(issue_date, datetime):
+                    issue_date_obj = issue_date.date()
+                elif isinstance(issue_date, date):
+                    issue_date_obj = issue_date
+                elif isinstance(issue_date, pd.Timestamp):
+                    issue_date_obj = issue_date.date()
+                else:
+                    return False
+                if issue_date_obj is None:
+                    return False
+                days_diff = (today - issue_date_obj).days
+                return days_diff >= 31
+            except (ValueError, TypeError, AttributeError, KeyError):
+                return False
+
+        def update_outlier(row):
+            current_outlier = row['outlier']
+            if pd.isna(current_outlier):
+                current_outlier = ''
+            current_outlier_str = str(current_outlier).strip()
+            if current_outlier_str == 'O':
+                return 'O'
+            if is_multichild_outlier(row):
+                return 'O'
+            if is_chobon_issue_date_outlier(row):
+                return 'O'
+            return current_outlier_str if current_outlier_str else ''
+        
+        df['outlier'] = df.apply(update_outlier, axis=1)
+        return df
+
+    except Exception:
+        traceback.print_exc()
+        return pd.DataFrame()
+
+def fetch_today_unfinished_subsidy_applications():
+    """오늘 날짜의 지원금 신청 데이터 중 작업자가 할당되지 않은 데이터를 조회한다."""
+    try:
+        kst = pytz.timezone('Asia/Seoul')
+        today = datetime.now(kst).date()
+        
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = _build_subsidy_query_base() + (
+                "WHERE DATE(sa.recent_received_date) = %s "
+                "AND (sa.worker IS NULL OR sa.worker = '') "
+                "ORDER BY sa.recent_received_date DESC "
+                "LIMIT 30"
+            )
+            params = (today,)
+            df = pd.read_sql(query, connection, params=params)
+
+        if df.empty:
+            return df
+
+        # 이상치 계산 로직 (fetch_recent_subsidy_applications와 동일)
+        def _is_child_over_18(birth_date_str: str) -> bool:
+            try:
+                birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
+                today = datetime.now().date()
+                age = today.year - birth_date.year
+                if age > 19:
+                    return True
+                if age < 19:
+                    return False
+                return (today.month, today.day) >= (birth_date.month, birth_date.day)
+            except (ValueError, TypeError):
+                return True
+
+        def is_multichild_outlier(row) -> bool:
+            try:
+                다자녀값 = row['다자녀']
+                if pd.isna(다자녀값) or 다자녀값 != 1:
+                    return False
+                dates_str = row['child_birth_date']
+                if pd.isna(dates_str) or not dates_str:
+                    return True
+                dates = json.loads(dates_str)
+                if not isinstance(dates, list) or not dates:
+                    return True
+                return any(_is_child_over_18(d) for d in dates)
+            except (json.JSONDecodeError, TypeError, KeyError):
+                return True
+
+        def is_chobon_issue_date_outlier(row) -> bool:
+            try:
+                초본값 = row['초본']
+                if pd.isna(초본값) or 초본값 != 1:
+                    return False
+                issue_date = row['issue_date']
+                if pd.isna(issue_date) or issue_date is None:
+                    return False
+                kst = pytz.timezone('Asia/Seoul')
+                today = datetime.now(kst).date()
+                issue_date_obj = None
+                if isinstance(issue_date, str):
+                    try:
+                        issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
+                    except ValueError:
+                        try:
+                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                        except ValueError:
+                            try:
+                                issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
+                            except ValueError:
+                                return False
+                elif isinstance(issue_date, datetime):
+                    issue_date_obj = issue_date.date()
+                elif isinstance(issue_date, date):
+                    issue_date_obj = issue_date
+                elif isinstance(issue_date, pd.Timestamp):
+                    issue_date_obj = issue_date.date()
+                else:
+                    return False
+                if issue_date_obj is None:
+                    return False
+                days_diff = (today - issue_date_obj).days
+                return days_diff >= 31
+            except (ValueError, TypeError, AttributeError, KeyError):
+                return False
+
+        def update_outlier(row):
+            current_outlier = row['outlier']
+            if pd.isna(current_outlier):
+                current_outlier = ''
+            current_outlier_str = str(current_outlier).strip()
+            if current_outlier_str == 'O':
+                return 'O'
+            if is_multichild_outlier(row):
+                return 'O'
+            if is_chobon_issue_date_outlier(row):
+                return 'O'
+            return current_outlier_str if current_outlier_str else ''
+        
+        df['outlier'] = df.apply(update_outlier, axis=1)
+        return df
+
+    except Exception:
         traceback.print_exc()
         return pd.DataFrame()
 
