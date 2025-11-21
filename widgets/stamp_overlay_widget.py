@@ -44,7 +44,9 @@ class StampOverlayWidget(QWidget):
                 {'path': 'assets/원본대조필.png', 'width': 320}
             ))
         if hasattr(self, 'stamp_button_3'):
-            self.stamp_button_3.clicked.connect(self._on_stamp_selected)
+            self.stamp_button_3.clicked.connect(lambda: self._on_stamp_button_clicked(
+                {'path': 'assets/명판.png', 'width': 300}
+            ))
         if hasattr(self, 'stamp_button_4'):
             self.stamp_button_4.clicked.connect(self._on_stamp_selected)
 
@@ -96,11 +98,12 @@ class StampOverlayWidget(QWidget):
             self._on_stamp_button_clicked({'path': 'assets/원본대조필.png', 'width': 320}) # 예시
             return
 
-        if key in (
-            Qt.Key.Key_3,
-            Qt.Key.Key_4,
-        ):
-            # 3-4번 도장은 현재 기능이 없으므로 기존 동작 유지
+        if key == Qt.Key.Key_3:
+            self._on_stamp_button_clicked({'path': 'assets/명판.png', 'width': 300})
+            return
+
+        if key == Qt.Key.Key_4:
+            # 4번 도장은 현재 기능이 없으므로 기존 동작 유지
             self._on_stamp_selected()
             return
 
