@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QStyledItemDelegate,
     QStyleOptionViewItem,
     QInputDialog,
+    QButtonGroup,
 )
 
 from core.sql_manager import fetch_recent_subsidy_applications, fetch_application_data_by_rn
@@ -54,6 +55,8 @@ class PdfLoadWidget(QWidget):
         self.setup_connections()
         self._pdf_view_widget = None
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 시작 여부
+        self._filter_mode = 'all'  # 필터 모드: 'all', 'my', 'unfinished'
+        self._worker_name = ''  # 현재 로그인한 작업자 이름
     
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""
@@ -67,6 +70,9 @@ class PdfLoadWidget(QWidget):
             
         if hasattr(self, 'complement_table_widget'):
             self.setup_table()
+        
+        # 필터 라디오 버튼 그룹 설정
+        self._setup_filter_buttons()
     
     def setup_table(self):
         """테이블 위젯 초기 설정"""
@@ -101,13 +107,16 @@ class PdfLoadWidget(QWidget):
             table.setRowCount(0)
             return
 
+        # 필터 적용
+        df = self._apply_filter(df)
+
         row_count = len(df)
-        # 최대 20개 행까지만 표시
+        # 최대 30개 행까지만 표시
         display_count = min(row_count, 30)
         table.setRowCount(display_count)
 
         for row_index, (_, row) in enumerate(df.iterrows()):
-            # 20개를 초과하면 중단
+            # 30개를 초과하면 중단
             if row_index >= 30:
                 break
             row_data = {
@@ -277,6 +286,60 @@ class PdfLoadWidget(QWidget):
             path_str = r'\\DESKTOP-KMJ' + path_str[2:]
 
         return path_str.strip()
+    
+    def _setup_filter_buttons(self):
+        """필터 라디오 버튼 그룹 설정"""
+        if not (hasattr(self, 'radioButton_all_rows') and 
+                hasattr(self, 'radioButton_my_rows') and 
+                hasattr(self, 'radioButton_unfinished_rows')):
+            return
+        
+        # QButtonGroup으로 묶어서 단일 선택 보장
+        self._filter_button_group = QButtonGroup(self)
+        self._filter_button_group.addButton(self.radioButton_all_rows, 0)  # 'all'
+        self._filter_button_group.addButton(self.radioButton_my_rows, 1)    # 'my'
+        self._filter_button_group.addButton(self.radioButton_unfinished_rows, 2)  # 'unfinished'
+        
+        # 기본값: 전체보기 선택
+        self.radioButton_all_rows.setChecked(True)
+        
+        # 버튼 클릭 시 필터 적용
+        self._filter_button_group.buttonClicked.connect(self._on_filter_changed)
+    
+    def _on_filter_changed(self, button):
+        """필터 변경 시 호출되는 슬롯"""
+        if button == self.radioButton_all_rows:
+            self._filter_mode = 'all'
+        elif button == self.radioButton_my_rows:
+            self._filter_mode = 'my'
+        elif button == self.radioButton_unfinished_rows:
+            self._filter_mode = 'unfinished'
+        
+        # 테이블 데이터 다시 로드 (필터 적용)
+        self.populate_recent_subsidy_rows()
+    
+    def set_worker_name(self, worker_name: str):
+        """작업자 이름을 설정한다."""
+        self._worker_name = worker_name or ''
+    
+    def _apply_filter(self, df: pd.DataFrame) -> pd.DataFrame:
+        """필터 모드에 따라 데이터프레임을 필터링한다."""
+        if df.empty:
+            return df
+        
+        if self._filter_mode == 'all':
+            # 전체보기: 필터링 없음
+            return df
+        elif self._filter_mode == 'my':
+            # 내신청건: 현재 작업자(worker)가 할당된 건만 표시
+            if not self._worker_name:
+                return df  # 작업자 이름이 없으면 전체 반환
+            return df[df['worker'] == self._worker_name]
+        elif self._filter_mode == 'unfinished':
+            # 미신청건: worker가 비어있거나 None인 건만 표시
+            return df[df['worker'].isna() | (df['worker'] == '')]
+        
+        return df
     
     def setup_connections(self):
         """시그널-슬롯 연결"""
