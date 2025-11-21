@@ -28,12 +28,30 @@ class InfoPanelWidget(QWidget):
         self._delivery_day_gap = day_gap
 
     def _adjust_to_weekday(self, target_date: date) -> date:
-        """주말(토요일, 일요일)이면 다음 월요일로 조정한다."""
-        weekday = target_date.weekday()  # 월요일=0, 일요일=6
-        if weekday >= 5:  # 토요일(5) 또는 일요일(6)
-            # 다음 월요일까지의 일수 계산
-            days_to_monday = 7 - weekday
-            target_date = target_date + timedelta(days=days_to_monday)
+        """주말(토요일, 일요일) 또는 공휴일이면 다음 평일로 조정한다."""
+        from core.sql_manager import fetch_holidays
+        
+        # 공휴일 조회 (캐싱을 위해 인스턴스 변수로 저장 가능하지만, 매번 조회로 단순화)
+        holidays = fetch_holidays()
+        
+        # 최대 30일까지 체크 (무한 루프 방지)
+        max_iterations = 30
+        iteration = 0
+        
+        while iteration < max_iterations:
+            weekday = target_date.weekday()  # 월요일=0, 일요일=6
+            is_weekend = weekday >= 5  # 토요일(5) 또는 일요일(6)
+            is_holiday = target_date in holidays
+            
+            # 주말이 아니고 공휴일도 아니면 평일이므로 반환
+            if not is_weekend and not is_holiday:
+                return target_date
+            
+            # 주말이거나 공휴일이면 다음 날로 이동
+            target_date = target_date + timedelta(days=1)
+            iteration += 1
+        
+        # 최대 반복 횟수에 도달한 경우 원래 날짜 반환 (에러 방지)
         return target_date
 
     def _on_radio_button_2_toggled(self, checked: bool):

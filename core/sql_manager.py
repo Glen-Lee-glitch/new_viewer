@@ -774,6 +774,40 @@ def fetch_delivery_day_gap(region: str) -> int | None:
         traceback.print_exc()
         return None
 
+def fetch_holidays() -> set[date]:
+    """
+    'greetlounge_holidays' 테이블에서 모든 공휴일을 조회하여 set으로 반환한다.
+    
+    Returns:
+        공휴일 date 객체들의 set
+    """
+    holidays = set()
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT date FROM greetlounge_holidays"
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                for row in rows:
+                    holiday_date = row[0]
+                    # 날짜 형식 변환 (datetime, date, str 등 다양한 형식 처리)
+                    if isinstance(holiday_date, date):
+                        holidays.add(holiday_date)
+                    elif isinstance(holiday_date, datetime):
+                        holidays.add(holiday_date.date())
+                    elif isinstance(holiday_date, str):
+                        try:
+                            holidays.add(datetime.strptime(holiday_date, "%Y-%m-%d").date())
+                        except ValueError:
+                            # 다른 형식 시도
+                            try:
+                                holidays.add(datetime.strptime(holiday_date.split()[0], "%Y-%m-%d").date())
+                            except ValueError:
+                                pass
+    except Exception:
+        traceback.print_exc()
+    return holidays
+
 def insert_delivery_day_gap(region: str, day_gap: int) -> bool:
     """
     '출고예정일' 테이블에 새로운 지역 데이터를 추가한다.
