@@ -808,6 +808,25 @@ def fetch_holidays() -> set[date]:
         traceback.print_exc()
     return holidays
 
+def fetch_give_works() -> pd.DataFrame:
+    """
+    give_works 테이블에서 작업상태가 '완료'가 아닌 데이터를 조회한다.
+    ['RN', '신청자', '지역'] 컬럼만 반환한다.
+    """
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT RN, 신청자, 지역
+                FROM give_works
+                WHERE 작업상태 != '완료' OR 작업상태 IS NULL
+                ORDER BY RN DESC
+            """
+            df = pd.read_sql(query, connection)
+            return df
+    except Exception:
+        traceback.print_exc()
+        return pd.DataFrame()
+
 def insert_delivery_day_gap(region: str, day_gap: int) -> bool:
     """
     '출고예정일' 테이블에 새로운 지역 데이터를 추가한다.
