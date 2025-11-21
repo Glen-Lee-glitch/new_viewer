@@ -149,9 +149,9 @@ def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int =
     
     text_image.close()
     
-    # 페이지 중앙 좌표 계산
+    # 페이지 중앙 좌표 계산 후 살짝 아래로 이동
     x = (page_width - img_width) / 2
-    y = (page_height - img_height) / 2
+    y = (page_height - img_height) / 2 + 30  # 중앙에서 30pt 아래로 이동
     
     # 이미지를 PDF 페이지에 삽입
     image_rect = pymupdf.Rect(x, y, x + img_width, y + img_height)
