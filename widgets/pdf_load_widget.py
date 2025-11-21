@@ -107,18 +107,13 @@ class PdfLoadWidget(QWidget):
             table.setRowCount(0)
             return
 
-        # 필터 적용
+        # 필터 적용 (필터 내부에서 이미 최대 30개로 제한됨)
         df = self._apply_filter(df)
 
         row_count = len(df)
-        # 최대 30개 행까지만 표시
-        display_count = min(row_count, 30)
-        table.setRowCount(display_count)
+        table.setRowCount(row_count)
 
         for row_index, (_, row) in enumerate(df.iterrows()):
-            # 30개를 초과하면 중단
-            if row_index >= 30:
-                break
             row_data = {
                 'rn': self._sanitize_text(row.get('RN', '')),
                 'region': self._sanitize_text(row.get('region', '')),
@@ -328,16 +323,18 @@ class PdfLoadWidget(QWidget):
             return df
         
         if self._filter_mode == 'all':
-            # 전체보기: 필터링 없음
-            return df
+            # 전체보기: 기존 30개의 최근 row 유지 (필터링 없음)
+            return df.head(30)
         elif self._filter_mode == 'my':
-            # 내신청건: 현재 작업자(worker)가 할당된 건만 표시
+            # 내신청건: 작업자가 프로그램 사용자와 일치하는 row 최대 30개
             if not self._worker_name:
-                return df  # 작업자 이름이 없으면 전체 반환
-            return df[df['worker'] == self._worker_name]
+                return pd.DataFrame()  # 작업자 이름이 없으면 빈 데이터프레임 반환
+            filtered_df = df[df['worker'] == self._worker_name]
+            return filtered_df.head(30)
         elif self._filter_mode == 'unfinished':
-            # 미신청건: worker가 비어있거나 None인 건만 표시
-            return df[df['worker'].isna() | (df['worker'] == '')]
+            # 미신청건: 작업자에 빈 값이 들어있는 row 최대 30개
+            filtered_df = df[df['worker'].isna() | (df['worker'] == '')]
+            return filtered_df.head(30)
         
         return df
     
