@@ -23,36 +23,83 @@ file_path = 'stamp_test.pdf'
 page_num = 9
 
 
+def _normalize_file_path(raw_path):
+    """
+    로컬 경로를 네트워크 경로로 변환합니다.
+    pdf_load_widget.py의 _normalize_file_path 메서드를 참고했습니다.
+    """
+    if raw_path is None:
+        return None
+
+    if isinstance(raw_path, Path):
+        path_str = str(raw_path)
+    else:
+        path_str = str(raw_path)
+
+    path_str = path_str.strip()
+    if path_str.startswith('"') and path_str.endswith('"') and len(path_str) >= 2:
+        path_str = path_str[1:-1]
+    elif path_str.startswith("'") and path_str.endswith("'") and len(path_str) >= 2:
+        path_str = path_str[1:-1]
+    
+    path_str = path_str.strip()
+
+    if path_str.upper().startswith('C:'):
+        path_str = r'\\DESKTOP-KMJ' + path_str[2:]
+
+    return path_str.strip()
+
+
 def fetch_table_data():
     """
-    데이터베이스에서 3개의 테이블 데이터를 가져옵니다.
+    데이터베이스에서 3개의 테이블을 JOIN하여 데이터를 가져옵니다.
+    
+    - test_ai_구매계약서의 ['modified_date', 'RN', 'page_number']
+    - subsidy_applications의 ['RN', 'recent_thread_id']를 RN으로 매칭
+    - emails의 ['thread_id', 'attached_file_path']를 recent_thread_id로 매칭
+    - attached_file_path가 없는 row는 제외
+    - 최종 10개만 반환
     
     Returns:
-        dict: {
-            'emails': list[dict],
-            'subsidy_applications': list[dict],
-            'test_ai_구매계약서': list[dict]
-        }
+        list[dict]: 조인된 데이터 리스트 (최대 10개)
     """
-    tables = ['emails', 'subsidy_applications', 'test_ai_구매계약서']
-    result = {}
-    
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            for table_name in tables:
-                query = f"SELECT * FROM {table_name}"
-                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                    cursor.execute(query)
-                    result[table_name] = cursor.fetchall()
-                    print(f"✅ {table_name} 테이블에서 {len(result[table_name])}개 행을 가져왔습니다.")
-        
-        return result
+            query = """
+                SELECT 
+                    c.modified_date,
+                    c.RN,
+                    c.page_number,
+                    sa.recent_thread_id,
+                    e.attached_file_path
+                FROM test_ai_구매계약서 c
+                INNER JOIN subsidy_applications sa 
+                    ON c.RN COLLATE utf8mb4_unicode_ci = sa.RN COLLATE utf8mb4_unicode_ci
+                INNER JOIN emails e 
+                    ON sa.recent_thread_id = e.thread_id
+                WHERE e.attached_file_path IS NOT NULL 
+                    AND e.attached_file_path != ''
+                ORDER BY c.modified_date DESC
+                LIMIT 10
+            """
+            
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute(query)
+                result = cursor.fetchall()
+                
+                # attached_file_path를 네트워크 경로로 변환
+                for row in result:
+                    if 'attached_file_path' in row:
+                        row['attached_file_path'] = _normalize_file_path(row['attached_file_path'])
+                
+                print(f"✅ {len(result)}개의 데이터를 가져왔습니다.")
+                return result
     
     except Exception as e:
         print(f"❌ 데이터베이스 조회 중 오류 발생: {e}")
         import traceback
         traceback.print_exc()
-        return {table: [] for table in tables}
+        return []
 
 def find_korean_font():
     """시스템에서 한글 폰트 파일 경로를 찾습니다."""
@@ -213,17 +260,72 @@ def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int =
     print(f"   좌표: ({x:.2f}, {y:.2f})")
     print(f"   파일 저장 완료: {pdf_path}")
 
-if __name__ == "__main__":
-
-    # text = '출고예정일 11/28'
-    # font_size = 16
+def process_batch_files():
+    """
+    데이터베이스에서 가져온 10개 데이터를 순회하며 각 PDF 파일에 텍스트를 삽입합니다.
+    """
+    text = '출고예정일 11/28'
+    font_size = 16
     
-    # try:
-    #     insert_text_to_pdf(file_path, page_num - 1, text, font_size)  # page_num은 1-based이므로 -1
-    # except Exception as e:
-    #     print(f"❌ 오류 발생: {e}")
-    #     import traceback
-    #     traceback.print_exc()
+    # 데이터베이스에서 데이터 가져오기
+    data_list = fetch_table_data()
+    
+    if not data_list:
+        print("❌ 처리할 데이터가 없습니다.")
+        return
+    
+    print(f"\n📋 총 {len(data_list)}개의 파일을 처리합니다.\n")
+    
+    success_count = 0
+    error_count = 0
+    
+    for idx, data in enumerate(data_list, 1):
+        pdf_path = data.get('attached_file_path')
+        page_number = data.get('page_number')
+        rn = data.get('RN')
+        
+        if not pdf_path:
+            print(f"[{idx}/{len(data_list)}] ❌ RN {rn}: attached_file_path가 없습니다.")
+            error_count += 1
+            continue
+        
+        if page_number is None:
+            print(f"[{idx}/{len(data_list)}] ❌ RN {rn}: page_number가 없습니다.")
+            error_count += 1
+            continue
+        
+        print(f"[{idx}/{len(data_list)}] 처리 중: RN {rn}, 파일: {Path(pdf_path).name}, 페이지: {page_number}")
+        
+        try:
+            # PDF 파일 존재 확인
+            pdf_file = Path(pdf_path)
+            if not pdf_file.exists():
+                print(f"  ⚠️ 파일이 존재하지 않습니다: {pdf_path}")
+                error_count += 1
+                continue
+            
+            # 페이지 번호는 1-based이므로 0-based로 변환
+            page_num_0based = int(page_number) - 1
+            
+            # 텍스트 삽입
+            insert_text_to_pdf(pdf_path, page_num_0based, text, font_size)
+            success_count += 1
+            print(f"  ✅ 완료\n")
+            
+        except Exception as e:
+            print(f"  ❌ 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+            error_count += 1
+            print()
+    
+    print(f"\n📊 처리 완료: 성공 {success_count}개, 실패 {error_count}개")
 
 
-    fetch_table_data()
+if __name__ == "__main__":
+    try:
+        process_batch_files()
+    except Exception as e:
+        print(f"❌ 전체 처리 중 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
