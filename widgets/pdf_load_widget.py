@@ -191,7 +191,7 @@ class PdfLoadWidget(QWidget):
             table.setRowCount(0)
             return
 
-        # 전체보기는 이미 30개로 제한되어 있고, 내신청건/미신청건도 SQL에서 30개로 제한됨
+        # 전체보기는 이미 30개로 제한되어 있고, 내신청건/미작업건도 SQL에서 30개로 제한됨
         # 추가 필터링 불필요
 
         row_count = len(df)
