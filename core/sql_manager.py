@@ -465,13 +465,14 @@ def update_subsidy_status(rn: str, status: str) -> bool:
 
 def get_today_completed_subsidies(worker: str = None) -> list:
     """
-    오늘 '지원완료' 처리된 지원금 신청 목록 (지역, 완료시간)을 반환한다.
+    오늘 '지원' 처리된 지원금 신청 목록 (지역, 신청날짜)을 반환한다.
+    daily_application 테이블에서 조회한다.
     
     Args:
         worker: 작업자 이름 (선택사항, 제공되면 해당 작업자만 필터링)
     
     Returns:
-        오늘 완료된 (지역, 완료시간) 튜플의 리스트
+        오늘 완료된 (지역, 신청날짜) 튜플의 리스트
     """
     try:
         # 한국 시간 (KST) 생성
@@ -482,23 +483,23 @@ def get_today_completed_subsidies(worker: str = None) -> list:
             # worker 파라미터에 따른 쿼리 분기
             if worker:
                 query = """
-                    SELECT region, status_updated_at
-                    FROM subsidy_applications 
-                    WHERE status = '지원완료' 
-                    AND DATE(status_updated_at) = %s
+                    SELECT region, apply_date
+                    FROM daily_application 
+                    WHERE type = '지원' 
+                    AND DATE(apply_date) = %s
                     AND worker = %s
                     AND region IS NOT NULL
-                    ORDER BY status_updated_at DESC
+                    ORDER BY apply_date DESC, rn DESC
                 """
                 params = (today, worker)
             else:
                 query = """
-                    SELECT region, status_updated_at
-                    FROM subsidy_applications 
-                    WHERE status = '지원완료' 
-                    AND DATE(status_updated_at) = %s
+                    SELECT region, apply_date
+                    FROM daily_application 
+                    WHERE type = '지원' 
+                    AND DATE(apply_date) = %s
                     AND region IS NOT NULL
-                    ORDER BY status_updated_at DESC
+                    ORDER BY apply_date DESC, rn DESC
                 """
                 params = (today,)
             

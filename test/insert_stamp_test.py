@@ -49,7 +49,6 @@ def _normalize_file_path(raw_path):
 
     return path_str.strip()
 
-
 def fetch_table_data():
     """
     데이터베이스에서 3개의 테이블을 JOIN하여 데이터를 가져옵니다.
