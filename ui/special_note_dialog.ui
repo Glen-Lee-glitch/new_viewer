@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>450</width>
-    <height>400</height>
+    <width>500</width>
+    <height>500</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -88,57 +88,10 @@
         <property name="visible">
          <bool>false</bool>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_missing">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QLabel" name="label_missing">
-           <property name="text">
-            <string>↳ 서류미비 상세:</string>
-           </property>
-           <property name="styleSheet">
-            <string>color: gray;</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="cb_missing_1">
-           <property name="text">
-            <string>신청서 누락</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="cb_missing_2">
-           <property name="text">
-            <string>인감증명서</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_1">
-           <property name="orientation">
-            <enum>Qt::Orientation::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
+        <property name="frameShape">
+         <enum>QFrame::Shape::NoFrame</enum>
+        </property>
+        <layout class="QGridLayout" name="gridLayout_missing"/>
        </widget>
       </item>
       <item>
@@ -146,63 +99,19 @@
         <property name="visible">
          <bool>false</bool>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_req">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QLabel" name="label_req">
-           <property name="text">
-            <string>↳ 요건 상세:</string>
-           </property>
-           <property name="styleSheet">
-            <string>color: gray;</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="cb_req_1">
-           <property name="text">
-            <string>기간 만료</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="cb_req_2">
-           <property name="text">
-            <string>자격 미달</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_2">
-           <property name="orientation">
-            <enum>Qt::Orientation::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
+        <property name="frameShape">
+         <enum>QFrame::Shape::NoFrame</enum>
+        </property>
+        <layout class="QGridLayout" name="gridLayout_req"/>
        </widget>
       </item>
       <item>
        <widget class="QFrame" name="sub_frame_other">
         <property name="visible">
          <bool>false</bool>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Shape::NoFrame</enum>
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout_other">
          <property name="leftMargin">
@@ -231,6 +140,12 @@
           <widget class="QCheckBox" name="cb_other_1">
            <property name="text">
             <string>직접 입력</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+           <property name="enabled">
+            <bool>false</bool>
            </property>
           </widget>
          </item>
