@@ -1,7 +1,7 @@
 import sys
 import os
 from PyQt6.QtWidgets import (
-    QDialog, QApplication, QCheckBox, QLineEdit, QGridLayout, QLabel
+    QDialog, QApplication, QCheckBox, QLineEdit, QGridLayout, QLabel, QMessageBox
 )
 from PyQt6.uic import loadUi
 
@@ -116,8 +116,64 @@ class SpecialNoteDialog(QDialog):
         self.sub_frame_req.setVisible(self.checkBox.isChecked())
         self.sub_frame_other.setVisible(self.checkBox_3.isChecked())
 
+    def validate_selection(self):
+        """Check if at least one category is selected and required details are filled."""
+        is_missing_checked = self.checkBox_2.isChecked()
+        is_req_checked = self.checkBox.isChecked()
+        is_other_checked = self.checkBox_3.isChecked()
+
+        # 1. Check if any main category is selected
+        if not (is_missing_checked or is_req_checked or is_other_checked):
+            QMessageBox.warning(self, "경고", "사유 대분류를 최소 하나 이상 선택해주세요.")
+            return False
+
+        # 2. Check Missing Documents Details
+        if is_missing_checked:
+            any_detail_checked = False
+            for name, widgets in self.missing_checkboxes.items():
+                if widgets['cb'].isChecked():
+                    any_detail_checked = True
+                    # If 'Other' is checked, ensure text is entered
+                    if name == '기타' and widgets['le']:
+                         if not widgets['le'].text().strip():
+                             QMessageBox.warning(self, "경고", "서류미비 - '기타' 사유를 입력해주세요.")
+                             widgets['le'].setFocus()
+                             return False
+            
+            if not any_detail_checked:
+                QMessageBox.warning(self, "경고", "서류미비의 상세 사유를 하나 이상 선택해주세요.")
+                return False
+
+        # 3. Check Requirements Details
+        if is_req_checked:
+            any_detail_checked = False
+            for name, widgets in self.req_checkboxes.items():
+                if widgets['cb'].isChecked():
+                    any_detail_checked = True
+                    if name == '기타' and widgets['le']:
+                         if not widgets['le'].text().strip():
+                             QMessageBox.warning(self, "경고", "요건 - '기타' 사유를 입력해주세요.")
+                             widgets['le'].setFocus()
+                             return False
+            
+            if not any_detail_checked:
+                QMessageBox.warning(self, "경고", "요건의 상세 사유를 하나 이상 선택해주세요.")
+                return False
+
+        # 4. Check Other (Main) Details
+        if is_other_checked:
+            if not self.lineEdit_other_detail.text().strip():
+                QMessageBox.warning(self, "경고", "기타 상세 사유를 입력해주세요.")
+                self.lineEdit_other_detail.setFocus()
+                return False
+
+        return True
+
     def on_send_clicked(self):
         """Handle send button click: gather data, print debug info, and close."""
+        if not self.validate_selection():
+            return
+
         results = self.get_selected_data()
         
         print("=== DEBUG: Selected Items ===")
@@ -146,9 +202,10 @@ class SpecialNoteDialog(QDialog):
                     if name == '기타' and le:
                         detail = le.text().strip()
                         if detail:
-                            data['missing'].append(f"기타({detail})")
+                            # Use input text directly instead of "기타(text)"
+                            data['missing'].append(detail)
                         else:
-                             data['missing'].append("기타")
+                             data['missing'].append("기타(내용없음)")
                     else:
                         data['missing'].append(name)
 
@@ -161,20 +218,20 @@ class SpecialNoteDialog(QDialog):
                     if name == '기타' and le:
                         detail = le.text().strip()
                         if detail:
-                            data['requirements'].append(f"기타({detail})")
+                            # Use input text directly instead of "기타(text)"
+                            data['requirements'].append(detail)
                         else:
-                             data['requirements'].append("기타")
+                             data['requirements'].append("기타(내용없음)")
                     else:
                         data['requirements'].append(name)
         
         # 3. Other (기타 - 대분류)
         if self.checkBox_3.isChecked():
-             # The lineEdit_other_detail is defined in the UI file for this section
              text = self.lineEdit_other_detail.text().strip()
              if text:
                  data['other'] = text
              else:
-                 data['other'] = "기타 사유 선택됨 (내용 없음)"
+                 data['other'] = "기타(내용없음)"
         
         return data
 
