@@ -1,7 +1,8 @@
 import sys
 import os
+import re
 from PyQt6.QtWidgets import (
-    QDialog, QApplication, QCheckBox, QLineEdit, QGridLayout, QLabel, QMessageBox
+    QDialog, QApplication, QCheckBox, QLineEdit, QGridLayout, QLabel, QMessageBox, QInputDialog
 )
 from PyQt6.uic import loadUi
 
@@ -16,7 +17,7 @@ class SpecialNoteDialog(QDialog):
     ]
     
     REQ_ITEMS = [
-        '전입일', '중복', '거주지 다름', '기타'
+        '전입일', '중복', '공동명의 거주지 다름', '자녀 생년월일 요건', '청년생애 요건', '기타'
     ]
 
     def __init__(self, parent=None):
@@ -115,6 +116,14 @@ class SpecialNoteDialog(QDialog):
         self.sub_frame_missing.setVisible(self.checkBox_2.isChecked())
         self.sub_frame_req.setVisible(self.checkBox.isChecked())
         self.sub_frame_other.setVisible(self.checkBox_3.isChecked())
+    
+    def _is_valid_rn(self, rn_text):
+        """Check if RN format matches 'RN' followed by 9 digits."""
+        # ^RN : Starts with 'RN'
+        # \d{9} : Exactly 9 digits
+        # $ : End of string
+        pattern = r'^RN\d{9}$'
+        return bool(re.match(pattern, rn_text))
 
     def validate_selection(self):
         """Check if at least one category is selected and required details are filled."""
@@ -166,6 +175,25 @@ class SpecialNoteDialog(QDialog):
                 QMessageBox.warning(self, "경고", "기타 상세 사유를 입력해주세요.")
                 self.lineEdit_other_detail.setFocus()
                 return False
+
+        # 5. Check RN last (with input dialog fallback and format validation)
+        rn_text = self.RN_lineEdit.text().strip()
+        
+        # If empty, prompt for input
+        while not rn_text:
+            text, ok = QInputDialog.getText(self, "RN 입력", "RN 번호를 입력해주세요 (예: RN123456789):")
+            if not ok:
+                # User cancelled
+                return False
+            rn_text = text.strip()
+            self.RN_lineEdit.setText(rn_text)
+        
+        # Validate Format
+        if not self._is_valid_rn(rn_text):
+            QMessageBox.warning(self, "경고", "RN 번호 형식이 올바르지 않습니다.\n\n형식: 'RN' + 숫자 9자리 (총 11자리)\n예: RN123456789")
+            self.RN_lineEdit.setFocus()
+            self.RN_lineEdit.selectAll()
+            return False
 
         return True
 
