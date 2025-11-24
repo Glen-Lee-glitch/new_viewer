@@ -35,6 +35,7 @@ secrets/*
 # project-specific secrets
 get_mail_logics/config.py
 test/daily.xls
+test/전기자동차 구매보조금 신청서.xls
 
 # OS generated files
 .DS_Store
