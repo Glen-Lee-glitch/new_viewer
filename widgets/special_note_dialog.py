@@ -14,7 +14,7 @@ from core.sql_manager import insert_additional_note
 class SpecialNoteDialog(QDialog):
     # Define detailed items as class constants
     MISSING_DOCS_ITEMS = [
-        '신청서1p', '신청서2p', '계약서1p', '계약서4p', 
+        '신청서1p', '신청서2p(동의서)', '계약서1p', '계약서4p', 
         '초본', '등본', '가족', '지납세', '지세과', '기타'
     ]
     
