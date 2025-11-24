@@ -112,10 +112,14 @@ class SpecialNoteDialog(QDialog):
                 row += 1
 
     def update_ui_state(self):
-        """Show/Hide sub-frames based on main checkbox state."""
+        """Show/Hide sub-frames based on main checkbox state and adjust size."""
         self.sub_frame_missing.setVisible(self.checkBox_2.isChecked())
         self.sub_frame_req.setVisible(self.checkBox.isChecked())
         self.sub_frame_other.setVisible(self.checkBox_3.isChecked())
+        
+        # Adjust size to fit content tightly
+        QApplication.processEvents()
+        self.adjustSize()
     
     def _is_valid_rn(self, rn_text):
         """Check if RN format matches 'RN' followed by 9 digits."""
