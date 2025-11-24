@@ -896,6 +896,57 @@ def insert_reply_email(
         traceback.print_exc()
         return False
 
+def insert_additional_note(
+    rn: str,
+    missing_docs: list | None,
+    requirements: list | None,
+    other_detail: str | None
+) -> bool:
+    """
+    additional_note 테이블에 특이사항 비고 데이터를 삽입한다.
+    같은 RN이 이미 존재하면 업데이트한다.
+    thread_id는 트리거가 자동으로 채워준다.
+    
+    Args:
+        rn: RN 번호 (필수)
+        missing_docs: 서류미비 상세 항목 리스트 (JSON으로 변환됨)
+        requirements: 요건 상세 항목 리스트 (JSON으로 변환됨)
+        other_detail: 기타 대분류 상세 내용
+    
+    Returns:
+        삽입/업데이트 성공 여부
+    """
+    if not rn:
+        raise ValueError("rn must be provided")
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                # 리스트를 JSON 문자열로 변환 (None이면 NULL)
+                missing_docs_json = json.dumps(missing_docs, ensure_ascii=False) if missing_docs else None
+                requirements_json = json.dumps(requirements, ensure_ascii=False) if requirements else None
+                
+                query = """
+                    INSERT INTO additional_note (
+                        RN, missing_docs, requirements, other_detail
+                    ) VALUES (
+                        %s, %s, %s, %s
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        missing_docs = VALUES(missing_docs),
+                        requirements = VALUES(requirements),
+                        other_detail = VALUES(other_detail),
+                        updated_at = CURRENT_TIMESTAMP
+                """
+                cursor.execute(query, (
+                    rn, missing_docs_json, requirements_json, other_detail
+                ))
+                connection.commit()
+                return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def is_admin_user(worker_name: str) -> bool:
     """
     workers 테이블에서 사용자가 관리자인지 확인한다.

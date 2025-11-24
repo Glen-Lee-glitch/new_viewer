@@ -9,6 +9,8 @@ from PyQt6.uic import loadUi
 # Ensure we can import from core/widgets if needed in the future
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from core.sql_manager import insert_additional_note
+
 class SpecialNoteDialog(QDialog):
     # Define detailed items as class constants
     MISSING_DOCS_ITEMS = [
@@ -202,20 +204,28 @@ class SpecialNoteDialog(QDialog):
         return True
 
     def on_send_clicked(self):
-        """Handle send button click: gather data, print debug info, and close."""
+        """Handle send button click: validate, save to database, and close."""
+        # 검증: 선택사항, RN 번호 등 모든 검증 완료 확인
         if not self.validate_selection():
             return
 
+        # 데이터 수집
         results = self.get_selected_data()
+        rn = self.RN_lineEdit.text().strip()
         
-        print("=== DEBUG: Selected Items ===")
-        print(f"RN: {self.RN_lineEdit.text()}")
-        print(f"서류미비: {results['missing']}")
-        print(f"요건: {results['requirements']}")
-        print(f"기타: {results['other']}")
-        print("=============================")
+        # 데이터베이스에 저장
+        success = insert_additional_note(
+            rn=rn,
+            missing_docs=results['missing'] if results['missing'] else None,
+            requirements=results['requirements'] if results['requirements'] else None,
+            other_detail=results['other']
+        )
         
-        self.accept() # Close dialog with Accepted result
+        if success:
+            QMessageBox.information(self, "완료", "특이사항이 성공적으로 저장되었습니다.")
+            self.accept()  # 다이얼로그 종료
+        else:
+            QMessageBox.critical(self, "오류", "데이터 저장 중 오류가 발생했습니다.\n다시 시도해주세요.")
 
     def get_selected_data(self):
         """Collect all selected options."""
