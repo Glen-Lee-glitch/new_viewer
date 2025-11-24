@@ -44,6 +44,9 @@ class SpecialNoteDialog(QDialog):
         # Connect close button
         self.pushButton_2.clicked.connect(self.close)
 
+        # Connect Send button
+        self.pushButton.clicked.connect(self.on_send_clicked)
+
     def _init_dynamic_ui(self):
         """Generate checkboxes dynamically for Missing Docs and Requirements."""
         # Setup Missing Documents Frame (checkBox_2)
@@ -113,6 +116,68 @@ class SpecialNoteDialog(QDialog):
         self.sub_frame_req.setVisible(self.checkBox.isChecked())
         self.sub_frame_other.setVisible(self.checkBox_3.isChecked())
 
+    def on_send_clicked(self):
+        """Handle send button click: gather data, print debug info, and close."""
+        results = self.get_selected_data()
+        
+        print("=== DEBUG: Selected Items ===")
+        print(f"RN: {self.RN_lineEdit.text()}")
+        print(f"서류미비: {results['missing']}")
+        print(f"요건: {results['requirements']}")
+        print(f"기타: {results['other']}")
+        print("=============================")
+        
+        self.accept() # Close dialog with Accepted result
+
+    def get_selected_data(self):
+        """Collect all selected options."""
+        data = {
+            'missing': [],
+            'requirements': [],
+            'other': None
+        }
+
+        # 1. Missing Documents (서류미비)
+        if self.checkBox_2.isChecked():
+            for name, widgets in self.missing_checkboxes.items():
+                cb = widgets['cb']
+                le = widgets['le']
+                if cb.isChecked():
+                    if name == '기타' and le:
+                        detail = le.text().strip()
+                        if detail:
+                            data['missing'].append(f"기타({detail})")
+                        else:
+                             data['missing'].append("기타")
+                    else:
+                        data['missing'].append(name)
+
+        # 2. Requirements (요건)
+        if self.checkBox.isChecked():
+            for name, widgets in self.req_checkboxes.items():
+                cb = widgets['cb']
+                le = widgets['le']
+                if cb.isChecked():
+                    if name == '기타' and le:
+                        detail = le.text().strip()
+                        if detail:
+                            data['requirements'].append(f"기타({detail})")
+                        else:
+                             data['requirements'].append("기타")
+                    else:
+                        data['requirements'].append(name)
+        
+        # 3. Other (기타 - 대분류)
+        if self.checkBox_3.isChecked():
+             # The lineEdit_other_detail is defined in the UI file for this section
+             text = self.lineEdit_other_detail.text().strip()
+             if text:
+                 data['other'] = text
+             else:
+                 data['other'] = "기타 사유 선택됨 (내용 없음)"
+        
+        return data
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
@@ -124,6 +189,9 @@ if __name__ == "__main__":
     """)
     
     dialog = SpecialNoteDialog()
-    dialog.show()
+    if dialog.exec():
+        print("Dialog accepted.")
+    else:
+        print("Dialog rejected.")
     
-    sys.exit(app.exec())
+    sys.exit()
