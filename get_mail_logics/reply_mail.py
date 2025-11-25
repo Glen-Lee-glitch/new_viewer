@@ -7,6 +7,7 @@ import json
 import base64
 import re
 import time
+
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -67,6 +68,10 @@ def create_auto_reply_content(row):
     """DataFrame 행 기반 자동 답장 본문 생성"""
     rn = row.get('RN', '')
     app_num = row.get('신청\n번호', '')
+    current_status = row.get('status', '') # 현재 상태 확인
+    
+    # 이미 '이메일 전송' 상태라면 보완 메일 모드로 동작
+    is_correction_mode = (current_status == '이메일 전송')
     
     has_app_num = not pd.isna(app_num) and str(app_num).strip()
     
@@ -92,7 +97,7 @@ def create_auto_reply_content(row):
     types = []
     
     # 신청번호가 있을 때만 유형 정보 수집 (엑셀에 있는 데이터라고 가정)
-    if has_app_num:
+    if has_app_num and not is_correction_mode:
         # 0. 신청유형 체크
         if not pd.isna(app_type_val):
             val_str = str(app_type_val).strip()
@@ -150,7 +155,7 @@ def create_auto_reply_content(row):
     ]
     
     # 신청번호가 있을 때만 '신청번호'와 '특이사항' 추가
-    if has_app_num:
+    if has_app_num and not is_correction_mode:
         lines.append(f"- 신청번호: {app_num}")
         if final_type_str:
             lines.append(f"- 특이사항: {final_type_str}")
@@ -158,13 +163,18 @@ def create_auto_reply_content(row):
     # 추가 정보(보완사항 등)가 있다면 본문에 삽입
     if additional_lines:
         lines.append("")
-        lines.append("[추가 확인 필요]")
+        if is_correction_mode:
+             lines.append("[📢 추가 보완 요청]") # 강조
+        else:
+             lines.append("[추가 확인 필요]")
         lines.extend(additional_lines)
     
     lines.append("")
 
     # [수정됨] 마무리 인사 멘트 분기
-    if has_app_num:
+    if is_correction_mode:
+        lines.append("위 보완 사항을 확인 부탁드립니다.")
+    elif has_app_num:
         lines.append("위 정보로 접수되었습니다.")
     else:
         lines.append("확인 부탁드립니다.")
@@ -403,35 +413,49 @@ def send_reply_all_batch(df):
                     # 신청번호 유무 확인 (create_auto_reply_content와 동일한 로직)
                     app_num = row.get('신청\n번호', '')
                     has_app_num = not pd.isna(app_num) and str(app_num).strip()
+                    current_status = row.get('status', '') # 현재 상태
                     
                     # status 값 결정
                     if has_app_num:
-                        status_value = '이메일 전송'
+                        new_status_value = '이메일 전송'
                     else:
-                        status_value = '요청메일 전송'
+                        new_status_value = '요청메일 전송'
                     
+                    # [중요] 상태 전이 규칙 적용 (이메일 전송 -> 요청메일 전송 금지)
+                    final_status_to_update = None
+                    
+                    if current_status == '이메일 전송':
+                        # 이미 '이메일 전송' 상태면 업데이트 하지 않음 (상태 유지)
+                        final_status_to_update = None
+                    else:
+                        # 그 외(NULL, 요청메일 전송 등)의 경우 새로운 상태로 업데이트
+                        final_status_to_update = new_status_value
+
                     with conn.cursor() as cursor:
                         # 1. subsidy_applications 테이블 업데이트
-                        update_sql = """
-                            UPDATE subsidy_applications 
-                            SET status = %s, 
-                                status_updated_at = NOW()
-                            WHERE RN = %s
-                        """
-                        cursor.execute(update_sql, (status_value, rn))
-                        
-                        # 2. 신청번호가 없는 경우 additional_note.successed 업데이트
-                        if not has_app_num:
-                            update_note_sql = """
-                                UPDATE additional_note 
-                                SET successed = 1
+                        if final_status_to_update:
+                            update_sql = """
+                                UPDATE subsidy_applications 
+                                SET status = %s, 
+                                    status_updated_at = NOW()
                                 WHERE RN = %s
                             """
-                            cursor.execute(update_note_sql, (rn,))
-                            print(f"✅ [DB 업데이트] {rn}: additional_note.successed -> 1")
+                            cursor.execute(update_sql, (final_status_to_update, rn))
+                            print(f"✅ [DB 업데이트] {rn}: status -> '{final_status_to_update}'")
+                        else:
+                            print(f"ℹ️ [DB 상태 유지] {rn}: 현재 '{current_status}' 상태 유지")
+                        
+                        # 2. additional_note.successed 업데이트 (무조건 1)
+                        # 보완 메일을 보냈든, 신규 메일을 보냈든 이 시점에서는 처리 완료로 간주
+                        update_note_sql = """
+                            UPDATE additional_note 
+                            SET successed = 1
+                            WHERE RN = %s
+                        """
+                        cursor.execute(update_note_sql, (rn,))
+                        print(f"✅ [DB 업데이트] {rn}: additional_note.successed -> 1")
                         
                     conn.commit()
-                    print(f"✅ [DB 업데이트] {rn}: status -> '{status_value}'")
                 except Exception as db_err:
                     print(f"⚠️ [DB 업데이트 실패] {rn}: {db_err}")
                     conn.rollback()
@@ -520,8 +544,20 @@ def main():
     df = pd.merge(df, df_db, on='RN', how='outer')
 
     # 4. 필터링 (이미 전송된 건 제외)
-    # [수정됨] status가 '이메일 전송'인 행 제거
-    df = df[~(df['status'] == '이메일 전송')]
+    # [수정]
+    # 1. 완전 신규 건: status가 NULL이거나 비어있음
+    cond_new = (df['status'].isna()) | (df['status'] == '')
+    
+    # 2. 상태 업그레이드: '요청메일 전송' 상태인데 신청번호가 생김 (신청완료 메일 보내야 함)
+    cond_upgrade = (df['status'] == '요청메일 전송') & (df['신청\n번호'].notna())
+
+    # 3. 추가 보완 필요: (이메일 전송 or 요청메일 전송) 상태인데 보완사항(missing_docs 등)이 있음
+    #    (DB 쿼리상 successed=0일 때만 값이 있으므로, 값이 있다는 건 아직 안 보낸 보완사항이란 뜻)
+    cond_correction = (df['status'].isin(['이메일 전송', '요청메일 전송'])) & (
+        (df['missing_docs'].notna()) | (df['requirements'].notna()) | (df['other_detail'].notna())
+    )
+    
+    df = df[cond_new | cond_upgrade | cond_correction]
     
     # 5. 실행
     print(f"\n🚀 처리 대상: 총 {len(df)}건")
