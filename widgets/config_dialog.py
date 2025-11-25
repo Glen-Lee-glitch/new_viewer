@@ -34,13 +34,13 @@ class ConfigDialog(QDialog):
         refresh_interval = self._settings.value("general/refresh_interval", 30, type=int)
         self.spinBox_refresh_time.setValue(refresh_interval)
         
-        payment_request_load = self._settings.value("general/payment_request_load", True, type=bool)
-        self.checkBox_payment_request_load.setChecked(payment_request_load)
+        # 지급신청 로드 체크박스는 항상 체크된 상태로 시작 (설정 저장 안 함)
+        self.checkBox_payment_request_load.setChecked(True)
     
     def _save_settings(self):
         """UI에 설정된 값을 저장합니다."""
         self._settings.setValue("general/refresh_interval", self.spinBox_refresh_time.value())
-        self._settings.setValue("general/payment_request_load", self.checkBox_payment_request_load.isChecked())
+        # 지급신청 로드 체크박스는 저장하지 않음 (프로그램 시작 시 항상 체크된 상태)
         self.accept()
     
     @property

@@ -488,8 +488,10 @@ class PdfLoadWidget(QWidget):
         # 지급 테이블 새로고침 여부 결정
         should_refresh_give_works = force_refresh_give_works
         if not should_refresh_give_works:
-            # QSettings에서 체크박스 상태 확인
+            # QSettings에서 체크박스 상태 확인 (기본값은 True - 프로그램 시작 시 항상 체크됨)
+            # 단, 설정이 저장되지 않으므로 항상 True로 동작
             settings = QSettings("GyeonggooLee", "NewViewer")
+            # 설정이 저장되지 않으므로 항상 True를 기본값으로 사용
             payment_request_load = settings.value("general/payment_request_load", True, type=bool)
             should_refresh_give_works = payment_request_load
         
