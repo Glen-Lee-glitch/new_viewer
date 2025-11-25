@@ -385,6 +385,8 @@ class MainWindow(QMainWindow):
             # 로그인 후 PDF 로드 위젯에 작업자 이름 설정
             if hasattr(self, '_pdf_load_widget'):
                 self._pdf_load_widget.set_worker_name(self._worker_name)
+                # 프로그램 시작 시 체크박스 상태 초기화 (기본값: True)
+                self._pdf_load_widget.set_payment_request_load_enabled(True)
             
             # 초기 새로고침 타이머 시작
             refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
@@ -410,6 +412,10 @@ class MainWindow(QMainWindow):
             refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
             self._refresh_timer.stop()  # 기존 타이머 중지
             self._refresh_timer.start(refresh_interval * 1000)  # 새 주기로 시작 (초 단위이므로 1000을 곱함)
+            
+            # 지급신청 로드 체크박스 상태를 PdfLoadWidget에 설정
+            payment_request_load_enabled = self._config_dialog.payment_request_load_enabled
+            self._pdf_load_widget.set_payment_request_load_enabled(payment_request_load_enabled)
     
     def _open_mail_dialog(self):
         """메일 다이얼로그를 연다."""

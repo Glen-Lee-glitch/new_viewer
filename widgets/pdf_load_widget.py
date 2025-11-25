@@ -61,6 +61,7 @@ class PdfLoadWidget(QWidget):
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 시작 여부
         self._filter_mode = 'all'  # 필터 모드: 'all', 'my', 'unfinished'
         self._worker_name = ''  # 현재 로그인한 작업자 이름
+        self._payment_request_load_enabled = True  # 지급신청 로드 체크박스 상태 (기본값: True)
         self.init_ui()
         self.setup_connections()
     
@@ -401,6 +402,10 @@ class PdfLoadWidget(QWidget):
         """작업자 이름을 설정한다."""
         self._worker_name = worker_name or ''
     
+    def set_payment_request_load_enabled(self, enabled: bool):
+        """지급신청 로드 체크박스 상태를 설정한다."""
+        self._payment_request_load_enabled = enabled
+    
     
     def setup_connections(self):
         """시그널-슬롯 연결"""
@@ -488,12 +493,8 @@ class PdfLoadWidget(QWidget):
         # 지급 테이블 새로고침 여부 결정
         should_refresh_give_works = force_refresh_give_works
         if not should_refresh_give_works:
-            # QSettings에서 체크박스 상태 확인 (기본값은 True - 프로그램 시작 시 항상 체크됨)
-            # 단, 설정이 저장되지 않으므로 항상 True로 동작
-            settings = QSettings("GyeonggooLee", "NewViewer")
-            # 설정이 저장되지 않으므로 항상 True를 기본값으로 사용
-            payment_request_load = settings.value("general/payment_request_load", True, type=bool)
-            should_refresh_give_works = payment_request_load
+            # 인스턴스 변수에서 체크박스 상태 확인
+            should_refresh_give_works = self._payment_request_load_enabled
         
         if should_refresh_give_works and hasattr(self, 'tableWidget'):
             self.populate_give_works_rows()

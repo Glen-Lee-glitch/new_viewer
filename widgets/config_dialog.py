@@ -47,4 +47,9 @@ class ConfigDialog(QDialog):
     def settings(self):
         """QSettings 인스턴스를 반환합니다."""
         return self._settings
+    
+    @property
+    def payment_request_load_enabled(self):
+        """지급신청 로드 체크박스 상태를 반환합니다."""
+        return self.checkBox_payment_request_load.isChecked()
 
