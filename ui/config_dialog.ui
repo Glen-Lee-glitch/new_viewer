@@ -51,6 +51,16 @@
          </item>
         </layout>
        </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_payment_request_load">
+         <property name="text">
+          <string>지급신청 로드</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tab_2">
