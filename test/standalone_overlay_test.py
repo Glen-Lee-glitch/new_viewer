@@ -3,6 +3,7 @@ import pandas as pd
 import pymysql
 from contextlib import closing
 from datetime import datetime
+import time
 
 # pynput은 GUI와 별도로 작동하므로, import 실패 시 바로 알려주는 것이 좋음
 try:
@@ -134,11 +135,13 @@ class InputAwareOverlayWindow(QWidget):
 # ---------------------------------------------------------
 class HotkeyEmitter(QObject):
     copy_signal = pyqtSignal(int)
+    copy_all_signal = pyqtSignal()
     toggle_overlay_signal = pyqtSignal()
     navigate_signal = pyqtSignal(str)
     close_overlay_signal = pyqtSignal()
 
     def emit_copy(self, index): self.copy_signal.emit(index)
+    def emit_copy_all(self): self.copy_all_signal.emit()
     def emit_toggle(self): self.toggle_overlay_signal.emit()
     def emit_navigate(self, direction): self.navigate_signal.emit(direction)
     def emit_close(self): self.close_overlay_signal.emit()
@@ -161,6 +164,7 @@ class OverlayWindow(QWidget):
         self.initUI()
         
         self.hotkey_emitter.copy_signal.connect(self.copy_to_clipboard)
+        self.hotkey_emitter.copy_all_signal.connect(self.copy_all_to_clipboard_history)
         self.hotkey_emitter.toggle_overlay_signal.connect(self.toggle_visibility)
         self.hotkey_emitter.navigate_signal.connect(self.navigate_text)
         self.hotkey_emitter.close_overlay_signal.connect(self.close_overlay_completely)
@@ -211,6 +215,7 @@ class OverlayWindow(QWidget):
             '<ctrl>+<alt>+<right>': self._on_navigate_pressed('next'),
             '<ctrl>+<alt>+<left>': self._on_navigate_pressed('prev'),
             '<ctrl>+<alt>+]': self._on_toggle_pressed,
+            '<ctrl>+<alt>+[': self._on_copy_all_pressed,
             '<ctrl>+<alt>+/': self._on_close_pressed
         }
         
@@ -224,6 +229,7 @@ class OverlayWindow(QWidget):
 
     def _on_navigate_pressed(self, direction): return lambda: self.hotkey_emitter.emit_navigate(direction)
     def _on_copy_pressed(self, index): return lambda: self.hotkey_emitter.emit_copy(index)
+    def _on_copy_all_pressed(self): self.hotkey_emitter.emit_copy_all()
     def _on_toggle_pressed(self): self.hotkey_emitter.emit_toggle()
     def _on_close_pressed(self): self.hotkey_emitter.emit_close()
 
@@ -240,6 +246,48 @@ class OverlayWindow(QWidget):
                 self.copy_message_label.adjustSize()
                 self._update_label_positions()
                 QTimer.singleShot(2000, self._hide_copy_message)
+
+    def copy_all_to_clipboard_history(self):
+        """현재 항목의 모든 데이터를 역순으로 복사하여 클립보드 히스토리에 쌓습니다."""
+        if not self.copy_data or self.current_index >= len(self.copy_data): return
+        
+        current_copy_list = self.copy_data[self.current_index]
+        
+        # 값이 있는 항목만 추출 (인덱스, 텍스트)
+        items_to_copy = [(i, text) for i, text in enumerate(current_copy_list) if text]
+        
+        if not items_to_copy: return
+
+        clipboard = QApplication.clipboard()
+        total = len(items_to_copy)
+        
+        # 역순으로 복사 (큰 번호 -> 작은 번호)
+        for step, (i, text) in enumerate(reversed(items_to_copy)):
+            # 1. UI 갱신: 현재 어떤 항목을 복사 중인지 표시
+            # (사용자가 멈춘 것으로 착각하지 않게 함)
+            msg = f"클립보드 기록 저장 중... ({step+1}/{total})\n값: {text}"
+            self.copy_message_label.setText(msg)
+            self.copy_message_label.show()
+            self.copy_message_label.adjustSize()
+            self._update_label_positions()
+            QApplication.processEvents()
+
+            # 2. 클립보드 설정
+            clipboard.setText(text)
+            
+            # 3. 안정적인 대기 (0.8초)
+            # 윈도우 클립보드 히스토리가 락을 걸고 데이터를 저장할 시간을 충분히 줌
+            # time.sleep만 쓰면 앱이 얼어버려서 윈도우 메시지 처리가 안 될 수 있음 -> processEvents 루프 사용
+            end_time = time.time() + 0.8
+            while time.time() < end_time:
+                QApplication.processEvents()
+                time.sleep(0.05)
+
+        # 완료 메시지
+        self.copy_message_label.setText(f"{total}개 항목 저장 완료!\n(Win + V 로 확인)")
+        self.copy_message_label.adjustSize()
+        self._update_label_positions()
+        QTimer.singleShot(2000, self._hide_copy_message)
 
     def _split_text_into_columns(self, text):
         if not text: return "", ""
@@ -373,7 +421,7 @@ class TestLauncher(QDialog):
         btn_layout.addWidget(self.run_btn)
         layout.addLayout(btn_layout)
 
-        info_label = QLabel("단축키:\n- 토글: Ctrl+Alt+]\n- 이동: Ctrl+Alt+방향키(좌/우)\n- 복사: Ctrl+Alt+숫자(1~8)\n- 완전히 닫기: Ctrl+Alt+/")
+        info_label = QLabel("단축키:\n- 토글: Ctrl+Alt+]\n- 전체복사: Ctrl+Alt+[\n- 이동: Ctrl+Alt+방향키(좌/우)\n- 복사: Ctrl+Alt+숫자(1~8)\n- 완전히 닫기: Ctrl+Alt+/")
         info_label.setStyleSheet("color: gray; padding-top: 10px;")
         layout.addWidget(info_label)
         

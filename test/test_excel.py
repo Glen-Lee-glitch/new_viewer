@@ -6,7 +6,7 @@ import pymysql
 from contextlib import closing
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-excel_path = os.path.join(project_root, "성남시1121.xlsx")
+excel_path = os.path.join(project_root, "부산.xlsx")
 
 # MySQL 연결 정보
 DB_CONFIG = {
@@ -135,7 +135,9 @@ def map_to_table_columns(dataframe: pd.DataFrame) -> pd.DataFrame:
 
         series = dataframe[excel_col]
 
-        if excel_col == "생년월일(법인번호)":
+        if excel_col == "순서":
+            mapped[table_col] = series.apply(to_int)
+        elif excel_col == "생년월일(법인번호)":
             mapped[table_col] = series.apply(to_text_date)
         elif excel_col == "공동 생년월일":
             mapped[table_col] = series.apply(to_text_date)
@@ -178,15 +180,15 @@ def map_to_table_columns(dataframe: pd.DataFrame) -> pd.DataFrame:
 
 def insert_to_database(dataframe: pd.DataFrame) -> bool:
     """
-    preprocessed_data 테이블에 데이터를 삽입한다.
-    순서 칼럼은 AUTO_INCREMENT이므로 제외한다.
+    preprocessed_data 테이블에 데이터를 삽입하고,
+    processed_data 테이블의 순서를 업데이트한다.
     """
     if dataframe.empty:
         print("삽입할 데이터가 없습니다.")
         return False
     
-    # 순서 칼럼 제외 (AUTO_INCREMENT)
-    insert_columns = [col for col in TABLE_COLUMNS if col != "순서" and col in dataframe.columns]
+    # 순서 칼럼 포함하여 삽입
+    insert_columns = [col for col in TABLE_COLUMNS if col in dataframe.columns]
     
     if not insert_columns:
         print("삽입할 칼럼이 없습니다.")
@@ -203,7 +205,16 @@ def insert_to_database(dataframe: pd.DataFrame) -> bool:
                     VALUES ({placeholders})
                 """
                 
+                # processed_data 테이블 업데이트용 쿼리
+                update_query = """
+                    UPDATE processed_data 
+                    SET `순서` = %s 
+                    WHERE RN = %s
+                """
+                
                 inserted_count = 0
+                updated_count = 0
+                
                 for _, row in dataframe.iterrows():
                     values = []
                     for col in insert_columns:
@@ -211,6 +222,10 @@ def insert_to_database(dataframe: pd.DataFrame) -> bool:
                         # NaN/None 처리
                         if pd.isna(value):
                             values.append(None)
+                        # 순서 칼럼은 정수로 변환
+                        elif col == "순서":
+                            order_value = to_int(value)
+                            values.append(order_value)
                         # 날짜 칼럼 처리 (이미 문자열로 변환되었을 수 있음)
                         elif col in ["주문시간", "출고예정일", "공동생년월일"]:
                             if isinstance(value, str):
@@ -223,14 +238,25 @@ def insert_to_database(dataframe: pd.DataFrame) -> bool:
                             values.append(value)
                     
                     try:
+                        # preprocessed_data에 삽입
                         cursor.execute(insert_query, values)
                         inserted_count += 1
+                        
+                        # processed_data의 순서 업데이트 (RN이 있고 순서 값이 있을 때만)
+                        rn_value = row.get('RN')
+                        order_value = to_int(row.get('순서'))
+                        if rn_value and pd.notna(rn_value) and order_value is not None:
+                            cursor.execute(update_query, (order_value, rn_value))
+                            if cursor.rowcount > 0:
+                                updated_count += 1
                     except Exception as e:
                         print(f"행 삽입 실패 (RN: {row.get('RN', 'N/A')}): {e}")
                         continue
                 
                 connection.commit()
-                print(f"\n성공적으로 {inserted_count}개 행이 삽입되었습니다.")
+                print(f"\n성공적으로 {inserted_count}개 행이 preprocessed_data에 삽입되었습니다.")
+                if updated_count > 0:
+                    print(f"성공적으로 {updated_count}개 행의 processed_data 순서가 업데이트되었습니다.")
                 return True
                 
     except Exception as e:
