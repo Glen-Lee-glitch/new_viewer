@@ -3,7 +3,7 @@ import math
 import pandas as pd
 
 from PyQt6 import uic
-from PyQt6.QtCore import pyqtSignal, QPoint, Qt
+from PyQt6.QtCore import pyqtSignal, QPoint, Qt, QSettings
 from PyQt6.QtGui import QColor, QBrush, QPainter
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -407,7 +407,7 @@ class PdfLoadWidget(QWidget):
         if hasattr(self, 'center_open_btn'):
             self.center_open_btn.clicked.connect(self.open_pdf_file)
         if hasattr(self, 'center_refresh_btn'):
-            self.center_refresh_btn.clicked.connect(self.refresh_data)
+            self.center_refresh_btn.clicked.connect(lambda: self.refresh_data(force_refresh_give_works=True))
         if hasattr(self, 'pushButton'):
             self.pushButton.clicked.connect(self.open_by_rn)
     
@@ -476,11 +476,26 @@ class PdfLoadWidget(QWidget):
         if paths:
             self.pdf_selected.emit(paths)
     
-    def refresh_data(self):
-        """sql 데이터 새로고침"""
+    def refresh_data(self, force_refresh_give_works: bool = False):
+        """sql 데이터 새로고침
+        
+        Args:
+            force_refresh_give_works: True이면 체크박스 상태와 관계없이 지급 테이블을 새로고침합니다.
+                                     False이면 체크박스가 체크되어 있을 때만 지급 테이블을 새로고침합니다.
+        """
         self.populate_recent_subsidy_rows()
-        if hasattr(self, 'tableWidget'):
+        
+        # 지급 테이블 새로고침 여부 결정
+        should_refresh_give_works = force_refresh_give_works
+        if not should_refresh_give_works:
+            # QSettings에서 체크박스 상태 확인
+            settings = QSettings("GyeonggooLee", "NewViewer")
+            payment_request_load = settings.value("general/payment_request_load", True, type=bool)
+            should_refresh_give_works = payment_request_load
+        
+        if should_refresh_give_works and hasattr(self, 'tableWidget'):
             self.populate_give_works_rows()
+        
         self.data_refreshed.emit()  # 새로고침 완료 시그널 emit
 
     @staticmethod
