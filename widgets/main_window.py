@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 import pytz
+import pymupdf
 
 from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
@@ -240,6 +241,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.page_change_requested.connect(self.change_page)
         self._thumbnail_viewer.undo_requested.connect(self._handle_undo_request)
         self._thumbnail_viewer.page_delete_requested.connect(self._handle_page_delete_request)
+        self._thumbnail_viewer.page_replace_with_original_requested.connect(self._handle_page_replace_with_original)
         self._pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
         self._pdf_view_widget.save_completed.connect(self._handle_save_completed) # 저장 완료 시그널 연결
         self._pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
@@ -1176,6 +1178,119 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "오류", f"원본 파일을 불러오는 중 오류가 발생했습니다:\n\n{str(e)}")
+
+    def _handle_page_replace_with_original(self, visual_page_num):
+        """선택된 페이지를 원본 PDF 파일의 같은 페이지 번호로 교체한다.
+        
+        Args:
+            visual_page_num: 단일 int 또는 int 리스트. '보이는' 페이지 번호(0부터 시작)
+        """
+        if not self.renderer:
+            QMessageBox.warning(self, "오류", "현재 로드된 PDF 문서가 없습니다.")
+            return
+        
+        if not self._is_current_file_processed:
+            QMessageBox.information(self, "정보", "현재 파일은 이미 원본입니다.")
+            return
+        
+        if not self._original_filepath:
+            QMessageBox.warning(self, "오류", "원본 파일 경로 정보를 찾을 수 없습니다.")
+            return
+        
+        # 단일 페이지인지 여러 페이지인지 확인
+        if isinstance(visual_page_num, int):
+            visual_pages_to_replace = [visual_page_num]
+        else:
+            visual_pages_to_replace = list(visual_page_num)
+        
+        # 유효성 검사
+        if not visual_pages_to_replace:
+            return
+        for vp in visual_pages_to_replace:
+            if not (0 <= vp < len(self._page_order)):
+                QMessageBox.warning(self, "오류", f"잘못된 페이지 번호입니다: {vp + 1}")
+                return
+        
+        try:
+            from pathlib import Path
+            import re
+            
+            # RN 추출
+            original_path_obj = Path(self._original_filepath)
+            filename_stem = original_path_obj.stem
+            
+            # RN을 추출하는 정규식
+            rn_match = re.match(r"(RN\d+)", filename_stem)
+            if not rn_match:
+                QMessageBox.warning(self, "오류", "원본 파일 경로에서 RN을 추출할 수 없습니다.")
+                return
+            
+            rn = rn_match.group(1)
+            
+            # 원본 파일이 있는 디렉토리
+            new_files_dir = Path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\new')
+            
+            # RN을 포함하는 모든 PDF 파일 찾기
+            matching_files = sorted(
+                new_files_dir.glob(f"{re.escape(rn)}*.pdf"),
+                key=lambda p: (
+                    p.stem,
+                    int(re.search(r'_(\d+)$', p.stem).group(1)) if re.search(r'_(\d+)$', p.stem) else 0
+                )
+            )
+            
+            if not matching_files:
+                QMessageBox.warning(self, "오류", f"원본 파일(RN: {rn})을 찾을 수 없습니다.")
+                return
+            
+            # 원본 PDF 파일들을 하나로 병합하여 메모리에 로드
+            original_doc = pymupdf.open()
+            for file_path in matching_files:
+                with pymupdf.open(str(file_path)) as f:
+                    original_doc.insert_pdf(f)
+            
+            original_pdf_bytes = original_doc.tobytes(garbage=4, deflate=True)
+            original_doc.close()
+            
+            # 선택된 각 페이지에 대해 교체 수행
+            # '보이는' 순서를 '실제' 페이지 번호로 변환
+            actual_pages_to_replace = [self._page_order[vp] for vp in visual_pages_to_replace]
+            
+            # 각 페이지에 대해 원본 파일의 같은 페이지 번호 확인 및 교체
+            for visual_idx, actual_page_num in enumerate(actual_pages_to_replace):
+                # 원본 파일에 해당 페이지 번호가 있는지 확인
+                original_doc_check = pymupdf.open(stream=original_pdf_bytes, filetype="pdf")
+                if actual_page_num >= original_doc_check.page_count:
+                    original_doc_check.close()
+                    QMessageBox.critical(
+                        self, 
+                        "오류", 
+                        f"원본 파일에 페이지 {actual_page_num + 1}이 없습니다.\n"
+                        f"(원본 파일 총 페이지 수: {original_doc_check.page_count})\n\n"
+                        f"작업이 취소되었습니다."
+                    )
+                    return
+                original_doc_check.close()
+                
+                # 페이지 교체 수행
+                self.renderer.replace_page(actual_page_num, original_pdf_bytes, actual_page_num)
+            
+            # 교체 완료 후 썸네일 및 뷰어 갱신
+            self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
+            self._pdf_view_widget.set_renderer(self.renderer, clear_overlay=False)
+            
+            # 현재 페이지가 교체된 페이지 중 하나라면 화면 갱신
+            if self.current_page in visual_pages_to_replace:
+                self.go_to_page(self.current_page)
+            
+            QMessageBox.information(
+                self, 
+                "완료", 
+                f"페이지 {[vp + 1 for vp in visual_pages_to_replace]}을(를) 원본 페이지로 교체했습니다."
+            )
+        
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"원본 페이지 교체 중 오류가 발생했습니다:\n\n{str(e)}")
 
     def _load_outbound_allocation_document(self):
         """(성남시 전용) 출고배정표 불러오기 - 서류병합 """

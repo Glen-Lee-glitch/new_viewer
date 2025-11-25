@@ -15,6 +15,7 @@ class ThumbnailViewWidget(QWidget):
     page_order_changed = pyqtSignal(list) # 변경된 페이지 순서를 전달하는 새 시그널
     undo_requested = pyqtSignal()
     page_delete_requested = pyqtSignal(object, dict) # '보이는' 페이지 번호(단일 int 또는 리스트)와 삭제 정보로 삭제 요청
+    page_replace_with_original_requested = pyqtSignal(object) # '보이는' 페이지 번호(단일 int 또는 리스트)로 원본 페이지 교체 요청
     
     def __init__(self):
         super().__init__()
@@ -101,9 +102,34 @@ class ThumbnailViewWidget(QWidget):
         delete_action = context_menu.addAction("페이지 삭제")
         delete_action.triggered.connect(self._prompt_delete_selected_page)
         
+        # 원본 액션 추가 (기능 미구현)
+        original_action = context_menu.addAction("원본")
+        original_action.triggered.connect(self._on_original_requested)
+        
         # 메뉴를 글로벌 좌표로 표시
         global_position = self.thumbnail_list_widget.mapToGlobal(position)
         context_menu.exec(global_position)
+    
+    def _on_original_requested(self):
+        """원본 메뉴 항목이 선택되었을 때 호출되는 메서드"""
+        selected_items = self.thumbnail_list_widget.selectedItems()
+        if not selected_items:
+            return
+        
+        # 선택된 모든 페이지의 row 번호를 수집 (0부터 시작하는 인덱스)
+        visual_page_nums = [self.thumbnail_list_widget.row(item) for item in selected_items]
+        
+        # 정렬하여 일관성 유지
+        visual_page_nums.sort()
+        
+        # 단일 페이지인 경우 int로, 여러 페이지인 경우 리스트로 전달
+        if len(visual_page_nums) == 1:
+            page_input = visual_page_nums[0]
+        else:
+            page_input = visual_page_nums
+        
+        # MainWindow에 원본 페이지 교체 요청
+        self.page_replace_with_original_requested.emit(page_input)
 
     def init_ui(self):
         """UI 파일을 로드하고 초기화"""

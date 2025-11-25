@@ -660,3 +660,78 @@ class PdfRender:
         except Exception as e:
             traceback.print_exc()
             raise ValueError(f"파일 추가 중 오류 발생: {e}")
+
+    def replace_page(self, page_num: int, source_pdf_bytes: bytes, source_page_num: int) -> None:
+        """지정된 페이지를 원본 PDF 파일의 같은 페이지 번호로 교체한다.
+        
+        Args:
+            page_num: 교체할 현재 PDF의 페이지 번호 (0부터 시작)
+            source_pdf_bytes: 원본 PDF 파일의 바이트 데이터
+            source_page_num: 원본 PDF에서 가져올 페이지 번호 (0부터 시작)
+        """
+        if not self.pdf_bytes:
+            raise RuntimeError("PDF가 로드되지 않았습니다.")
+        
+        try:
+            # 원본 PDF 문서 열기
+            with pymupdf.open(stream=source_pdf_bytes, filetype="pdf") as source_doc:
+                # 원본 페이지 번호 유효성 확인
+                if not (0 <= source_page_num < source_doc.page_count):
+                    raise IndexError(f"원본 PDF에 페이지 번호 {source_page_num}가 없습니다. (총 {source_doc.page_count} 페이지)")
+                
+                # 현재 문서 열기
+                with pymupdf.open(stream=self.pdf_bytes, filetype="pdf") as current_doc:
+                    # 현재 페이지 번호 유효성 확인
+                    if not (0 <= page_num < current_doc.page_count):
+                        raise IndexError(f"현재 PDF에 페이지 번호 {page_num}가 없습니다. (총 {current_doc.page_count} 페이지)")
+                    
+                    # 원본 페이지를 A4로 변환하여 가져오기
+                    source_page = source_doc.load_page(source_page_num)
+                    bounds = source_page.bound()
+                    is_landscape = bounds.width > bounds.height
+                    
+                    TARGET_DPI = 200
+                    if is_landscape:
+                        a4_rect = pymupdf.paper_rect("a4-l")
+                    else:
+                        a4_rect = pymupdf.paper_rect("a4")
+                    
+                    target_pixel_width = a4_rect.width / 72 * TARGET_DPI
+                    target_pixel_height = a4_rect.height / 72 * TARGET_DPI
+                    
+                    zoom_x = target_pixel_width / bounds.width if bounds.width > 0 else 0
+                    zoom_y = target_pixel_height / bounds.height if bounds.height > 0 else 0
+                    zoom = min(zoom_x, zoom_y)
+                    
+                    matrix = pymupdf.Matrix(zoom, zoom)
+                    pix = source_page.get_pixmap(matrix=matrix, alpha=False, annots=True)
+                    
+                    # 기존 페이지 삭제
+                    current_doc.delete_pages([page_num])
+                    
+                    # 새 페이지 생성 및 이미지 삽입
+                    new_page = current_doc.new_page(page_num, width=a4_rect.width, height=a4_rect.height)
+                    
+                    margin = 0.98
+                    page_rect = new_page.rect
+                    margin_x = page_rect.width * (1 - margin) / 2
+                    margin_y = page_rect.height * (1 - margin) / 2
+                    target_rect = page_rect + (margin_x, margin_y, -margin_x, -margin_y)
+                    
+                    new_page.insert_image(target_rect, pixmap=pix)
+                    
+                    # 변경사항 저장
+                    self.pdf_bytes = current_doc.tobytes(garbage=4, deflate=True)
+            
+            # 내부 문서 객체 갱신
+            if self.doc:
+                self.doc.close()
+            
+            self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
+            self.page_count = self.doc.page_count
+            
+            print(f"페이지 교체 완료: 페이지 {page_num + 1}을 원본 페이지 {source_page_num + 1}로 교체했습니다.")
+        
+        except Exception as e:
+            traceback.print_exc()
+            raise ValueError(f"페이지 교체 중 오류 발생: {e}")
