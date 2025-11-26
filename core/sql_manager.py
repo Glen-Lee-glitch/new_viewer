@@ -32,7 +32,7 @@ def claim_subsidy_work(rn: str, worker: str) -> bool:
             try:
                 with connection.cursor() as cursor:
                     lock_query = (
-                        "SELECT worker FROM subsidy_applications "
+                        "SELECT worker, status FROM subsidy_applications "
                         "WHERE RN = %s FOR UPDATE"
                     )
                     cursor.execute(lock_query, (rn,))
@@ -43,15 +43,25 @@ def claim_subsidy_work(rn: str, worker: str) -> bool:
                         return False
 
                     existing_worker = row[0]
+                    existing_status = row[1] if len(row) > 1 else None
+                    
                     if existing_worker:
                         connection.rollback()
                         return existing_worker == worker
 
-                    update_query = (
-                        "UPDATE subsidy_applications SET worker = %s, status = %s "
-                        "WHERE RN = %s"
-                    )
-                    cursor.execute(update_query, (worker, '처리중', rn))
+                    # status가 '이메일 전송' 또는 '요청메일 전송'이면 status는 변경하지 않음
+                    if existing_status in ('이메일 전송', '요청메일 전송'):
+                        update_query = (
+                            "UPDATE subsidy_applications SET worker = %s "
+                            "WHERE RN = %s"
+                        )
+                        cursor.execute(update_query, (worker, rn))
+                    else:
+                        update_query = (
+                            "UPDATE subsidy_applications SET worker = %s, status = %s "
+                            "WHERE RN = %s"
+                        )
+                        cursor.execute(update_query, (worker, '처리중', rn))
                 connection.commit()
                 return True
             except Exception:
