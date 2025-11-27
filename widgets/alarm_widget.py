@@ -1,5 +1,5 @@
 from pathlib import Path
-from PyQt6.QtWidgets import QWidget, QListWidget, QVBoxLayout, QLabel, QPushButton, QGridLayout
+from PyQt6.QtWidgets import QWidget, QListWidget, QVBoxLayout, QLabel, QPushButton, QGridLayout, QScrollArea
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6 import uic
 
@@ -48,22 +48,23 @@ class AlarmWidget(QWidget):
             if layout is None:
                 layout = QVBoxLayout(self.groupBox_finished)
             
-            # 제목 라벨 추가
-            title_label = QLabel("금일 처리완료 건")
-            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            title_label.setStyleSheet("font-weight: bold; color: #333; margin-bottom: 5px;")
-            layout.addWidget(title_label)
+            # 레이아웃 마진 및 간격 조정 (타이틀 공간 확보를 위해 상단 마진 추가)
+            layout.setContentsMargins(2, 15, 2, 2)
+            layout.setSpacing(0)
+            
+            # 스타일 시트 제거 (기본 테마 스타일 사용)
+            self.groupBox_finished.setStyleSheet("")
             
             # 리스트 위젯 생성 및 추가
             self._finished_list = QListWidget()
-            # 최소 5개 row가 보이도록 높이 조정 (항목당 약 28px로 계산)
-            self._finished_list.setMinimumHeight(120)  # 5 * 28 = 140px
-            self._finished_list.setMaximumHeight(140)  # 최대 높이도 약간 증가
+            # 높이 조정 (항목당 약 24px로 계산, 3~4개 보이도록 축소)
+            self._finished_list.setMinimumHeight(60)  
+            self._finished_list.setMaximumHeight(80)
 
             # 폰트 크기 조정 (1pt 줄이기)
             font = self._finished_list.font()
             font.setPointSize(font.pointSize() - 2)
-            self._finished_list.setFont(    font)
+            self._finished_list.setFont(font)
 
             layout.addWidget(self._finished_list)
     
@@ -74,6 +75,13 @@ class AlarmWidget(QWidget):
             layout = self.groupBox_2.layout()
             if layout is None:
                 layout = QVBoxLayout(self.groupBox_2)
+            
+            # 레이아웃 마진 및 간격 조정 (타이틀 공간 확보를 위해 상단 마진 추가)
+            layout.setContentsMargins(2, 15, 2, 2)
+            layout.setSpacing(0)
+            
+            # 스타일 시트 제거 (기본 테마 스타일 사용)
+            self.groupBox_2.setStyleSheet("")
             
             # 버튼 컨테이너 생성 (나중에 업데이트할 때 사용)
             self._ev_buttons_container = QWidget()
@@ -95,8 +103,13 @@ class AlarmWidget(QWidget):
         if not parent_layout:
             return
         
-        # 기존 컨테이너 제거
-        if hasattr(self, '_ev_buttons_container') and self._ev_buttons_container:
+        # 기존 컨테이너 제거 (QScrollArea 포함)
+        if hasattr(self, '_ev_buttons_scroll_area') and self._ev_buttons_scroll_area:
+            parent_layout.removeWidget(self._ev_buttons_scroll_area)
+            self._ev_buttons_scroll_area.deleteLater()
+            self._ev_buttons_scroll_area = None
+        elif hasattr(self, '_ev_buttons_container') and self._ev_buttons_container:
+            # 혹시 이전 버전의 컨테이너가 남아있다면 제거
             parent_layout.removeWidget(self._ev_buttons_container)
             self._ev_buttons_container.deleteLater()
             self._ev_buttons_container = None
@@ -104,31 +117,78 @@ class AlarmWidget(QWidget):
         if not rn_list:
             return
         
-        # 새 컨테이너 생성
-        self._ev_buttons_container = QWidget()
-        container_layout = QGridLayout(self._ev_buttons_container)
-        container_layout.setContentsMargins(0, 5, 0, 0)
-        container_layout.setSpacing(5)
+        # 스크롤 영역 생성
+        self._ev_buttons_scroll_area = QScrollArea()
+        self._ev_buttons_scroll_area.setWidgetResizable(True)
+        self._ev_buttons_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
-        # 버튼 생성 및 배치 (2열로 배치)
-        cols = 2
+        # 스크롤 영역 내부 컨테이너 위젯
+        scroll_content = QWidget()
+        self._ev_buttons_scroll_area.setWidget(scroll_content)
+        
+        # 세로 정렬 레이아웃 (VBoxLayout)
+        container_layout = QVBoxLayout(scroll_content)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(3)
+        # 위쪽 정렬 (버튼이 위에서부터 쌓이도록)
+        container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        # QSizePolicy 임포트 확인
+        from PyQt6.QtWidgets import QSizePolicy
+        
         for i, rn in enumerate(rn_list):
             btn = QPushButton(rn)
-            # 스타일 설정: 글자 크기 조정, 패딩 최소화, 높이 조정
+            
+            # 사이즈 정책
+            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            
+            # 스타일 설정
             btn.setStyleSheet("""
                 QPushButton {
                     font-size: 11px;
-                    padding: 3px;
-                    min-height: 20px;
+                    padding: 2px 4px;
+                    margin: 0px;
+                    min-height: 22px;
+                    max-height: 25px;
+                    border: 1px solid #555;
+                    border-radius: 2px;
+                    background-color: rgba(255, 255, 255, 0.05);
+                    text-align: center;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 255, 255, 0.15);
+                    border: 1px solid #777;
+                }
+                QPushButton:pressed {
+                    background-color: rgba(255, 255, 255, 0.25);
                 }
             """)
             
-            row = i // cols
-            col = i % cols
-            container_layout.addWidget(btn, row, col)
+            container_layout.addWidget(btn)
         
-        # 새 컨테이너를 groupBox_2에 추가
-        parent_layout.addWidget(self._ev_buttons_container)
+        # 높이 설정: 버튼 하나당 높이 + 간격
+        # qt-material 테마 등을 고려하여 좀 더 넉넉하게 잡음
+        item_height = 36  # 28 -> 36으로 증가
+        
+        # 5개 이하일 때는 스크롤 없이 모두 표시
+        if len(rn_list) <= 5:
+            # 내용물 크기에 맞춤 (스크롤 필요 없음)
+            # 여유분 5px 추가
+            needed_h = len(rn_list) * item_height + 5
+            self._ev_buttons_scroll_area.setFixedHeight(needed_h)
+            self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        else:
+            # 5개 초과 시 최대 5개 높이로 제한하고 스크롤 활성화
+            max_h = 5 * item_height + 5
+            self._ev_buttons_scroll_area.setFixedHeight(max_h)
+            self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # 스크롤 영역 테두리 제거 (깔끔하게 보이도록)
+        self._ev_buttons_scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        
+        # 새 스크롤 영역을 groupBox_2에 추가
+        parent_layout.addWidget(self._ev_buttons_scroll_area)
     
     def _load_completed_regions(self):
         """오늘 완료된 지역 목록을 로드한다."""
