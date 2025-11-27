@@ -89,7 +89,7 @@ def _build_subsidy_query_base():
         "       CASE "
         "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
         "               CASE "
-        "                   WHEN (gr.구매계약서 = 1 AND (c.ai_계약일자 IS NULL OR c.ai_이름 IS NULL OR c.전화번호 IS NULL OR c.이메일 IS NULL)) "
+        "                   WHEN (gr.구매계약서 = 1 AND (c.ai_계약일자 IS NULL OR c.ai_이름 IS NULL OR c.전화번호 IS NULL OR c.이메일 IS NULL OR c.ai_계약일자 < '2025-01-01')) "
         "                   OR (gr.초본 = 1 AND (cb.name IS NULL OR cb.birth_date IS NULL OR cb.address_1 IS NULL)) "
         "                   OR (gr.청년생애 = 1 AND (y.local_name IS NULL OR y.range_date IS NULL)) "
         "                   THEN 'O' "
@@ -494,12 +494,14 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 "       e.file_rendered, "
                 "       sa.urgent, "
                 "       gr.구매계약서, gr.초본, gr.공동명의, gr.다자녀, "
-                "       d.child_birth_date, cb.issue_date "
+                "       d.child_birth_date, cb.issue_date, "
+                "       c.ai_계약일자, c.ai_이름, c.전화번호, c.이메일 "
                 "FROM subsidy_applications sa "
                 "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
                 "LEFT JOIN gemini_results gr ON sa.RN COLLATE utf8mb4_unicode_ci = gr.RN COLLATE utf8mb4_unicode_ci "
                 "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
                 "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
+                "LEFT JOIN test_ai_구매계약서 c ON sa.RN COLLATE utf8mb4_unicode_ci = c.RN COLLATE utf8mb4_unicode_ci "
                 "WHERE sa.RN = %s"
             )
             
@@ -516,6 +518,36 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 # 이상치(outlier) 계산 로직 (fetch_recent_subsidy_applications의 로직 간소화 적용)
                 # 필요하다면 여기서 outlier 계산 로직을 추가하거나, 기본값만 설정
                 result['outlier'] = '' 
+                
+                # 0. 구매계약서 이상치 체크 (구매계약서가 있고 초본 또는 공동명의가 있는 경우)
+                if result.get('구매계약서') == 1 and (result.get('초본') == 1 or result.get('공동명의') == 1):
+                    try:
+                        ai_계약일자 = result.get('ai_계약일자')
+                        ai_이름 = result.get('ai_이름')
+                        전화번호 = result.get('전화번호')
+                        이메일 = result.get('이메일')
+                        
+                        # NULL 체크 또는 2025년 이전 체크
+                        if (ai_계약일자 is None or ai_이름 is None or 전화번호 is None or 이메일 is None):
+                            result['outlier'] = 'O'
+                        else:
+                            # 2025년 이전 체크
+                            if isinstance(ai_계약일자, str):
+                                try:
+                                    contract_date = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
+                                    if contract_date < date(2025, 1, 1):
+                                        result['outlier'] = 'O'
+                                except (ValueError, AttributeError):
+                                    pass
+                            elif isinstance(ai_계약일자, (datetime, date)):
+                                contract_date = ai_계약일자 if isinstance(ai_계약일자, date) else ai_계약일자.date()
+                                if contract_date < date(2025, 1, 1):
+                                    result['outlier'] = 'O'
+                            elif isinstance(ai_계약일자, pd.Timestamp):
+                                if ai_계약일자.date() < date(2025, 1, 1):
+                                    result['outlier'] = 'O'
+                    except Exception:
+                        pass
                 
                 # 1. 다자녀 이상치 체크
                 try:
