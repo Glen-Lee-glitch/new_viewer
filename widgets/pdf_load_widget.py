@@ -24,9 +24,11 @@ from core.sql_manager import (
     fetch_give_works,
     fetch_today_subsidy_applications_by_worker,
     fetch_today_unfinished_subsidy_applications,
-    get_email_by_thread_id
+    get_email_by_thread_id,
+    check_gemini_flags
 )
 from widgets.email_view_dialog import EmailViewDialog
+from widgets.gemini_results_dialog import GeminiResultsDialog
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -314,12 +316,22 @@ class PdfLoadWidget(QWidget):
             menu.addSeparator()  # 구분선 추가
             email_action = menu.addAction("이메일 확인하기")
         
+        # 모든 row에 대해 'AI 결과' 메뉴 추가
+        menu.addSeparator()  # 구분선 추가
+        ai_result_action = menu.addAction("AI 결과")
+        
         action = menu.exec(global_pos)
+
+        # action이 None이면 아무것도 하지 않음 (메뉴 밖 클릭 또는 ESC)
+        if action is None:
+            return
 
         if action == start_action:
             self.start_selected_work()
         elif action == email_action:
             self._show_email_view(row)
+        elif action == ai_result_action:
+            self._show_gemini_results(row)
     
     def _show_email_view(self, row: int):
         """이메일 확인 다이얼로그를 표시한다."""
@@ -354,6 +366,32 @@ class PdfLoadWidget(QWidget):
             parent=self
         )
         dialog.exec()
+    
+    def _show_gemini_results(self, row: int):
+        """AI 결과 다이얼로그를 비모달로 표시한다."""
+        table = self.complement_table_widget
+        rn_item = table.item(row, 1)  # RN 컬럼(1번)
+        
+        if not rn_item:
+            QMessageBox.warning(self, "오류", "데이터를 불러올 수 없습니다.")
+            return
+        
+        # RN 추출
+        rn = rn_item.text().strip()
+        if not rn:
+            QMessageBox.warning(self, "오류", "RN을 찾을 수 없습니다.")
+            return
+        
+        # gemini_results 존재 여부 확인
+        flags = check_gemini_flags(rn)
+        if not flags:
+            QMessageBox.warning(self, "경고", f"RN '{rn}'에 대한 AI 결과가 없습니다.")
+            return
+        
+        # GeminiResultsDialog를 비모달로 생성하고 표시
+        dialog = GeminiResultsDialog(parent=self)
+        dialog.load_data(rn)
+        dialog.show()  # 비모달로 표시
 
     def start_selected_work(self):
         """선택된 행을 emit하여 다운로드 로직이 처리하도록 한다."""
