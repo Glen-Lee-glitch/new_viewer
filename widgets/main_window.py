@@ -1268,6 +1268,7 @@ class MainWindow(QMainWindow):
             # 기본 정보 보존 (show_load_view()에서 초기화되기 전에 저장)
             saved_basic_info = self._pending_basic_info.copy() if self._pending_basic_info else None
             saved_current_rn = self._current_rn
+            saved_is_context_menu_work = self._is_context_menu_work  # 컨텍스트 메뉴 작업 플래그 보존
             
             # 기존 뷰어 정리 후 원본 파일 로드
             self.show_load_view() # 현재 뷰를 닫고 로드 화면으로 전환
@@ -1283,6 +1284,9 @@ class MainWindow(QMainWindow):
             if saved_current_rn:
                 self._current_rn = saved_current_rn
                 self._pdf_view_widget.set_current_rn(saved_current_rn)
+            
+            # 컨텍스트 메뉴 작업 플래그 복원 (special_note 다이얼로그를 위해 필요)
+            self._is_context_menu_work = saved_is_context_menu_work
             
             QMessageBox.information(self, "정보", "원본 파일을 성공적으로 불러왔습니다.")
 
