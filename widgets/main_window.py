@@ -249,7 +249,8 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.toolbar.email_requested.connect(self._open_mail_dialog)
         self._pdf_view_widget.page_delete_requested.connect(self._handle_page_delete_request)
         self._pdf_load_widget.ai_review_requested.connect(self._show_gemini_results_dialog)
-        self._pdf_load_widget.data_refreshed.connect(self._update_refresh_time)  # 데이터 새로고침 시 시간 업데이트
+        # 데이터 새로고침 시 시간 업데이트 및 알람 위젯 갱신
+        self._pdf_load_widget.data_refreshed.connect(self._on_data_refreshed)
         
         # 정보 패널 업데이트 연결
         self._pdf_view_widget.pdf_loaded.connect(self._info_panel.update_file_info)
@@ -866,6 +867,13 @@ class MainWindow(QMainWindow):
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
     
+    def _on_data_refreshed(self):
+        """데이터 새로고침 완료 시 호출되는 슬롯"""
+        self._update_refresh_time()
+        # 알람 위젯도 함께 새로고침
+        if hasattr(self, '_alarm_widget'):
+            self._alarm_widget.refresh_data()
+
     def _update_refresh_time(self):
         """한국 시간으로 새로고침 시간을 업데이트한다."""
         korea_tz = pytz.timezone('Asia/Seoul')
