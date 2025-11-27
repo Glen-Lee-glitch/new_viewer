@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox
 from PyQt6.QtGui import QCloseEvent
 from PyQt6 import uic
 from pathlib import Path
-from core.sql_manager import get_worker_names
+from core.sql_manager import get_worker_names, fetch_after_apply_counts
 
 class LoginDialog(QDialog):
     def __init__(self, parent=None):
@@ -36,6 +36,9 @@ class LoginDialog(QDialog):
         # 버튼 연결 (검증 로직 포함)
         self.buttonBox.accepted.connect(self._validate_and_accept)
         self.buttonBox.rejected.connect(self.reject)
+        
+        # 리마인더 라벨 업데이트
+        self._update_reminder_labels()
         
         # 입력 필드 포커스
         self.lineEdit_worker.setFocus()
@@ -79,6 +82,17 @@ class LoginDialog(QDialog):
         # reject()를 호출하면 다이얼로그가 닫히고 exec()가 Rejected를 반환함
         self.reject()
         event.accept()
+    
+    def _update_reminder_labels(self):
+        """리마인더 라벨을 업데이트한다."""
+        try:
+            today_count, tomorrow_count = fetch_after_apply_counts()
+            self.today_apply.setText(f"{today_count}건")
+            self.tomorrow_label.setText(f"{tomorrow_count}건")
+        except Exception:
+            # 오류 발생 시 기본값 설정
+            self.today_apply.setText("0건")
+            self.tomorrow_label.setText("0건")
     
     def get_worker_name(self) -> str:
         """입력된 작업자 이름을 반환한다."""

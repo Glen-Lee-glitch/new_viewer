@@ -1230,6 +1230,44 @@ def fetch_ev_required_rns(worker_name: str) -> list[str]:
         traceback.print_exc()
         return []
 
+def fetch_after_apply_counts() -> tuple[int, int]:
+    """
+    after_apply 테이블에서 오늘과 내일의 신청 건수를 조회한다.
+    
+    Returns:
+        (오늘 건수, 내일 건수) 튜플
+    """
+    try:
+        kst = pytz.timezone('Asia/Seoul')
+        today = datetime.now(kst).date()
+        tomorrow = today + timedelta(days=1)
+        
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            # 오늘 건수 조회
+            today_query = """
+                SELECT COUNT(*) 
+                FROM after_apply 
+                WHERE DATE(after_date) = %s
+            """
+            # 내일 건수 조회
+            tomorrow_query = """
+                SELECT COUNT(*) 
+                FROM after_apply 
+                WHERE DATE(after_date) = %s
+            """
+            
+            with connection.cursor() as cursor:
+                cursor.execute(today_query, (today,))
+                today_count = cursor.fetchone()[0] or 0
+                
+                cursor.execute(tomorrow_query, (tomorrow,))
+                tomorrow_count = cursor.fetchone()[0] or 0
+                
+                return (today_count, tomorrow_count)
+    except Exception:
+        traceback.print_exc()
+        return (0, 0)
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
