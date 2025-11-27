@@ -960,6 +960,51 @@ def fetch_gemini_chobon_results(rn: str) -> dict:
         traceback.print_exc()
         return {}
 
+def fetch_gemini_multichild_results(rn: str) -> dict:
+    """
+    test_ai_다자녀 테이블에서 RN으로 데이터를 조회한다.
+    """
+    if not rn:
+        return {}
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT child_birth_date
+                FROM test_ai_다자녀
+                WHERE RN = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                if row:
+                    import json
+                    return {
+                        'child_birth_date': json.loads(row[0]) if row[0] else []
+                    }
+                return {}
+    except Exception:
+        traceback.print_exc()
+        return {}
+
+def fetch_subsidy_model(rn: str) -> str:
+    """
+    subsidy_applications 테이블에서 RN으로 차종(model) 정보를 조회한다.
+    """
+    if not rn:
+        return ""
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT model FROM subsidy_applications WHERE RN = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                return row[0] if row and row[0] else ""
+    except Exception:
+        traceback.print_exc()
+        return ""
+
 def get_recent_thread_id_by_rn(rn: str) -> str | None:
     """
     RN으로 subsidy_applications 테이블에서 recent_thread_id를 조회한다.

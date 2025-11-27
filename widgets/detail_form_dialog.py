@@ -3,7 +3,7 @@ from PyQt6 import uic
 from PyQt6.QtWidgets import QDialog, QApplication
 from PyQt6.QtCore import Qt, QEvent
 
-from core.sql_manager import fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_chobon_results
+from core.sql_manager import fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_chobon_results, fetch_subsidy_model, fetch_gemini_multichild_results
 
 class DetailFormDialog(QDialog):
     """상세 정보 표시 다이얼로그 (form.ui 사용)"""
@@ -45,7 +45,9 @@ class DetailFormDialog(QDialog):
             self.label_address_1,
             self.label_address_2,
             self.label_firstandyouth,
-            self.label_gender
+            self.label_gender,
+            self.label_model,
+            self.label_children
         ]
         
         for label in labels:
@@ -64,7 +66,9 @@ class DetailFormDialog(QDialog):
             self.label_address_1,
             self.label_address_2,
             self.label_firstandyouth,
-            self.label_gender
+            self.label_gender,
+            self.label_model,
+            self.label_children
         ]
         
         for label in labels_to_make_clickable:
@@ -84,7 +88,9 @@ class DetailFormDialog(QDialog):
             self.label_address_1,
             self.label_address_2,
             self.label_firstandyouth,
-            self.label_gender
+            self.label_gender,
+            self.label_model,
+            self.label_children
         ]
 
         if obj in clickable_labels and event.type() == QEvent.Type.MouseButtonPress:
@@ -189,6 +195,33 @@ class DetailFormDialog(QDialog):
              self.label_firstandyouth.setText("O")
         else:
              self.label_firstandyouth.setText("")
+             
+        # 5. 차종 데이터 로드
+        model_name = fetch_subsidy_model(rn)
+        
+        # 모델명 매핑
+        model_mapping = {
+            'Model Y L': 'New Model Y Long Range',
+            'Model Y R': 'New Model Y RWD',
+            'Model 3 R': 'Model 3 RWD'
+        }
+        
+        # 매핑된 이름이 있으면 사용, 없으면 원래 이름 사용
+        display_model_name = model_mapping.get(model_name, model_name)
+        self.label_model.setText(display_model_name)
+        
+        # 6. 다자녀 데이터 로드
+        if flags.get('다자녀', False):
+            multichild_data = fetch_gemini_multichild_results(rn)
+            child_birth_dates = multichild_data.get('child_birth_date', [])
+            
+            if child_birth_dates:
+                count = len(child_birth_dates)
+                self.label_children.setText(f"{count}자녀")
+            else:
+                self.label_children.setText("")
+        else:
+            self.label_children.setText("")
 
     def _clear_chobon_fields(self):
         """초본 관련 필드 초기화"""
