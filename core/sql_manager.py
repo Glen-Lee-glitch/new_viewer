@@ -1200,6 +1200,36 @@ def insert_delivery_day_gap(region: str, day_gap: int) -> bool:
         traceback.print_exc()
         return False
 
+def fetch_ev_required_rns(worker_name: str) -> list[str]:
+    """
+    ev_required 테이블에서 조건에 맞는 RN 목록을 조회한다.
+    조건: status='신규', step!='지급보완', worker=worker_name
+    
+    Args:
+        worker_name: 작업자 이름
+        
+    Returns:
+        RN 목록 리스트
+    """
+    if not worker_name:
+        return []
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT RN
+                FROM ev_required
+                WHERE status = '신규' AND step != '지급보완' AND worker = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (worker_name,))
+                rows = cursor.fetchall()
+                # 튜플의 첫 번째 요소인 RN만 추출하여 리스트로 반환
+                return [row[0] for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
