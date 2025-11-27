@@ -140,17 +140,16 @@ class AlarmWidget(QWidget):
         for i, rn in enumerate(rn_list):
             btn = QPushButton(rn)
             
-            # 사이즈 정책
+            # 사이즈 정책 및 높이 강제 고정
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            btn.setFixedHeight(22)  # 높이를 강제로 22px로 고정
             
             # 스타일 설정
             btn.setStyleSheet("""
                 QPushButton {
                     font-size: 11px;
-                    padding: 2px 4px;
+                    padding: 0px;
                     margin: 0px;
-                    min-height: 22px;
-                    max-height: 25px;
                     border: 1px solid #555;
                     border-radius: 2px;
                     background-color: rgba(255, 255, 255, 0.05);
@@ -167,9 +166,21 @@ class AlarmWidget(QWidget):
             
             container_layout.addWidget(btn)
         
-        # 높이 설정: 버튼 하나당 높이 + 간격
-        # qt-material 테마 등을 고려하여 좀 더 넉넉하게 잡음
-        item_height = 36  # 28 -> 36으로 증가
+        # 높이 설정: 버튼 하나당 높이(22) + 간격(3) = 25
+        item_height = 25
+        
+        # 5개 이하일 때는 스크롤 없이 모두 표시
+        if len(rn_list) <= 5:
+            # 내용물 크기에 맞춤 (스크롤 필요 없음)
+            # 여유분 10px 추가 (테마 패딩 등 고려하여 넉넉하게)
+            needed_h = len(rn_list) * item_height + 10
+            self._ev_buttons_scroll_area.setFixedHeight(needed_h)
+            self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        else:
+            # 5개 초과 시 최대 5개 높이로 제한하고 스크롤 활성화
+            max_h = 5 * item_height + 10
+            self._ev_buttons_scroll_area.setFixedHeight(max_h)
+            self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
         # 5개 이하일 때는 스크롤 없이 모두 표시
         if len(rn_list) <= 5:
