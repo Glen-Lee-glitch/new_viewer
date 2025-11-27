@@ -211,6 +211,7 @@ class DetailFormDialog(QDialog):
         self.label_model.setText(display_model_name)
         
         # 6. 다자녀 데이터 로드
+        has_multichild = False
         if flags.get('다자녀', False):
             multichild_data = fetch_gemini_multichild_results(rn)
             child_birth_dates = multichild_data.get('child_birth_date', [])
@@ -218,10 +219,39 @@ class DetailFormDialog(QDialog):
             if child_birth_dates:
                 count = len(child_birth_dates)
                 self.label_children.setText(f"{count}자녀")
+                has_multichild = True
             else:
                 self.label_children.setText("")
         else:
             self.label_children.setText("")
+            
+        # 7. 하단 레이아웃 가시성 제어 (공동명의, 다자녀, 청년생애, 기타)
+        # 일단 모두 숨김
+        self._set_bottom_layout_visibility(
+            show_joint=False, # 공동명의 (아직 로직 없음)
+            show_multichild=has_multichild, 
+            show_youth=flags.get('청년생애', False), 
+            show_etc=False # 기타 (아직 로직 없음)
+        )
+
+    def _set_bottom_layout_visibility(self, show_joint, show_multichild, show_youth, show_etc):
+        """하단 레이아웃 항목들의 가시성을 제어한다."""
+        # 공동명의
+        self.label_12.setVisible(show_joint)
+        self.label_name_2.setVisible(show_joint)
+        self.label_birth_date_2.setVisible(show_joint)
+        
+        # 다자녀
+        self.label_13.setVisible(show_multichild)
+        self.label_children.setVisible(show_multichild)
+        
+        # 청년생애
+        self.label_14.setVisible(show_youth)
+        self.label_firstandyouth.setVisible(show_youth)
+        
+        # 기타
+        self.label_15.setVisible(show_etc)
+        self.label_etc.setVisible(show_etc)
 
     def _clear_chobon_fields(self):
         """초본 관련 필드 초기화"""
