@@ -1005,6 +1005,77 @@ def fetch_subsidy_model(rn: str) -> str:
         traceback.print_exc()
         return ""
 
+def fetch_subsidy_region(rn: str) -> str:
+    """
+    subsidy_applications 테이블에서 RN으로 지역(region) 정보를 조회한다.
+    """
+    if not rn:
+        return ""
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT region FROM subsidy_applications WHERE RN = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                return row[0] if row and row[0] else ""
+    except Exception:
+        traceback.print_exc()
+        return ""
+
+def calculate_delivery_date(region: str) -> str:
+    """
+    오늘 날짜와 지역을 기반으로 출고예정일을 계산한다.
+    
+    Args:
+        region: 지역명
+        
+    Returns:
+        출고예정일 문자열 (YYYY-MM-DD 형식) 또는 빈 문자열
+    """
+    if not region:
+        return ""
+    
+    try:
+        # day_gap 조회
+        day_gap = fetch_delivery_day_gap(region)
+        if day_gap is None:
+            return ""
+        
+        # 오늘 날짜 (한국 시간 기준)
+        kst = pytz.timezone('Asia/Seoul')
+        today = datetime.now(kst).date()
+        
+        # 공휴일 조회
+        holidays = fetch_holidays()
+        
+        # 1단계: 오늘 날짜 + day_gap일 (주말/공휴일 포함해서 단순히 일수만 더함)
+        delivery_date = today + timedelta(days=day_gap)
+        
+        # 2단계: 계산된 날짜가 주말/공휴일이면 다음 영업일로 조정
+        max_iterations = 100
+        iteration = 0
+        
+        while iteration < max_iterations:
+            weekday = delivery_date.weekday()  # 월요일=0, 일요일=6
+            is_weekend = weekday >= 5  # 토요일(5) 또는 일요일(6)
+            is_holiday = delivery_date in holidays
+            
+            # 주말/공휴일이 아니면 반환
+            if not is_weekend and not is_holiday:
+                break
+            
+            # 주말/공휴일이면 다음 날로 이동
+            delivery_date = delivery_date + timedelta(days=1)
+            iteration += 1
+        
+        # 계산된 출고예정일을 문자열로 반환
+        return delivery_date.strftime('%Y-%m-%d')
+        
+    except Exception:
+        traceback.print_exc()
+        return ""
+
 def get_recent_thread_id_by_rn(rn: str) -> str | None:
     """
     RN으로 subsidy_applications 테이블에서 recent_thread_id를 조회한다.

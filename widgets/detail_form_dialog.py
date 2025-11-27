@@ -3,7 +3,9 @@ from PyQt6 import uic
 from PyQt6.QtWidgets import QDialog, QApplication
 from PyQt6.QtCore import Qt, QEvent
 
-from core.sql_manager import fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_chobon_results, fetch_subsidy_model, fetch_gemini_multichild_results
+from core.sql_manager import (fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_chobon_results, 
+                              fetch_subsidy_model, fetch_gemini_multichild_results, fetch_subsidy_region, 
+                              calculate_delivery_date)
 
 class DetailFormDialog(QDialog):
     """상세 정보 표시 다이얼로그 (form.ui 사용)"""
@@ -47,7 +49,8 @@ class DetailFormDialog(QDialog):
             self.label_firstandyouth,
             self.label_gender,
             self.label_model,
-            self.label_children
+            self.label_children,
+            self.label_deliver_date
         ]
         
         for label in labels:
@@ -68,7 +71,8 @@ class DetailFormDialog(QDialog):
             self.label_firstandyouth,
             self.label_gender,
             self.label_model,
-            self.label_children
+            self.label_children,
+            self.label_deliver_date
         ]
         
         for label in labels_to_make_clickable:
@@ -90,7 +94,8 @@ class DetailFormDialog(QDialog):
             self.label_firstandyouth,
             self.label_gender,
             self.label_model,
-            self.label_children
+            self.label_children,
+            self.label_deliver_date
         ]
 
         if obj in clickable_labels and event.type() == QEvent.Type.MouseButtonPress:
@@ -210,7 +215,15 @@ class DetailFormDialog(QDialog):
         display_model_name = model_mapping.get(model_name, model_name)
         self.label_model.setText(display_model_name)
         
-        # 6. 다자녀 데이터 로드
+        # 6. 출고예정일 계산 및 표시
+        region = fetch_subsidy_region(rn)
+        if region:
+            delivery_date = calculate_delivery_date(region)
+            self.label_deliver_date.setText(delivery_date)
+        else:
+            self.label_deliver_date.setText("")
+        
+        # 7. 다자녀 데이터 로드
         has_multichild = False
         if flags.get('다자녀', False):
             multichild_data = fetch_gemini_multichild_results(rn)
@@ -225,7 +238,7 @@ class DetailFormDialog(QDialog):
         else:
             self.label_children.setText("")
             
-        # 7. 하단 레이아웃 가시성 제어 (공동명의, 다자녀, 청년생애, 기타)
+        # 8. 하단 레이아웃 가시성 제어 (공동명의, 다자녀, 청년생애, 기타)
         # 일단 모두 숨김
         self._set_bottom_layout_visibility(
             show_joint=False, # 공동명의 (아직 로직 없음)
