@@ -25,7 +25,7 @@ from widgets.info_panel_widget import InfoPanelWidget
 from widgets.todo_widget import ToDoWidget
 from widgets.settings_dialog import SettingsDialog
 from widgets.login_dialog import LoginDialog
-from widgets.mail_dialog import MailDialog
+from widgets.special_note_dialog import SpecialNoteDialog
 from widgets.worker_progress_dialog import WorkerProgressDialog
 from widgets.alarm_widget import AlarmWidget
 from widgets.gemini_results_dialog import GeminiResultsDialog
@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         self._alarm_widget = AlarmWidget(self._worker_name)
         self._todo_widget = ToDoWidget(self)
         self._settings_dialog = SettingsDialog(self)
-        self._mail_dialog = MailDialog(parent=self)
+        # self._mail_dialog = MailDialog(parent=self) # SpecialNoteDialog는 필요할 때 생성
         self._pending_basic_info: dict | None = None
         self._gemini_results_dialog = GeminiResultsDialog(self)
         self._config_dialog = ConfigDialog(self)
@@ -246,7 +246,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.save_completed.connect(self._handle_save_completed) # 저장 완료 시그널 연결
         self._pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
         self._pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
-        self._pdf_view_widget.toolbar.email_requested.connect(self._open_mail_dialog)
+        self._pdf_view_widget.toolbar.email_requested.connect(self._open_special_note_dialog)
         self._pdf_view_widget.page_delete_requested.connect(self._handle_page_delete_request)
         self._pdf_load_widget.ai_review_requested.connect(self._show_gemini_results_dialog)
         # 데이터 새로고침 시 시간 업데이트 및 알람 위젯 갱신
@@ -420,42 +420,30 @@ class MainWindow(QMainWindow):
             payment_request_load_enabled = self._config_dialog.payment_request_load_enabled
             self._pdf_load_widget.set_payment_request_load_enabled(payment_request_load_enabled)
     
-    def _open_mail_dialog(self):
-        """메일 다이얼로그를 연다."""
+    def _open_special_note_dialog(self):
+        """특이사항 입력 다이얼로그를 연다."""
+        dialog = SpecialNoteDialog(parent=self)
+        
         # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
-        if self._current_rn:
-            self._mail_dialog.set_rn_value(self._current_rn)
+        if self._current_rn and hasattr(dialog, 'RN_lineEdit'):
+            dialog.RN_lineEdit.setText(self._current_rn)
 
-        # 다이얼로그를 열기 직전에 최신 작업자 이름 설정
-        self._mail_dialog.set_worker_name(self._worker_name)
-        
-        if self._mail_dialog.exec():
-            rn_value = self._mail_dialog.get_rn_value()
-            content = self._mail_dialog.get_content()
-            print(f"메일 전송 요청 - RN: {rn_value}, 내용: {content}")
-            # TODO: 실제 메일 전송 로직 구현
+        dialog.exec()
 
-    def _open_mail_dialog_then_return_to_main(self):
-        """이메일 다이얼로그를 열고, 완료 후 메인화면으로 돌아간다."""
+    def _open_special_note_dialog_then_return_to_main(self):
+        """특이사항 입력 다이얼로그를 열고, 완료 후 메인화면으로 돌아간다."""
+        dialog = SpecialNoteDialog(parent=self)
+
         # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
-        if self._current_rn:
-            self._mail_dialog.set_rn_value(self._current_rn)
-
-        # 다이얼로그를 열기 직전에 최신 작업자 이름 설정
-        self._mail_dialog.set_worker_name(self._worker_name)
+        if self._current_rn and hasattr(dialog, 'RN_lineEdit'):
+            dialog.RN_lineEdit.setText(self._current_rn)
         
-        # 이메일 다이얼로그를 모달로 실행
-        dialog_result = self._mail_dialog.exec()
-        
-        if dialog_result:
-            rn_value = self._mail_dialog.get_rn_value()
-            content = self._mail_dialog.get_content()
-            print(f"[컨텍스트 메뉴 작업 완료 후 메일 전송] RN: {rn_value}, 내용: {content}")
-            # TODO: 실제 메일 전송 로직 구현
+        # 다이얼로그를 모달로 실행
+        dialog.exec()
         
         # 이메일 창 완료 후 즉시 컨텍스트 메뉴 작업 플래그 리셋
         self._is_context_menu_work = False
-        print("[컨텍스트 메뉴 작업 플래그] 이메일 창 완료 후 False로 리셋됨")
+        print("[컨텍스트 메뉴 작업 플래그] 특이사항 창 완료 후 False로 리셋됨")
         
         # 이메일 창이 닫힌 후 메인화면으로 돌아가기
         self.show_load_view()
@@ -693,7 +681,7 @@ class MainWindow(QMainWindow):
             # 컨텍스트 메뉴를 통한 작업이었다면 이메일 창을 먼저 열기
             if self._is_context_menu_work:
                 self._is_context_menu_work = False  # 플래그 리셋
-                self._open_mail_dialog_then_return_to_main()
+                self._open_special_note_dialog_then_return_to_main()
             else:
                 # 일반적인 경우 바로 메인화면으로 돌아가기
                 self.show_load_view()
