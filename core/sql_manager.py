@@ -87,13 +87,14 @@ def _build_subsidy_query_base():
         "       sa.mail_count, "
         "       d.child_birth_date, "
         "       cb.issue_date, "
+        "       cb.chobon, "
         "       c.ai_계약일자, c.ai_이름, c.전화번호, c.이메일, "
         "       cb.name AS chobon_name, cb.birth_date AS chobon_birth_date, cb.address_1 AS chobon_address_1, "
         "       CASE "
         "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
         "               CASE "
         "                   WHEN (gr.구매계약서 = 1 AND (c.ai_계약일자 IS NULL OR c.ai_이름 IS NULL OR c.전화번호 IS NULL OR c.이메일 IS NULL OR c.ai_계약일자 < '2025-01-01')) "
-        "                   OR (gr.초본 = 1 AND (cb.name IS NULL OR cb.birth_date IS NULL OR cb.address_1 IS NULL)) "
+        "                   OR (gr.초본 = 1 AND (cb.name IS NULL OR cb.birth_date IS NULL OR cb.address_1 IS NULL OR cb.chobon = 0)) "
         "                   OR (gr.청년생애 = 1 AND (y.local_name IS NULL OR y.range_date IS NULL)) "
         "                   THEN 'O' "
         "                   ELSE 'X' "
@@ -254,6 +255,15 @@ def fetch_recent_subsidy_applications():
             if is_chobon_issue_date_outlier(row):
                 return 'O'
             
+            # 초본 chobon == 0 이상치 체크
+            try:
+                초본값 = row.get('초본', 0)
+                chobon값 = row.get('chobon')
+                if (pd.notna(초본값) and 초본값 == 1) and (pd.notna(chobon값) and chobon값 == 0):
+                    return 'O'
+            except (ValueError, TypeError, KeyError):
+                pass
+            
             # 이상치가 아니면 기존 값 반환 (문자열로 변환)
             return current_outlier_str if current_outlier_str else ''
         
@@ -366,6 +376,14 @@ def fetch_today_subsidy_applications_by_worker(worker_name: str):
                 return 'O'
             if is_chobon_issue_date_outlier(row):
                 return 'O'
+            # 초본 chobon == 0 이상치 체크
+            try:
+                초본값 = row.get('초본', 0)
+                chobon값 = row.get('chobon')
+                if (pd.notna(초본값) and 초본값 == 1) and (pd.notna(chobon값) and chobon값 == 0):
+                    return 'O'
+            except (ValueError, TypeError, KeyError):
+                pass
             return current_outlier_str if current_outlier_str else ''
         
         df['outlier'] = df.apply(update_outlier, axis=1)
@@ -471,6 +489,14 @@ def fetch_today_unfinished_subsidy_applications():
                 return 'O'
             if is_chobon_issue_date_outlier(row):
                 return 'O'
+            # 초본 chobon == 0 이상치 체크
+            try:
+                초본값 = row.get('초본', 0)
+                chobon값 = row.get('chobon')
+                if (pd.notna(초본값) and 초본값 == 1) and (pd.notna(chobon값) and chobon값 == 0):
+                    return 'O'
+            except (ValueError, TypeError, KeyError):
+                pass
             return current_outlier_str if current_outlier_str else ''
         
         df['outlier'] = df.apply(update_outlier, axis=1)
@@ -499,6 +525,7 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 "       sa.mail_count, "
                 "       gr.구매계약서, gr.초본, gr.공동명의, gr.다자녀, "
                 "       d.child_birth_date, cb.issue_date, "
+                "       cb.chobon, "
                 "       c.ai_계약일자, c.ai_이름, c.전화번호, c.이메일, "
                 "       cb.name AS chobon_name, cb.birth_date AS chobon_birth_date, cb.address_1 AS chobon_address_1 "
                 "FROM subsidy_applications sa "
@@ -590,6 +617,15 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                             result['outlier'] = 'O'
                      except Exception:
                          pass
+
+                # 3. 초본 chobon == 0 체크
+                if result['outlier'] != 'O' and result.get('초본') == 1:
+                    try:
+                        chobon값 = result.get('chobon')
+                        if chobon값 is not None and chobon값 == 0:
+                            result['outlier'] = 'O'
+                    except Exception:
+                        pass
 
                 return result
 

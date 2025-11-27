@@ -224,7 +224,8 @@ class PdfLoadWidget(QWidget):
                 '이메일': row.get('이메일'),
                 'chobon_name': row.get('chobon_name'),  # 초본 필드 추가
                 'chobon_birth_date': row.get('chobon_birth_date'),
-                'chobon_address_1': row.get('chobon_address_1')
+                'chobon_address_1': row.get('chobon_address_1'),
+                'chobon': row.get('chobon', 0)  # chobon 칼럼 추가
             }
 
             # 'AI' 칼럼 값 계산
@@ -588,6 +589,7 @@ class PdfLoadWidget(QWidget):
             'chobon_name': data.get('chobon_name'),
             'chobon_birth_date': data.get('chobon_birth_date'),
             'chobon_address_1': data.get('chobon_address_1'),
+            'chobon': data.get('chobon', 0),
             'special_note': data.get('special_note', ''),
             'recent_thread_id': data.get('recent_thread_id', ''),
             'file_rendered': data.get('file_rendered', 0),
@@ -678,6 +680,7 @@ class PdfLoadWidget(QWidget):
             'chobon_name': data.get('chobon_name'),  # 초본 필드 추가
             'chobon_birth_date': data.get('chobon_birth_date'),
             'chobon_address_1': data.get('chobon_address_1'),
+            'chobon': data.get('chobon', 0),  # chobon 칼럼 추가
             'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
         }
 

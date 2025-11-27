@@ -895,6 +895,9 @@ class MainWindow(QMainWindow):
             if outlier_type == 'contract':
                 title = "구매계약서 이상"
                 message = "구매계약서 이상!"
+            elif outlier_type == 'chobon_missing':
+                title = "초본 없음"
+                message = "초본 없음!"
             elif outlier_type == 'chobon':
                 title = "초본 이상"
                 message = "초본 이상!"
@@ -963,6 +966,11 @@ class MainWindow(QMainWindow):
             chobon_name = metadata.get('chobon_name')
             chobon_birth_date = metadata.get('chobon_birth_date')
             chobon_address_1 = metadata.get('chobon_address_1')
+            chobon = metadata.get('chobon', 1)  # 기본값은 1 (정상)
+            
+            # chobon == 0이면 "초본 없음"으로 처리
+            if chobon == 0:
+                return 'chobon_missing'
             
             if chobon_name is None or chobon_birth_date is None or chobon_address_1 is None:
                 return 'chobon'
