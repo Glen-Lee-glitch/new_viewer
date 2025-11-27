@@ -344,6 +344,11 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
 
     def toggle_stamp_overlay(self):
         """(공개 메서드) 스탬프 오버레이를 토글한다."""
+        # 스탬프 모드가 활성화되어 있으면 취소
+        if self._is_stamp_mode:
+            self._deactivate_stamp_mode()
+            return
+        # 그렇지 않으면 오버레이 토글
         self._toggle_stamp_overlay()
 
     def _toggle_stamp_overlay(self):
