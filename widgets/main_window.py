@@ -303,6 +303,11 @@ class MainWindow(QMainWindow):
         self.addAction(self.crop_action)
         self.crop_action.triggered.connect(self._pdf_view_widget._open_crop_dialog)
 
+        # AI 결과 보기 단축키 액션 (메뉴와 별개로 동작)
+        self.view_ai_results_shortcut_action = QAction(self)
+        self.addAction(self.view_ai_results_shortcut_action)
+        self.view_ai_results_shortcut_action.triggered.connect(self._open_ai_results_dialog)
+
         self._apply_shortcuts()
 
     def _apply_shortcuts(self):
@@ -324,6 +329,10 @@ class MainWindow(QMainWindow):
         # 자르기 단축키 적용
         crop_shortcut = settings.value("shortcuts/crop", "Y")
         self.crop_action.setShortcut(QKeySequence.fromString(crop_shortcut, QKeySequence.SequenceFormat.PortableText))
+
+        # AI 결과 보기 단축키 적용
+        view_ai_results_shortcut = settings.value("shortcuts/view_ai_results", "A")
+        self.view_ai_results_shortcut_action.setShortcut(QKeySequence.fromString(view_ai_results_shortcut, QKeySequence.SequenceFormat.PortableText))
 
     # === 프로퍼티 정의(선택 범위 숨김 권장) ===
 
@@ -473,10 +482,21 @@ class MainWindow(QMainWindow):
     
     def _open_ai_results_dialog(self):
         """현재 작업 중인 RN으로 AI 결과 다이얼로그를 연다."""
-        if self._current_rn:
+        if not self._current_rn:
+            QMessageBox.warning(self, "오류", "현재 작업 중인 RN이 없습니다.")
+            return
+
+        # AI 결과 데이터 존재 여부 확인
+        from core.sql_manager import check_gemini_flags
+        flags = check_gemini_flags(self._current_rn)
+        
+        # 플래그 중 하나라도 True면 데이터가 있는 것으로 간주
+        has_ai_results = any(flags.values()) if flags else False
+
+        if has_ai_results:
             self._show_gemini_results_dialog(self._current_rn)
         else:
-            QMessageBox.warning(self, "오류", "현재 작업 중인 RN이 없습니다.")
+            QMessageBox.warning(self, "알림", "AI 결과 데이터가 없습니다.")
 
     # === 문서 생명주기 관리 ===
     def load_document(self, pdf_paths: list, is_preprocessed: bool = False):
