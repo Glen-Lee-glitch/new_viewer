@@ -296,14 +296,19 @@ class PdfLoadWidget(QWidget):
         if rn_item:
             row_data = rn_item.data(Qt.ItemDataRole.UserRole)
             if isinstance(row_data, dict):
-                mail_count = row_data.get('mail_count', 0)
+                mail_count_raw = row_data.get('mail_count', 0)
+                # 숫자 타입 변환 (pandas에서 가져온 값이 float일 수 있음)
+                try:
+                    mail_count = int(mail_count_raw) if mail_count_raw is not None else 0
+                except (ValueError, TypeError):
+                    mail_count = 0
 
         menu = QMenu(self)  
         start_action = menu.addAction("작업 시작하기")
         
-        # mail_count > 2인 경우에만 '이메일 확인하기' 메뉴 추가
+        # mail_count >= 2인 경우에만 '이메일 확인하기' 메뉴 추가 (하이라이트 조건과 동일)
         email_action = None
-        if mail_count > 2:
+        if mail_count >= 2:
             menu.addSeparator()  # 구분선 추가
             email_action = menu.addAction("이메일 확인하기")
         
