@@ -179,6 +179,13 @@
                </widget>
               </item>
               <item>
+               <widget class="QLabel" name="necessary_apply_count_label">
+                <property name="text">
+                 <string/>
+                </property>
+               </widget>
+              </item>
+              <item>
                <widget class="QRadioButton" name="radioButton_all_rows">
                 <property name="text">
                  <string>전체보기</string>
