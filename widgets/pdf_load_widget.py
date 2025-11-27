@@ -212,7 +212,14 @@ class PdfLoadWidget(QWidget):
                 '공동명의': row.get('공동명의', 0),
                 'urgent': row.get('urgent', 0),  # urgent 상태 추가
                 'outlier': self._sanitize_text(row.get('outlier', '')),  # 이상치 정보 추가
-                'original_filepath': self._normalize_file_path(row.get('original_filepath')) # 이 줄을 추가
+                'original_filepath': self._normalize_file_path(row.get('original_filepath')), # 이 줄을 추가
+                'ai_계약일자': row.get('ai_계약일자'),  # 구매계약서 필드 추가
+                'ai_이름': row.get('ai_이름'),
+                '전화번호': row.get('전화번호'),
+                '이메일': row.get('이메일'),
+                'chobon_name': row.get('chobon_name'),  # 초본 필드 추가
+                'chobon_birth_date': row.get('chobon_birth_date'),
+                'chobon_address_1': row.get('chobon_address_1')
             }
 
             # 'AI' 칼럼 값 계산
@@ -457,6 +464,16 @@ class PdfLoadWidget(QWidget):
             'name': data.get('name', ''),
             'region': data.get('region', ''),
             'worker': data.get('worker', ''),
+            '구매계약서': data.get('구매계약서', 0),
+            '초본': data.get('초본', 0),
+            '공동명의': data.get('공동명의', 0),
+            'ai_계약일자': data.get('ai_계약일자'),
+            'ai_이름': data.get('ai_이름'),
+            '전화번호': data.get('전화번호'),
+            '이메일': data.get('이메일'),
+            'chobon_name': data.get('chobon_name'),
+            'chobon_birth_date': data.get('chobon_birth_date'),
+            'chobon_address_1': data.get('chobon_address_1'),
             'special_note': data.get('special_note', ''),
             'recent_thread_id': data.get('recent_thread_id', ''),
             'file_rendered': data.get('file_rendered', 0),
@@ -535,6 +552,16 @@ class PdfLoadWidget(QWidget):
             'urgent': data.get('urgent', 0),
             'outlier': data.get('outlier', ""),
             'original_filepath': data.get('original_filepath', ""), # 이 줄을 추가
+            '구매계약서': data.get('구매계약서', 0),  # 구매계약서 플래그 추가
+            '초본': data.get('초본', 0),  # 초본 플래그 추가
+            '공동명의': data.get('공동명의', 0),  # 공동명의 플래그 추가
+            'ai_계약일자': data.get('ai_계약일자'),  # 구매계약서 필드 추가
+            'ai_이름': data.get('ai_이름'),
+            '전화번호': data.get('전화번호'),
+            '이메일': data.get('이메일'),
+            'chobon_name': data.get('chobon_name'),  # 초본 필드 추가
+            'chobon_birth_date': data.get('chobon_birth_date'),
+            'chobon_address_1': data.get('chobon_address_1'),
             'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
         }
 

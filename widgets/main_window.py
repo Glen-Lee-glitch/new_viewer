@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
         self._current_rn = ""  # 현재 작업 중인 RN 번호 저장용
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 여부
         self._pending_outlier_check = False  # PDF 렌더 완료 후 이상치 체크 플래그
+        self._pending_outlier_metadata = None  # 이상치 메타데이터 저장용
         
         # 초기 상태에서 작업자 현황 버튼 숨김
         if hasattr(self, 'pushButton_worker_progress'):
@@ -557,6 +558,7 @@ class MainWindow(QMainWindow):
         self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
         self._is_context_menu_work = False  # 로컬 파일 열기 시 컨텍스트 메뉴 작업 플래그 리셋
         self._pending_outlier_check = False  # 로컬 파일 열기 시 이상치 체크 플래그 리셋
+        self._pending_outlier_metadata = None  # 이상치 메타데이터 리셋
         self._info_panel.update_basic_info("", "", "", "")
         # 로컬 파일 열기 시 '원본 불러오기' 액션 비활성화
         if hasattr(self, 'load_original_action'):
@@ -613,6 +615,8 @@ class MainWindow(QMainWindow):
             # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
             outlier_value = metadata.get('outlier', '')
             self._pending_outlier_check = (self._is_context_menu_work and outlier_value == 'O')
+            if self._pending_outlier_check:
+                self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
             
             self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
             
@@ -644,6 +648,8 @@ class MainWindow(QMainWindow):
         # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
         outlier_value = metadata.get('outlier', '')
         self._pending_outlier_check = (self._is_context_menu_work and outlier_value == 'O')
+        if self._pending_outlier_check:
+            self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
         
         self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
         
@@ -699,6 +705,7 @@ class MainWindow(QMainWindow):
         self._current_rn = ""  # 현재 RN 초기화
         self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
         self._pending_outlier_check = False  # 이상치 체크 플래그 리셋
+        self._pending_outlier_metadata = None  # 이상치 메타데이터 리셋
         self._pdf_view_widget.set_current_rn("") # PdfViewWidget의 RN도 초기화
 
         # 메인화면으로 돌아갈 때 '원본 불러오기' 액션 비활성화
@@ -848,12 +855,87 @@ class MainWindow(QMainWindow):
         if self._pending_outlier_check:
             self._pending_outlier_check = False  # 플래그 리셋
             
+            # 이상치 종류 판단
+            outlier_type = self._determine_outlier_type(self._pending_outlier_metadata)
+            self._pending_outlier_metadata = None  # 메타데이터 리셋
+            
+            # 메시지 설정
+            if outlier_type == 'contract':
+                title = "구매계약서 이상"
+                message = "구매계약서 이상!"
+            elif outlier_type == 'chobon':
+                title = "초본 이상"
+                message = "초본 이상!"
+            else:
+                title = "서류 이상"
+                message = "서류 이상!"
+            
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("서류 이상")
-            msg_box.setText("서류 이상!")
+            msg_box.setWindowTitle(title)
+            msg_box.setText(message)
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
+    
+    def _determine_outlier_type(self, metadata: dict | None) -> str:
+        """
+        메타데이터를 기반으로 이상치 종류를 판단한다.
+        
+        Returns:
+            'contract': 구매계약서 이상치
+            'chobon': 초본 이상치
+            'other': 기타 이상치
+        """
+        if not metadata:
+            return 'other'
+        
+        구매계약서 = metadata.get('구매계약서', 0) == 1
+        초본 = metadata.get('초본', 0) == 1
+        공동명의 = metadata.get('공동명의', 0) == 1
+        
+        # 구매계약서 이상치 체크
+        if 구매계약서 and (초본 or 공동명의):
+            ai_계약일자 = metadata.get('ai_계약일자')
+            ai_이름 = metadata.get('ai_이름')
+            전화번호 = metadata.get('전화번호')
+            이메일 = metadata.get('이메일')
+            
+            # NULL 체크
+            if ai_계약일자 is None or ai_이름 is None or 전화번호 is None or 이메일 is None:
+                return 'contract'
+            
+            # 2025년 이전 체크
+            try:
+                from datetime import datetime, date
+                import pandas as pd
+                
+                if isinstance(ai_계약일자, str):
+                    try:
+                        contract_date = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
+                        if contract_date < date(2025, 1, 1):
+                            return 'contract'
+                    except (ValueError, AttributeError):
+                        pass
+                elif isinstance(ai_계약일자, (datetime, date)):
+                    contract_date = ai_계약일자 if isinstance(ai_계약일자, date) else ai_계약일자.date()
+                    if contract_date < date(2025, 1, 1):
+                        return 'contract'
+                elif isinstance(ai_계약일자, pd.Timestamp):
+                    if ai_계약일자.date() < date(2025, 1, 1):
+                        return 'contract'
+            except Exception:
+                pass
+        
+        # 초본 이상치 체크
+        if 초본:
+            chobon_name = metadata.get('chobon_name')
+            chobon_birth_date = metadata.get('chobon_birth_date')
+            chobon_address_1 = metadata.get('chobon_address_1')
+            
+            if chobon_name is None or chobon_birth_date is None or chobon_address_1 is None:
+                return 'chobon'
+        
+        return 'other'
     
     def _on_data_refreshed(self):
         """데이터 새로고침 완료 시 호출되는 슬롯"""
