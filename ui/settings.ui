@@ -97,7 +97,7 @@
           <item>
            <widget class="QLabel" name="label_5">
             <property name="text">
-             <string>임시 2</string>
+             <string>AI 결과</string>
             </property>
            </widget>
           </item>
