@@ -23,8 +23,10 @@ from core.sql_manager import (
     fetch_application_data_by_rn, 
     fetch_give_works,
     fetch_today_subsidy_applications_by_worker,
-    fetch_today_unfinished_subsidy_applications
+    fetch_today_unfinished_subsidy_applications,
+    get_email_by_thread_id
 )
+from widgets.email_view_dialog import EmailViewDialog
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -317,8 +319,41 @@ class PdfLoadWidget(QWidget):
         if action == start_action:
             self.start_selected_work()
         elif action == email_action:
-            # TODO: 이메일 확인 기능 구현 예정
-            pass
+            self._show_email_view(row)
+    
+    def _show_email_view(self, row: int):
+        """이메일 확인 다이얼로그를 표시한다."""
+        table = self.complement_table_widget
+        rn_item = table.item(row, 1)  # RN 컬럼(1번)
+        
+        if not rn_item:
+            QMessageBox.warning(self, "오류", "데이터를 불러올 수 없습니다.")
+            return
+        
+        # 행 데이터에서 recent_thread_id 가져오기
+        row_data = rn_item.data(Qt.ItemDataRole.UserRole)
+        if not row_data or not isinstance(row_data, dict):
+            QMessageBox.warning(self, "오류", "데이터를 불러올 수 없습니다.")
+            return
+        
+        recent_thread_id = row_data.get('recent_thread_id', '')
+        if not recent_thread_id:
+            QMessageBox.information(self, "정보", "연결된 이메일 thread_id가 없습니다.")
+            return
+        
+        # thread_id로 이메일 정보 조회
+        email_data = get_email_by_thread_id(recent_thread_id)
+        if not email_data:
+            QMessageBox.warning(self, "오류", "이메일 정보를 찾을 수 없습니다.")
+            return
+        
+        # 이메일 확인 다이얼로그 표시
+        dialog = EmailViewDialog(
+            title=email_data.get('title', ''),
+            content=email_data.get('content', ''),
+            parent=self
+        )
+        dialog.exec()
 
     def start_selected_work(self):
         """선택된 행을 emit하여 다운로드 로직이 처리하도록 한다."""

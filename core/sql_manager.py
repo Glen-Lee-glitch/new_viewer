@@ -652,6 +652,35 @@ def get_mail_content_by_thread_id(thread_id: str) -> str:
         traceback.print_exc()
         return ""
 
+def get_email_by_thread_id(thread_id: str) -> dict | None:
+    """
+    thread_id로 emails 테이블에서 title과 content를 조회하여 딕셔너리로 반환한다.
+    
+    Args:
+        thread_id: 이메일 thread_id
+        
+    Returns:
+        {'title': str, 'content': str} 또는 None
+    """
+    if not thread_id:
+        return None
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT title, content FROM emails WHERE thread_id = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (thread_id,))
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'title': row[0] if row[0] else '',
+                        'content': row[1] if row[1] else ''
+                    }
+                return None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def get_daily_worker_progress():
     """
     daily_application 테이블에서 type이 '지원'인 것 중 작업자별 건수를 조회한다.
