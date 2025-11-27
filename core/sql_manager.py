@@ -941,22 +941,44 @@ def insert_reply_email(
         traceback.print_exc()
         return False
 
+def get_current_status(rn: str) -> str | None:
+    """
+    RN으로 현재 status를 조회한다.
+    """
+    if not rn:
+        return None
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT status FROM subsidy_applications WHERE RN = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def insert_additional_note(
     rn: str,
     missing_docs: list | None,
     requirements: list | None,
-    other_detail: str | None
+    other_detail: str | None,
+    target_status: str | None = None
 ) -> bool:
     """
-    additional_note 테이블에 특이사항 비고 데이터를 삽입한다.
-    같은 RN이 이미 존재하면 업데이트한다.
-    thread_id는 트리거가 자동으로 채워준다.
+    additional_note 테이블에 특이사항 비고 데이터를 삽입하고, 
+    조건에 따라 subsidy_applications 테이블의 status를 업데이트한다.
     
     Args:
         rn: RN 번호 (필수)
         missing_docs: 서류미비 상세 항목 리스트 (JSON으로 변환됨)
         requirements: 요건 상세 항목 리스트 (JSON으로 변환됨)
         other_detail: 기타 대분류 상세 내용
+        target_status: 업데이트할 상태값 (선택사항)
+            - None이면 status 업데이트 안 함
+            - '이메일 전송' 또는 '요청메일 전송' 상태인 경우 업데이트 안 함
+            - 그 외의 경우 target_status로 업데이트
     
     Returns:
         삽입/업데이트 성공 여부
@@ -966,28 +988,54 @@ def insert_additional_note(
     
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            with connection.cursor() as cursor:
-                # 리스트를 JSON 문자열로 변환 (None이면 NULL)
-                missing_docs_json = json.dumps(missing_docs, ensure_ascii=False) if missing_docs else None
-                requirements_json = json.dumps(requirements, ensure_ascii=False) if requirements else None
+            # 1. 특이사항 저장 (내용이 있는 경우에만)
+            if missing_docs or requirements or other_detail:
+                with connection.cursor() as cursor:
+                    # 리스트를 JSON 문자열로 변환 (None이면 NULL)
+                    missing_docs_json = json.dumps(missing_docs, ensure_ascii=False) if missing_docs else None
+                    requirements_json = json.dumps(requirements, ensure_ascii=False) if requirements else None
+                    
+                    query = """
+                        INSERT INTO additional_note (
+                            RN, missing_docs, requirements, other_detail
+                        ) VALUES (
+                            %s, %s, %s, %s
+                        )
+                        ON DUPLICATE KEY UPDATE
+                            missing_docs = VALUES(missing_docs),
+                            requirements = VALUES(requirements),
+                            other_detail = VALUES(other_detail),
+                            updated_at = CURRENT_TIMESTAMP
+                    """
+                    cursor.execute(query, (
+                        rn, missing_docs_json, requirements_json, other_detail
+                    ))
+            
+            # 2. Status 업데이트 (target_status가 있는 경우)
+            if target_status:
+                # 현재 상태 조회
+                current_status = None
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT status FROM subsidy_applications WHERE RN = %s", (rn,))
+                    row = cursor.fetchone()
+                    current_status = row[0] if row else None
                 
-                query = """
-                    INSERT INTO additional_note (
-                        RN, missing_docs, requirements, other_detail
-                    ) VALUES (
-                        %s, %s, %s, %s
-                    )
-                    ON DUPLICATE KEY UPDATE
-                        missing_docs = VALUES(missing_docs),
-                        requirements = VALUES(requirements),
-                        other_detail = VALUES(other_detail),
-                        updated_at = CURRENT_TIMESTAMP
-                """
-                cursor.execute(query, (
-                    rn, missing_docs_json, requirements_json, other_detail
-                ))
-                connection.commit()
-                return True
+                # 상태 업데이트 조건 확인
+                if current_status not in ('이메일 전송', '요청메일 전송'):
+                    with connection.cursor() as cursor:
+                        kst = pytz.timezone('Asia/Seoul')
+                        current_time = datetime.now(kst)
+                        
+                        update_query = """
+                            UPDATE subsidy_applications 
+                            SET status = %s, status_updated_at = %s
+                            WHERE RN = %s
+                        """
+                        cursor.execute(update_query, (target_status, current_time, rn))
+            
+            connection.commit()
+            return True
+            
     except Exception:
         traceback.print_exc()
         return False

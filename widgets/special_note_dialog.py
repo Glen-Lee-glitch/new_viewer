@@ -45,10 +45,41 @@ class SpecialNoteDialog(QDialog):
         self.update_ui_state()
 
         # Connect close button
-        self.pushButton_2.clicked.connect(self.close)
+        self.pushButton_2.clicked.connect(self.on_cancel_clicked)
 
         # Connect Send button
         self.pushButton.clicked.connect(self.on_send_clicked)
+
+    def on_cancel_clicked(self):
+        """Handle cancel button click: update status to 'pdf 전처리' and close."""
+        rn = self.RN_lineEdit.text().strip()
+        
+        if not rn:
+            # RN이 없으면 그냥 닫음
+            self.close()
+            return
+
+        # 취소 확인 (선택사항, 여기서는 즉시 실행)
+        # reply = QMessageBox.question(self, '취소', '취소하시겠습니까? 상태가 "pdf 전처리"로 변경됩니다.',
+        #                              QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        # if reply == QMessageBox.StandardButton.No:
+        #     return
+
+        # 데이터베이스 상태 업데이트 (특이사항 내용은 저장하지 않음)
+        success = insert_additional_note(
+            rn=rn,
+            missing_docs=None,
+            requirements=None,
+            other_detail=None,
+            target_status='pdf 전처리'
+        )
+        
+        if success:
+            # 성공 시 메시지 없이 조용히 닫거나, 필요 시 메시지 표시
+            self.reject()  # 다이얼로그 취소 종료
+        else:
+            QMessageBox.warning(self, "알림", "상태 업데이트에 실패했습니다.\n(이미 메일 전송된 상태일 수 있습니다)")
+            self.reject()
 
     def _init_dynamic_ui(self):
         """Generate checkboxes dynamically for Missing Docs and Requirements."""
@@ -213,12 +244,13 @@ class SpecialNoteDialog(QDialog):
         results = self.get_selected_data()
         rn = self.RN_lineEdit.text().strip()
         
-        # 데이터베이스에 저장
+        # 데이터베이스에 저장 (status='작업자 확인'으로 변경)
         success = insert_additional_note(
             rn=rn,
             missing_docs=results['missing'] if results['missing'] else None,
             requirements=results['requirements'] if results['requirements'] else None,
-            other_detail=results['other']
+            other_detail=results['other'],
+            target_status='작업자 확인'
         )
         
         if success:
