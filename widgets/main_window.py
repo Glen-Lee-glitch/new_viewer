@@ -232,8 +232,10 @@ class MainWindow(QMainWindow):
         preferences_action.triggered.connect(self._open_config_dialog)
         self.menu_settings.addAction(preferences_action)
         
-        # '파일' 메뉴 안의 '옵션' 서브메뉴는 UI 파일에서 정의되어 있으며, hover 시 자동으로 서브메뉴가 표시됩니다.
-        # action_detail_option1과 action_detail_option2는 UI 파일에서 정의되어 있습니다.
+        # '파일' 메뉴 안의 '추가서류' 서브메뉴는 UI 파일에서 정의되어 있으며, hover 시 자동으로 서브메뉴가 표시됩니다.
+        # 초기에는 비활성화 (컨텍스트 메뉴 작업일 때만 활성화)
+        if hasattr(self, 'menu_additional_documents'):
+            self.menu_additional_documents.menuAction().setEnabled(False)
 
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""
@@ -545,9 +547,12 @@ class MainWindow(QMainWindow):
             if self._pending_outlier_check:
                 QTimer.singleShot(500, self._check_and_show_outlier_reminder)
         
-        # 컨텍스트 메뉴를 통한 작업인 경우 '원본 불러오기' 액션 활성화
-        if hasattr(self, 'load_original_action') and self._is_context_menu_work:
-            self.load_original_action.setEnabled(True)
+        # 컨텍스트 메뉴를 통한 작업인 경우 '원본 불러오기' 및 '추가서류' 액션 활성화
+        if self._is_context_menu_work:
+            if hasattr(self, 'load_original_action'):
+                self.load_original_action.setEnabled(True)
+            if hasattr(self, 'menu_additional_documents'):
+                self.menu_additional_documents.menuAction().setEnabled(True)
 
         # 성남시인 경우 전용 액션 활성화
         if hasattr(self, 'outbound_allocation_action') and region == '성남시':
@@ -563,9 +568,11 @@ class MainWindow(QMainWindow):
         self._pending_outlier_check = False  # 로컬 파일 열기 시 이상치 체크 플래그 리셋
         self._pending_outlier_metadata = None  # 이상치 메타데이터 리셋
         self._info_panel.update_basic_info("", "", "", "")
-        # 로컬 파일 열기 시 '원본 불러오기' 액션 비활성화
+        # 로컬 파일 열기 시 '원본 불러오기' 및 '추가서류' 액션 비활성화
         if hasattr(self, 'load_original_action'):
             self.load_original_action.setEnabled(False)
+        if hasattr(self, 'menu_additional_documents'):
+            self.menu_additional_documents.menuAction().setEnabled(False)
         self.load_document(pdf_paths)
 
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
@@ -711,9 +718,11 @@ class MainWindow(QMainWindow):
         self._pending_outlier_metadata = None  # 이상치 메타데이터 리셋
         self._pdf_view_widget.set_current_rn("") # PdfViewWidget의 RN도 초기화
 
-        # 메인화면으로 돌아갈 때 '원본 불러오기' 액션 비활성화
+        # 메인화면으로 돌아갈 때 '원본 불러오기' 및 '추가서류' 액션 비활성화
         if hasattr(self, 'load_original_action'):
             self.load_original_action.setEnabled(False)
+        if hasattr(self, 'menu_additional_documents'):
+            self.menu_additional_documents.menuAction().setEnabled(False)
         
         # AI 결과 보기 액션 비활성화
         if hasattr(self, 'view_ai_results_action'):

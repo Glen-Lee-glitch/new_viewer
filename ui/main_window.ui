@@ -75,14 +75,14 @@
     <property name="title">
      <string>파일</string>
     </property>
-    <addaction name="menu_option"/>
+    <addaction name="menu_additional_documents"/>
    </widget>
-  <widget class="QMenu" name="menu_option">
+  <widget class="QMenu" name="menu_additional_documents">
     <property name="title">
-     <string>옵션</string>
+     <string>추가서류</string>
     </property>
-    <addaction name="action_detail_option1"/>
-    <addaction name="action_detail_option2"/>
+    <addaction name="action_gu_contract"/>
+    <addaction name="action_support_lease"/>
    </widget>
    <widget class="QMenu" name="menu_edit">
     <property name="title">
@@ -99,14 +99,14 @@
      <string>설정</string>
     </property>
   </widget>
-  <action name="action_detail_option1">
+  <action name="action_gu_contract">
    <property name="text">
-    <string>상세옵션1</string>
+    <string>구계약관</string>
    </property>
   </action>
-  <action name="action_detail_option2">
+  <action name="action_support_lease">
    <property name="text">
-    <string>상세옵션2</string>
+    <string>지원리스</string>
    </property>
   </action>
   <addaction name="menu_file"/>
