@@ -256,26 +256,27 @@ class PdfLoadWidget(QWidget):
             table.setItem(row_index, 4, ai_item)
 
             # --- Row Highlighting ---
-            highlight_color = None
-            text_color = None
-
-            # urgent 칼럼이 1이면 빨간색 하이라이트 (최우선)
+            # urgent 칼럼이 1이면 전체 행에 빨간색 하이라이트 (최우선)
             if row_data['urgent'] == 1:
                 highlight_color = QColor(220, 53, 69, 180)  # 빨간색 (Bootstrap의 danger 색상과 유사)
                 text_color = QColor("white")
-            # mail_count가 2 이상이면 연한 노란색 하이라이트
-            elif row_data.get('mail_count', 0) >= 2:
-                highlight_color = QColor(255, 249, 170, 180)  # 연한 노란색
-                text_color = QColor("black")
-
-            if highlight_color:
+                
                 # 모든 컬럼에 하이라이트 적용
                 for col in range(table.columnCount()):
                     item = table.item(row_index, col)
                     if item:
                         item.setData(HighlightRole, highlight_color)
-                        if text_color:
-                            item.setForeground(text_color)
+                        item.setForeground(text_color)
+            # urgent가 아닌 경우에만 mail_count 하이라이트 적용
+            elif row_data.get('mail_count', 0) >= 2:
+                mail_highlight_color = QColor(255, 249, 170, 180)  # 연한 노란색
+                mail_text_color = QColor("black")
+                
+                # RN 컬럼(1번)에만 하이라이트 적용
+                rn_item = table.item(row_index, 1)
+                if rn_item:
+                    rn_item.setData(HighlightRole, mail_highlight_color)
+                    rn_item.setForeground(mail_text_color)
 
     def show_context_menu(self, pos: QPoint):
         """테이블 컨텍스트 메뉴 표시"""
