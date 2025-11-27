@@ -940,7 +940,7 @@ def fetch_gemini_chobon_results(rn: str) -> dict:
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = """
-                SELECT name, birth_date, address_1, address_2
+                SELECT name, birth_date, address_1, address_2, gender
                 FROM test_ai_초본
                 WHERE RN = %s
             """
@@ -952,7 +952,8 @@ def fetch_gemini_chobon_results(rn: str) -> dict:
                         'name': row[0],
                         'birth_date': row[1],
                         'address_1': row[2],
-                        'address_2': row[3]
+                        'address_2': row[3],
+                        'gender': row[4]
                     }
                 return {}
     except Exception:

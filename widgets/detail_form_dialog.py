@@ -44,7 +44,8 @@ class DetailFormDialog(QDialog):
             self.label_birth_date,
             self.label_address_1,
             self.label_address_2,
-            self.label_firstandyouth
+            self.label_firstandyouth,
+            self.label_gender
         ]
         
         for label in labels:
@@ -62,7 +63,8 @@ class DetailFormDialog(QDialog):
             self.label_birth_date,
             self.label_address_1,
             self.label_address_2,
-            self.label_firstandyouth
+            self.label_firstandyouth,
+            self.label_gender
         ]
         
         for label in labels_to_make_clickable:
@@ -81,7 +83,8 @@ class DetailFormDialog(QDialog):
             self.label_birth_date,
             self.label_address_1,
             self.label_address_2,
-            self.label_firstandyouth
+            self.label_firstandyouth,
+            self.label_gender
         ]
 
         if obj in clickable_labels and event.type() == QEvent.Type.MouseButtonPress:
@@ -118,8 +121,10 @@ class DetailFormDialog(QDialog):
         
         # 계약일자
         self.label_contract_date.setText(str(contract_data.get('ai_계약일자', '')))
-        # 이름
-        self.label_name_1.setText(str(contract_data.get('ai_이름', '')))
+        
+        # 이름 (초본 데이터 우선, 없으면 계약서 데이터)
+        name = str(contract_data.get('ai_이름', ''))
+        
         # 전화번호 (휴대폰, 전화 동일하게 설정)
         phone = str(contract_data.get('전화번호', ''))
         self.label_hp.setText(phone)
@@ -134,6 +139,11 @@ class DetailFormDialog(QDialog):
         if flags.get('초본', False):
             chobon_data = fetch_gemini_chobon_results(rn)
             if chobon_data:
+                # 초본 이름이 있으면 우선 사용
+                chobon_name = chobon_data.get('name')
+                if chobon_name:
+                    name = str(chobon_name)
+                
                 # 생년월일
                 birth_date = chobon_data.get('birth_date')
                 if birth_date:
@@ -148,10 +158,30 @@ class DetailFormDialog(QDialog):
                 # 주소
                 self.label_address_1.setText(str(chobon_data.get('address_1', '')))
                 self.label_address_2.setText(str(chobon_data.get('address_2', '')))
+                
+                # 성별
+                gender_val = chobon_data.get('gender')
+                if gender_val is not None:
+                    try:
+                        # 0이면 여자, 1이면 남자
+                        gender_int = int(gender_val)
+                        if gender_int == 0:
+                            self.label_gender.setText("여자")
+                        elif gender_int == 1:
+                            self.label_gender.setText("남자")
+                        else:
+                            self.label_gender.setText(str(gender_val))
+                    except (ValueError, TypeError):
+                        self.label_gender.setText(str(gender_val))
+                else:
+                    self.label_gender.setText("")
             else:
                  self._clear_chobon_fields()
         else:
             self._clear_chobon_fields()
+            
+        # 이름 설정 (최종 결정된 이름)
+        self.label_name_1.setText(name)
 
         # 4. 청년생애 데이터 로드
         # 데이터가 있는 경우에만 'O' 표시
@@ -165,4 +195,5 @@ class DetailFormDialog(QDialog):
         self.label_birth_date.setText("")
         self.label_address_1.setText("")
         self.label_address_2.setText("")
+        self.label_gender.setText("")
 
