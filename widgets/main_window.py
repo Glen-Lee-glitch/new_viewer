@@ -28,7 +28,7 @@ from widgets.login_dialog import LoginDialog
 from widgets.special_note_dialog import SpecialNoteDialog
 from widgets.worker_progress_dialog import WorkerProgressDialog
 from widgets.alarm_widget import AlarmWidget
-from widgets.gemini_results_dialog import GeminiResultsDialog
+from widgets.detail_form_dialog import DetailFormDialog
 from widgets.config_dialog import ConfigDialog
 from widgets.necessary_widget import NecessaryWidget
 
@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
         self._settings_dialog = SettingsDialog(self)
         # self._mail_dialog = MailDialog(parent=self) # SpecialNoteDialog는 필요할 때 생성
         self._pending_basic_info: dict | None = None
-        self._gemini_results_dialog = GeminiResultsDialog(self)
+        self._detail_form_dialog = DetailFormDialog(self)
         self._config_dialog = ConfigDialog(self)
         self._necessary_widget = NecessaryWidget()
         
@@ -474,11 +474,11 @@ class MainWindow(QMainWindow):
         worker_progress_dialog.exec()
         
     def _show_gemini_results_dialog(self, rn: str):
-        """Gemini AI 결과 다이얼로그를 표시한다."""
-        self._gemini_results_dialog.load_data(rn)
-        self._gemini_results_dialog.show()
-        self._gemini_results_dialog.raise_()
-        self._gemini_results_dialog.activateWindow()
+        """상세 정보 다이얼로그를 표시한다."""
+        self._detail_form_dialog.load_data(rn)
+        self._detail_form_dialog.show()
+        self._detail_form_dialog.raise_()
+        self._detail_form_dialog.activateWindow()
     
     def _open_ai_results_dialog(self):
         """현재 작업 중인 RN으로 AI 결과 다이얼로그를 연다."""

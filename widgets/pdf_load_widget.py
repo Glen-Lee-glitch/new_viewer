@@ -28,7 +28,7 @@ from core.sql_manager import (
     check_gemini_flags
 )
 from widgets.email_view_dialog import EmailViewDialog
-from widgets.gemini_results_dialog import GeminiResultsDialog
+from widgets.detail_form_dialog import DetailFormDialog
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -369,7 +369,7 @@ class PdfLoadWidget(QWidget):
         dialog.exec()
     
     def _show_gemini_results(self, row: int):
-        """AI 결과 다이얼로그를 비모달로 표시한다."""
+        """AI 결과 다이얼로그(상세 정보)를 비모달로 표시한다."""
         table = self.complement_table_widget
         rn_item = table.item(row, 1)  # RN 컬럼(1번)
         
@@ -383,14 +383,14 @@ class PdfLoadWidget(QWidget):
             QMessageBox.warning(self, "오류", "RN을 찾을 수 없습니다.")
             return
         
-        # gemini_results 존재 여부 확인
+        # gemini_results 존재 여부 확인 (기존 로직 유지)
         flags = check_gemini_flags(rn)
         if not flags:
             QMessageBox.warning(self, "경고", f"RN '{rn}'에 대한 AI 결과가 없습니다.")
             return
         
-        # GeminiResultsDialog를 비모달로 생성하고 표시
-        dialog = GeminiResultsDialog(parent=self)
+        # DetailFormDialog 비모달로 생성하고 표시
+        dialog = DetailFormDialog(parent=self)
         dialog.load_data(rn)
         dialog.show()  # 비모달로 표시
 
