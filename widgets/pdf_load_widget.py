@@ -283,12 +283,37 @@ class PdfLoadWidget(QWidget):
         table = self.complement_table_widget
         global_pos = table.viewport().mapToGlobal(pos)
 
+        # 클릭한 위치의 행 확인
+        item = table.itemAt(pos)
+        if item is None:
+            return
+        
+        row = item.row()
+        rn_item = table.item(row, 1)  # RN 컬럼(1번)
+        
+        # mail_count 확인
+        mail_count = 0
+        if rn_item:
+            row_data = rn_item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(row_data, dict):
+                mail_count = row_data.get('mail_count', 0)
+
         menu = QMenu(self)  
         start_action = menu.addAction("작업 시작하기")
+        
+        # mail_count > 2인 경우에만 '이메일 확인하기' 메뉴 추가
+        email_action = None
+        if mail_count > 2:
+            menu.addSeparator()  # 구분선 추가
+            email_action = menu.addAction("이메일 확인하기")
+        
         action = menu.exec(global_pos)
 
         if action == start_action:
             self.start_selected_work()
+        elif action == email_action:
+            # TODO: 이메일 확인 기능 구현 예정
+            pass
 
     def start_selected_work(self):
         """선택된 행을 emit하여 다운로드 로직이 처리하도록 한다."""
