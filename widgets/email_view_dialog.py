@@ -10,29 +10,30 @@ class EmailViewDialog(QDialog):
         self.setWindowTitle("이메일 확인")
         self.setMinimumWidth(600)
         self.setMinimumHeight(400)
+        self.setStyleSheet("background-color: #ffffff;")
         
         layout = QVBoxLayout(self)
         
         # 제목 레이블
         title_label = QLabel("제목:")
-        title_label.setStyleSheet("font-weight: bold;")
+        title_label.setStyleSheet("font-weight: bold; color: #000000;")
         layout.addWidget(title_label)
         
         title_text = QLabel(title)
         title_text.setWordWrap(True)
-        title_text.setStyleSheet("padding: 5px; background-color: #f0f0f0; border: 1px solid #ccc;")
+        title_text.setStyleSheet("padding: 5px; background-color: #f0f0f0; border: 1px solid #ccc; color: #000000;")
         layout.addWidget(title_text)
         
         # 내용 레이블
         content_label = QLabel("내용:")
-        content_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        content_label.setStyleSheet("font-weight: bold; margin-top: 10px; color: #000000;")
         layout.addWidget(content_label)
         
         # 내용 텍스트 에디터 (읽기 전용)
         content_text = QTextEdit()
         content_text.setPlainText(content)
         content_text.setReadOnly(True)
-        content_text.setStyleSheet("padding: 5px; border: 1px solid #ccc;")
+        content_text.setStyleSheet("padding: 5px; border: 1px solid #ccc; background-color: #ffffff; color: #000000;")
         layout.addWidget(content_text)
         
         # 닫기 버튼
