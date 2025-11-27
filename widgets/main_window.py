@@ -231,6 +231,9 @@ class MainWindow(QMainWindow):
         preferences_action = QAction("환경설정", self)
         preferences_action.triggered.connect(self._open_config_dialog)
         self.menu_settings.addAction(preferences_action)
+        
+        # '파일' 메뉴 안의 '옵션' 서브메뉴는 UI 파일에서 정의되어 있으며, hover 시 자동으로 서브메뉴가 표시됩니다.
+        # action_detail_option1과 action_detail_option2는 UI 파일에서 정의되어 있습니다.
 
     def _setup_connections(self):
         """애플리케이션의 모든 시그널-슬롯 연결을 설정한다."""

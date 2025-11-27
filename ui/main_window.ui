@@ -71,10 +71,18 @@
      <height>33</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menu_file">
+  <widget class="QMenu" name="menu_file">
     <property name="title">
      <string>파일</string>
     </property>
+    <addaction name="menu_option"/>
+   </widget>
+  <widget class="QMenu" name="menu_option">
+    <property name="title">
+     <string>옵션</string>
+    </property>
+    <addaction name="action_detail_option1"/>
+    <addaction name="action_detail_option2"/>
    </widget>
    <widget class="QMenu" name="menu_edit">
     <property name="title">
@@ -86,15 +94,25 @@
      <string>보기</string>
     </property>
    </widget>
-   <widget class="QMenu" name="menu_settings">
+  <widget class="QMenu" name="menu_settings">
     <property name="title">
      <string>설정</string>
     </property>
-   </widget>
-   <addaction name="menu_file"/>
-   <addaction name="menu_edit"/>
-   <addaction name="menu_view"/>
-   <addaction name="menu_settings"/>
+  </widget>
+  <action name="action_detail_option1">
+   <property name="text">
+    <string>상세옵션1</string>
+   </property>
+  </action>
+  <action name="action_detail_option2">
+   <property name="text">
+    <string>상세옵션2</string>
+   </property>
+  </action>
+  <addaction name="menu_file"/>
+  <addaction name="menu_edit"/>
+  <addaction name="menu_view"/>
+  <addaction name="menu_settings"/>
   </widget>
   <widget class="QStatusBar" name="ui_status_bar">
    <widget class="QWidget" name="ui_nav_widget" native="true">
