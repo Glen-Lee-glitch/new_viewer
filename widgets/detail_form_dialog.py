@@ -94,7 +94,18 @@ class DetailFormDialog(QDialog):
                 
                 if text_to_copy:
                     QApplication.clipboard().setText(text_to_copy)
-                return True # 이벤트 소비 (선택 동작 방지 등을 원하면 조정 가능하지만, 복사 후 선택도 가능하게 하려면 False 반환 고려. 여기선 복사 우선)
+                    # 복사 성공 시 배경색 변경 (연한 초록색, 텍스트 검정)
+                    obj.setStyleSheet("""
+                        QLabel {
+                            border: 1px solid #555555;
+                            border-radius: 3px;
+                            padding: 4px;
+                            background-color: #A5D6A7;
+                            color: #000000;
+                            font-weight: bold;
+                        }
+                    """)
+                return True
         
         return super().eventFilter(obj, event)
 
