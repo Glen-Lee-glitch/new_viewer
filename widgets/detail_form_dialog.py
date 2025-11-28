@@ -229,9 +229,19 @@ class DetailFormDialog(QDialog):
             # 법인인 경우: 법인주소 사용
             법인주소 = biz_data.get('법인주소', '')
             if 법인주소:
-                # 주소를 address_1에 설정 (전체 주소)
-                self.label_address_1.setText(str(법인주소))
-                self.label_address_2.setText("")
+                # 첫 번째 쉼표를 기준으로 split
+                법인주소_str = str(법인주소)
+                if ',' in 법인주소_str:
+                    parts = 법인주소_str.split(',', 1)  # 최대 1번만 split
+                    address_1 = parts[0].strip()
+                    address_2 = parts[1].strip() if len(parts) > 1 else ""
+                else:
+                    # 쉼표가 없으면 전체를 주소1에
+                    address_1 = 법인주소_str
+                    address_2 = ""
+                
+                self.label_address_1.setText(address_1)
+                self.label_address_2.setText(address_2)
         else:
             # 개인인 경우: 초본 데이터 로드
             if flags.get('초본', False):
