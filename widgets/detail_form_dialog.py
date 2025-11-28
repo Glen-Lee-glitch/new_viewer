@@ -346,23 +346,60 @@ class DetailFormDialog(QDialog):
         )
 
     def _set_bottom_layout_visibility(self, show_joint, show_multichild, show_youth, show_etc):
-        """하단 레이아웃 항목들의 가시성을 제어한다."""
+        """하단 레이아웃 항목들의 가시성을 제어하고 하이라이트 스타일을 적용한다."""
+        # 하이라이트 스타일 정의
+        highlight_style = """
+            QLabel {
+                border: 2px solid #888888;
+                border-radius: 3px;
+                padding: 4px;
+                background-color: #f06262;
+                color: #000000;
+            }
+        """
+        
         # 공동명의
-        self.label_12.setVisible(show_joint)
-        self.label_name_2.setVisible(show_joint)
-        self.label_birth_date_2.setVisible(show_joint)
+        if show_joint:
+            self.label_12.setVisible(True)
+            self.label_12.setStyleSheet(highlight_style)
+            self.label_name_2.setVisible(True)
+            self.label_name_2.setStyleSheet(highlight_style)
+            self.label_birth_date_2.setVisible(True)
+            self.label_birth_date_2.setStyleSheet(highlight_style)
+        else:
+            self.label_12.setVisible(False)
+            self.label_name_2.setVisible(False)
+            self.label_birth_date_2.setVisible(False)
         
         # 다자녀
-        self.label_13.setVisible(show_multichild)
-        self.label_children.setVisible(show_multichild)
+        if show_multichild:
+            self.label_13.setVisible(True)
+            self.label_13.setStyleSheet(highlight_style)
+            self.label_children.setVisible(True)
+            self.label_children.setStyleSheet(highlight_style)
+        else:
+            self.label_13.setVisible(False)
+            self.label_children.setVisible(False)
         
         # 청년생애
-        self.label_14.setVisible(show_youth)
-        self.label_firstandyouth.setVisible(show_youth)
+        if show_youth:
+            self.label_14.setVisible(True)
+            self.label_14.setStyleSheet(highlight_style)
+            self.label_firstandyouth.setVisible(True)
+            self.label_firstandyouth.setStyleSheet(highlight_style)
+        else:
+            self.label_14.setVisible(False)
+            self.label_firstandyouth.setVisible(False)
         
         # 기타
-        self.label_15.setVisible(show_etc)
-        self.label_etc.setVisible(show_etc)
+        if show_etc:
+            self.label_15.setVisible(True)
+            self.label_15.setStyleSheet(highlight_style)
+            self.label_etc.setVisible(True)
+            self.label_etc.setStyleSheet(highlight_style)
+        else:
+            self.label_15.setVisible(False)
+            self.label_etc.setVisible(False)
 
     def _clear_chobon_fields(self):
         """초본 관련 필드 초기화"""
