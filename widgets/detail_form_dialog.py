@@ -59,7 +59,9 @@ class DetailFormDialog(QDialog):
             self.label_19,
             self.label_21,
             self.label_23,
-            self.label_25
+            self.label_25,
+            # RN 라벨 추가
+            self.label_RN
         ]
     
     def _hide_enterprise_fields(self):
@@ -293,9 +295,9 @@ class DetailFormDialog(QDialog):
             self.label_name_1.setText(name)
 
         # 5. 청년생애 데이터 로드
-        # 데이터가 있는 경우에만 'O' 표시
+        # 데이터가 있는 경우에만 'Y' 표시
         if flags.get('청년생애', False):
-             self.label_firstandyouth.setText("O")
+             self.label_firstandyouth.setText("Y")
         else:
              self.label_firstandyouth.setText("")
              
@@ -344,6 +346,9 @@ class DetailFormDialog(QDialog):
             show_youth=flags.get('청년생애', False), 
             show_etc=False # 기타 (아직 로직 없음)
         )
+        
+        # 9. RN 필드 표시 (항상 맨 아래에 표시)
+        self.label_RN.setText(rn)
 
     def _set_bottom_layout_visibility(self, show_joint, show_multichild, show_youth, show_etc):
         """하단 레이아웃 항목들의 가시성을 제어하고 하이라이트 스타일을 적용한다."""

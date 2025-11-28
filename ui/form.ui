@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>512</width>
-    <height>502</height>
+    <height>676</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -602,6 +602,50 @@
        </item>
        <item>
         <widget class="QLabel" name="label_etc">
+         <property name="text">
+          <string>TextLabel</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_bottom">
+     <item>
+      <spacer name="horizontalSpacer_5">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_20">
+       <item>
+        <widget class="QLabel" name="label_26">
+         <property name="styleSheet">
+          <string notr="true">QLabel {
+    background-color: #2b2b2b;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: bold;
+}</string>
+         </property>
+         <property name="text">
+          <string>RN 번호</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_RN">
          <property name="text">
           <string>TextLabel</string>
          </property>

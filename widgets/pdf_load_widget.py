@@ -530,7 +530,6 @@ class PdfLoadWidget(QWidget):
         """지급신청 로드 체크박스 상태를 설정한다."""
         self._payment_request_load_enabled = enabled
     
-    
     def setup_connections(self):
         """시그널-슬롯 연결"""
         if hasattr(self, 'center_open_btn'):
