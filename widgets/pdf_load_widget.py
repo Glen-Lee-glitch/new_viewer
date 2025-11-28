@@ -168,7 +168,7 @@ class PdfLoadWidget(QWidget):
             table.setItem(row_index, 4, memo_item)
         
         # 디버그: RN 목록 출력
-        print(f"[지급 테이블] 작업상태가 '완료'가 아닌 RN 목록: {rn_list}")
+        print(f"[지급 테이블] 미완료 건수: {len(rn_list)}개")
 
     def populate_recent_subsidy_rows(self):
         """최근 지원금 신청 데이터를 테이블에 채운다."""

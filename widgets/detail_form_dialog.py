@@ -347,7 +347,7 @@ class DetailFormDialog(QDialog):
 
     def _set_bottom_layout_visibility(self, show_joint, show_multichild, show_youth, show_etc):
         """하단 레이아웃 항목들의 가시성을 제어하고 하이라이트 스타일을 적용한다."""
-        # 하이라이트 스타일 정의
+        # 하이라이트 스타일 정의 (헤더용)
         highlight_style = """
             QLabel {
                 border: 2px solid #888888;
@@ -358,14 +358,26 @@ class DetailFormDialog(QDialog):
             }
         """
         
+        # 하이라이트 스타일 정의 (데이터용 - bold 추가)
+        highlight_data_style = """
+            QLabel {
+                border: 2px solid #888888;
+                border-radius: 3px;
+                padding: 4px;
+                background-color: #f06262;
+                color: #000000;
+                font-weight: bold;
+            }
+        """
+        
         # 공동명의
         if show_joint:
             self.label_12.setVisible(True)
             self.label_12.setStyleSheet(highlight_style)
             self.label_name_2.setVisible(True)
-            self.label_name_2.setStyleSheet(highlight_style)
+            self.label_name_2.setStyleSheet(highlight_data_style)
             self.label_birth_date_2.setVisible(True)
-            self.label_birth_date_2.setStyleSheet(highlight_style)
+            self.label_birth_date_2.setStyleSheet(highlight_data_style)
         else:
             self.label_12.setVisible(False)
             self.label_name_2.setVisible(False)
@@ -376,7 +388,7 @@ class DetailFormDialog(QDialog):
             self.label_13.setVisible(True)
             self.label_13.setStyleSheet(highlight_style)
             self.label_children.setVisible(True)
-            self.label_children.setStyleSheet(highlight_style)
+            self.label_children.setStyleSheet(highlight_data_style)
         else:
             self.label_13.setVisible(False)
             self.label_children.setVisible(False)
@@ -386,7 +398,7 @@ class DetailFormDialog(QDialog):
             self.label_14.setVisible(True)
             self.label_14.setStyleSheet(highlight_style)
             self.label_firstandyouth.setVisible(True)
-            self.label_firstandyouth.setStyleSheet(highlight_style)
+            self.label_firstandyouth.setStyleSheet(highlight_data_style)
         else:
             self.label_14.setVisible(False)
             self.label_firstandyouth.setVisible(False)
@@ -396,7 +408,7 @@ class DetailFormDialog(QDialog):
             self.label_15.setVisible(True)
             self.label_15.setStyleSheet(highlight_style)
             self.label_etc.setVisible(True)
-            self.label_etc.setStyleSheet(highlight_style)
+            self.label_etc.setStyleSheet(highlight_data_style)
         else:
             self.label_15.setVisible(False)
             self.label_etc.setVisible(False)
