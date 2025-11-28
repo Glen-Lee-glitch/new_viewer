@@ -34,10 +34,10 @@ class DetailFormDialog(QDialog):
             
         self._setup_label_interaction()
         self._setup_copy_on_click()
-
-    def _setup_label_interaction(self):
-        """라벨들이 텍스트 선택을 지원하도록 설정한다."""
-        labels = [
+    
+    def _get_all_clickable_labels(self):
+        """클릭 가능한 모든 라벨 리스트를 반환한다."""
+        return [
             self.label_contract_date,
             self.label_name_1,
             self.label_hp,
@@ -52,51 +52,42 @@ class DetailFormDialog(QDialog):
             self.label_children,
             self.label_deliver_date
         ]
-        
-        for label in labels:
+    
+    def _reset_label_styles(self):
+        """모든 라벨의 스타일을 기본값으로 초기화한다."""
+        default_style = """
+            QLabel {
+                border: 1px solid #555555;
+                border-radius: 3px;
+                padding: 4px;
+                background-color: #1e1e1e;
+                color: #ffffff;
+            }
+        """
+        for label in self._get_all_clickable_labels():
+            label.setStyleSheet(default_style)
+    
+    def reject(self):
+        """다이얼로그를 닫을 때 라벨 스타일을 초기화한다."""
+        self._reset_label_styles()
+        super().reject()
+
+    def _setup_label_interaction(self):
+        """라벨들이 텍스트 선택을 지원하도록 설정한다."""
+        for label in self._get_all_clickable_labels():
             if hasattr(self, label.objectName()):
                 label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
     def _setup_copy_on_click(self):
         """라벨을 클릭했을 때 클립보드에 복사하는 기능 설정"""
-        labels_to_make_clickable = [
-            self.label_contract_date,
-            self.label_name_1,
-            self.label_hp,
-            self.label_pn,
-            self.label_email,
-            self.label_birth_date,
-            self.label_address_1,
-            self.label_address_2,
-            self.label_firstandyouth,
-            self.label_gender,
-            self.label_model,
-            self.label_children,
-            self.label_deliver_date
-        ]
-        
-        for label in labels_to_make_clickable:
+        for label in self._get_all_clickable_labels():
             if hasattr(self, label.objectName()):
                 label.setCursor(Qt.CursorShape.PointingHandCursor)
                 label.installEventFilter(self)
 
     def eventFilter(self, obj, event):
         """이벤트 필터. 클릭 시 텍스트를 복사하는 로직을 처리한다."""
-        clickable_labels = [
-            self.label_contract_date,
-            self.label_name_1,
-            self.label_hp,
-            self.label_pn,
-            self.label_email,
-            self.label_birth_date,
-            self.label_address_1,
-            self.label_address_2,
-            self.label_firstandyouth,
-            self.label_gender,
-            self.label_model,
-            self.label_children,
-            self.label_deliver_date
-        ]
+        clickable_labels = self._get_all_clickable_labels()
 
         if obj in clickable_labels and event.type() == QEvent.Type.MouseButtonPress:
             if event.button() == Qt.MouseButton.LeftButton:
@@ -125,6 +116,9 @@ class DetailFormDialog(QDialog):
 
     def load_data(self, rn: str):
         """제공된 RN으로 데이터를 조회하고 UI를 업데이트한다."""
+        # 라벨 스타일 초기화 (새로 열 때 깨끗한 상태로 시작)
+        self._reset_label_styles()
+        
         self.setWindowTitle(f"상세 정보: {rn}")
 
         # 1. 구매계약서 데이터 로드
