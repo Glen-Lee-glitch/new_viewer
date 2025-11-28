@@ -32,6 +32,9 @@ class DetailFormDialog(QDialog):
             self.buttonBox.accepted.connect(self.accept)
             self.buttonBox.rejected.connect(self.reject)
             
+        # 초기에는 법인/사업자 필드 숨김
+        self._hide_enterprise_fields()
+            
         self._setup_label_interaction()
         self._setup_copy_on_click()
     
@@ -50,8 +53,30 @@ class DetailFormDialog(QDialog):
             self.label_gender,
             self.label_model,
             self.label_children,
-            self.label_deliver_date
+            self.label_deliver_date,
+            # 법인/사업자 관련 값 라벨 추가
+            self.label_17,
+            self.label_19,
+            self.label_21,
+            self.label_23,
+            self.label_25
         ]
+    
+    def _hide_enterprise_fields(self):
+        """법인/사업자 관련 필드를 숨긴다."""
+        # horizontalLayout_ent_1 관련 (기관명, 대표자)
+        if hasattr(self, 'label_16'): self.label_16.setVisible(False)
+        if hasattr(self, 'label_17'): self.label_17.setVisible(False)
+        if hasattr(self, 'label_18'): self.label_18.setVisible(False)
+        if hasattr(self, 'label_19'): self.label_19.setVisible(False)
+        
+        # horizontalLayout_ent_2 관련 (법인등록번호, 사업자등록번호, 개인사업자명)
+        if hasattr(self, 'label_20'): self.label_20.setVisible(False)
+        if hasattr(self, 'label_21'): self.label_21.setVisible(False)
+        if hasattr(self, 'label_22'): self.label_22.setVisible(False)
+        if hasattr(self, 'label_23'): self.label_23.setVisible(False)
+        if hasattr(self, 'label_24'): self.label_24.setVisible(False)
+        if hasattr(self, 'label_25'): self.label_25.setVisible(False)
     
     def _reset_label_styles(self):
         """모든 라벨의 스타일을 기본값으로 초기화한다."""
