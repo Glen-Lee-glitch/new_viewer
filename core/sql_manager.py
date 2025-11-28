@@ -90,6 +90,7 @@ def _build_subsidy_query_base():
         "       cb.chobon, "
         "       c.ai_계약일자, c.ai_이름, c.전화번호, c.이메일, "
         "       cb.name AS chobon_name, cb.birth_date AS chobon_birth_date, cb.address_1 AS chobon_address_1, "
+        "       biz.is_법인, "
         "       CASE "
         "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
         "               CASE "
@@ -114,6 +115,7 @@ def _build_subsidy_query_base():
         "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
         "LEFT JOIN test_ai_청년생애 y ON sa.RN COLLATE utf8mb4_unicode_ci = y.RN COLLATE utf8mb4_unicode_ci "
         "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
+        "LEFT JOIN test_ai_사업자등록증 biz ON sa.RN COLLATE utf8mb4_unicode_ci = biz.RN COLLATE utf8mb4_unicode_ci "
         "LEFT JOIN ("
         "    SELECT re1.RN, re1.mail_type, re1.app_num "
         "    FROM reply_emails re1 "
@@ -527,13 +529,15 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 "       d.child_birth_date, cb.issue_date, "
                 "       cb.chobon, "
                 "       c.ai_계약일자, c.ai_이름, c.전화번호, c.이메일, "
-                "       cb.name AS chobon_name, cb.birth_date AS chobon_birth_date, cb.address_1 AS chobon_address_1 "
+                "       cb.name AS chobon_name, cb.birth_date AS chobon_birth_date, cb.address_1 AS chobon_address_1, "
+                "       biz.is_법인 "
                 "FROM subsidy_applications sa "
                 "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
                 "LEFT JOIN gemini_results gr ON sa.RN COLLATE utf8mb4_unicode_ci = gr.RN COLLATE utf8mb4_unicode_ci "
                 "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
                 "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
                 "LEFT JOIN test_ai_구매계약서 c ON sa.RN COLLATE utf8mb4_unicode_ci = c.RN COLLATE utf8mb4_unicode_ci "
+                "LEFT JOIN test_ai_사업자등록증 biz ON sa.RN COLLATE utf8mb4_unicode_ci = biz.RN COLLATE utf8mb4_unicode_ci "
                 "WHERE sa.RN = %s"
             )
             
@@ -981,6 +985,38 @@ def fetch_gemini_multichild_results(rn: str) -> dict:
                     import json
                     return {
                         'child_birth_date': json.loads(row[0]) if row[0] else []
+                    }
+                return {}
+    except Exception:
+        traceback.print_exc()
+        return {}
+
+def fetch_gemini_business_results(rn: str) -> dict:
+    """
+    test_ai_사업자등록증 테이블에서 RN으로 데이터를 조회한다.
+    """
+    if not rn:
+        return {}
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT is_법인, 법인명, 대표자, 등록번호, 사업자등록번호, 사업자명, 법인주소
+                FROM test_ai_사업자등록증
+                WHERE RN = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'is_법인': bool(row[0]) if row[0] is not None else False,
+                        '기관명': row[1],  # 법인명을 기관명으로 매핑
+                        '대표자': row[2],
+                        '법인등록번호': row[3],  # 등록번호를 법인등록번호로 매핑
+                        '사업자등록번호': row[4],
+                        '개인사업자명': row[5],  # 사업자명을 개인사업자명으로 매핑
+                        '법인주소': row[6]  # 법인주소 추가
                     }
                 return {}
     except Exception:
