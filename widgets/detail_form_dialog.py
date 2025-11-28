@@ -194,7 +194,7 @@ class DetailFormDialog(QDialog):
             self.label_25.setText(str(biz_data.get('개인사업자명', '')))
             
             # 신청 유형 표시
-            self.label_apply_type.setText("법인/사업자")
+            self.label_apply_type.setText("법인")
             
         else:
             # 개인인 경우: 개인정보 필드 표시하고 법인 필드 숨김
