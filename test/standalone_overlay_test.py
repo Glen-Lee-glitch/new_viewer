@@ -4,20 +4,11 @@ import pymysql
 from contextlib import closing
 from datetime import datetime
 import time
-
-# pynput은 GUI와 별도로 작동하므로, import 실패 시 바로 알려주는 것이 좋음
-try:
-    from pynput import keyboard
-except ImportError:
-    print("="*50)
-    print("ERROR: pynput 라이브러리를 찾을 수 없습니다.")
-    print("터미널에서 'pip install pynput' 명령어로 설치해주세요.")
-    print("="*50)
-    sys.exit()
-
+import os
 from PyQt6.QtWidgets import (QApplication, QDialog, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QLineEdit, QPushButton, QMessageBox, QWidget)
+                             QLabel, QLineEdit, QPushButton, QMessageBox, QWidget, QFileDialog)
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer
+from pynput import keyboard
 
 
 # ---------------------------------------------------------
@@ -411,6 +402,24 @@ class TestLauncher(QDialog):
         form_layout.addWidget(self.name_input)
         layout.addLayout(form_layout)
 
+        excel_layout = QHBoxLayout()
+        excel_layout.addWidget(QLabel("엑셀 파일 경로:"))
+        self.excel_path_input = QLineEdit()
+        self.excel_path_input.setPlaceholderText("업로드할 엑셀 파일 경로")
+        self.excel_path_input.setReadOnly(True)
+        excel_layout.addWidget(self.excel_path_input)
+        
+        self.select_excel_btn = QPushButton("파일 선택")
+        self.select_excel_btn.clicked.connect(self.open_excel_file)
+        excel_layout.addWidget(self.select_excel_btn)
+        layout.addLayout(excel_layout)
+
+        excel_upload_btn_layout = QHBoxLayout()
+        self.upload_excel_btn = QPushButton("3. 엑셀 DB에 업로드")
+        self.upload_excel_btn.clicked.connect(self.upload_excel_to_db)
+        excel_upload_btn_layout.addWidget(self.upload_excel_btn)
+        layout.addLayout(excel_upload_btn_layout)
+
         btn_layout = QHBoxLayout()
         self.test_db_btn = QPushButton("1. DB 연결 테스트")
         self.test_db_btn.clicked.connect(self.check_db)
@@ -433,6 +442,41 @@ class TestLauncher(QDialog):
             QMessageBox.information(self, "DB 연결", message)
         else:
             QMessageBox.critical(self, "DB 연결", message)
+
+    def open_excel_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "엑셀 파일 선택", "", "Excel Files (*.xlsx *.xls)")
+        if file_path:
+            self.excel_path_input.setText(file_path)
+
+    def upload_excel_to_db(self):
+        excel_path = self.excel_path_input.text().strip()
+        if not excel_path:
+            QMessageBox.warning(self, "입력 오류", "엑셀 파일 경로를 입력해주세요.")
+            return
+        
+        if not os.path.exists(excel_path):
+            QMessageBox.warning(self, "파일 없음", "지정된 엑셀 파일이 존재하지 않습니다.")
+            return
+            
+        try:
+            df = pd.read_excel(excel_path)
+            if df.empty:
+                QMessageBox.information(self, "엑셀 데이터", "엑셀 파일에 데이터가 없습니다.")
+                return
+            
+            mapped_df = map_to_table_columns(df)
+            
+            if mapped_df.empty:
+                QMessageBox.information(self, "매핑 데이터", "매핑된 데이터가 없습니다. 엑셀 컬럼을 확인해주세요.")
+                return
+
+            if insert_to_database(mapped_df):
+                QMessageBox.information(self, "업로드 성공", "엑셀 데이터가 성공적으로 데이터베이스에 업로드되었습니다.")
+            else:
+                QMessageBox.critical(self, "업로드 실패", "엑셀 데이터 업로드 중 오류가 발생했습니다.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "처리 오류", f"엑셀 처리 중 오류가 발생했습니다:\n{e}")
 
     def _format_date_value(self, value: str) -> str:
         if not value or pd.isna(value) or str(value).lower() in ['nan', 'none']: return ""
@@ -623,6 +667,160 @@ class TestLauncher(QDialog):
         if self.overlay:
             self.overlay.close()
         super().closeEvent(event)
+
+# ---------------------------------------------------------
+# Excel Upload Logic
+# ---------------------------------------------------------
+
+TABLE_COLUMNS = [
+    "순서", "신청자", "전처리", "지역", "RN", "주문시간", "성명", "생년월일", "성별",
+    "사업자번호", "사업자명", "신청차종", "출고예정일", "주소1", "주소2", "전화",
+    "휴대폰", "이메일", "신청유형", "우선순위", "다자녀수", "공동명의자", "공동생년월일", "보조금",
+]
+
+EXCEL_TO_TABLE = {
+    "순서": "순서", "신청자": "신청자", "전처리": "전처리", "지역": "지역",
+    "RN번호": "RN", "주문시간": "주문시간", "성명(대표자)": "성명",
+    "생년월일(법인번호)": "생년월일", "성별": "성별", "사업자번호": "사업자번호",
+    "사업자명": "사업자명", "신청차종": "신청차종", "출고예정일": "출고예정일",
+    "주소1": "주소1", "주소2": "주소2", "전화": "전화", "휴대폰": "휴대폰",
+    "이메일": "이메일", "신청유형": "신청유형", "우선순위": "우선순위",
+    "다자녀수": "다자녀수", "공동명의자": "공동명의자", "공동 생년월일": "공동생년월일",
+    "보조금": "보조금",
+}
+
+def to_text_date(value: object) -> str | None:
+    if pd.isna(value):
+        return None
+    if isinstance(value, (datetime, pd.Timestamp)):
+        return value.strftime("%Y-%m-%d")
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+    try:
+        parsed = pd.to_datetime(text_value, errors="raise")
+        return parsed.strftime("%Y-%m-%d")
+    except Exception:
+        return text_value
+
+def to_int(value: object) -> int | None:
+    if pd.isna(value):
+        return None
+    try:
+        return int(float(value))
+    except (ValueError, TypeError):
+        return None
+
+def map_to_table_columns(dataframe: pd.DataFrame) -> pd.DataFrame:
+    mapped = {}
+    missing_columns = []
+
+    for excel_col, table_col in EXCEL_TO_TABLE.items():
+        if excel_col not in dataframe.columns:
+            missing_columns.append((excel_col, table_col))
+            continue
+
+        series = dataframe[excel_col]
+
+        if excel_col == "순서":
+            mapped[table_col] = series.apply(to_int)
+        elif excel_col == "생년월일(법인번호)":
+            mapped[table_col] = series.apply(to_text_date)
+        elif excel_col == "공동 생년월일":
+            mapped[table_col] = series.apply(to_text_date)
+        elif excel_col == "다자녀수":
+            mapped[table_col] = series.apply(to_int)
+        elif excel_col == "보조금":
+            mapped[table_col] = series.apply(to_int)
+        elif excel_col == "주문시간":
+            mapped[table_col] = series.dt.strftime("%Y-%m-%d") if pd.api.types.is_datetime64_any_dtype(series) else series
+        elif excel_col == "출고예정일":
+            mapped[table_col] = series.dt.strftime("%Y-%m-%d") if pd.api.types.is_datetime64_any_dtype(series) else series
+        else:
+            mapped[table_col] = series
+
+    mapped_df = pd.DataFrame(mapped)
+    return mapped_df
+
+def insert_to_database(dataframe: pd.DataFrame) -> bool:
+    if dataframe.empty:
+        print("삽입할 데이터가 없습니다.")
+        return False
+    
+    insert_columns = [col for col in TABLE_COLUMNS if col in dataframe.columns]
+    
+    if not insert_columns:
+        print("삽입할 칼럼이 없습니다.")
+        return False
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                columns_str = ", ".join([f"`{col}`" for col in insert_columns])
+                placeholders = ", ".join(["%s"] * len(insert_columns))
+                insert_query = f"""
+                    INSERT INTO preprocessed_data ({columns_str})
+                    VALUES ({placeholders})
+                """
+                
+                update_query = """
+                    UPDATE processed_data 
+                    SET `순서` = %s 
+                    WHERE RN = %s
+                """
+                
+                inserted_count = 0
+                updated_count = 0
+                
+                for _, row in dataframe.iterrows():
+                    values = []
+                    for col in insert_columns:
+                        value = row[col]
+                        if pd.isna(value):
+                            values.append(None)
+                        elif col == "순서":
+                            order_value = to_int(value)
+                            values.append(order_value)
+                        elif col in ["주문시간", "출고예정일", "공동생년월일"]:
+                            if isinstance(value, str):
+                                values.append(value)
+                            elif isinstance(value, (datetime, pd.Timestamp)):
+                                values.append(value.strftime("%Y-%m-%d"))
+                            else:
+                                values.append(None)
+                        else:
+                            values.append(value)
+                    
+                    try:
+                        cursor.execute(insert_query, values)
+                        inserted_count += 1
+                        
+                        rn_value = row.get('RN')
+                        order_value = to_int(row.get('순서'))
+                        if rn_value and pd.notna(rn_value) and order_value is not None:
+                            cursor.execute(update_query, (order_value, rn_value))
+                            if cursor.rowcount > 0:
+                                updated_count += 1
+                    except Exception as e:
+                        print(f"행 삽입 실패 (RN: {row.get('RN', 'N/A')}): {e}")
+                        continue
+                
+                connection.commit()
+                print(f"\n성공적으로 {inserted_count}개 행이 preprocessed_data에 삽입되었습니다.")
+                if updated_count > 0:
+                    print(f"성공적으로 {updated_count}개 행의 processed_data 순서가 업데이트되었습니다.")
+                return True
+                
+    except Exception as e:
+        print(f"데이터베이스 삽입 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+
+
+# ---------------------------------------------------------
 
 if __name__ == "__main__":
     try:
