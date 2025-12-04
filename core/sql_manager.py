@@ -1096,6 +1096,9 @@ def fetch_subsidy_amount(region: str, model: str) -> str:
         
     target_column = model_mapping[model]
     
+    # 만원 단위 표기 지역 목록
+    만원_단위_지역 = ['성남시', '의정부시']
+    
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             # SQL Injection 방지를 위해 컬럼명은 포맷팅으로 넣지 않고 화이트리스트 검증(매핑) 사용
@@ -1107,6 +1110,23 @@ def fetch_subsidy_amount(region: str, model: str) -> str:
                 
                 if row and row[0] is not None:
                     amount = int(row[0])
+                    
+                    # 1. 만원 단위 표기 지역 처리
+                    if region in 만원_단위_지역:
+                        # 10000으로 나누기
+                        amount_in_manwon = amount / 10000
+                        
+                        # 정수로 딱 떨어지면 정수로, 아니면 소수점까지 표시
+                        if amount_in_manwon.is_integer():
+                            return f"{int(amount_in_manwon)}"
+                        else:
+                            return f"{amount_in_manwon}"
+                    
+                    # 2. '원' 제외 지역 (추후 추가 예정)
+                    # if region in 원_제외_지역:
+                    #     return f"{amount:,}"
+
+                    # 3. 일반적인 경우 (천 단위 콤마 + 원)
                     return f"{amount:,}원"
                 
                 return ""
