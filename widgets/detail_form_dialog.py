@@ -88,8 +88,12 @@ class DetailFormDialog(QDialog):
         if hasattr(self, 'label_24'): self.label_24.setVisible(False)
         if hasattr(self, 'label_25'): self.label_25.setVisible(False)
 
-    def _show_enterprise_fields(self):
-        """법인/사업자 관련 필드를 보여준다."""
+    def _show_enterprise_fields(self, is_individual_business=False):
+        """법인/사업자 관련 필드를 보여준다.
+        
+        Args:
+            is_individual_business: 개인사업자인 경우 True. 법인등록번호를 숨기고 사업자등록번호와 개인사업자명만 표시.
+        """
         # horizontalLayout_ent_1 관련
         if hasattr(self, 'label_16'): self.label_16.setVisible(True)
         if hasattr(self, 'label_17'): self.label_17.setVisible(True)
@@ -97,12 +101,22 @@ class DetailFormDialog(QDialog):
         if hasattr(self, 'label_19'): self.label_19.setVisible(True)
         
         # horizontalLayout_ent_2 관련
-        if hasattr(self, 'label_20'): self.label_20.setVisible(True)
-        if hasattr(self, 'label_21'): self.label_21.setVisible(True)
-        if hasattr(self, 'label_22'): self.label_22.setVisible(True)
-        if hasattr(self, 'label_23'): self.label_23.setVisible(True)
-        if hasattr(self, 'label_24'): self.label_24.setVisible(True)
-        if hasattr(self, 'label_25'): self.label_25.setVisible(True)
+        if is_individual_business:
+            # 개인사업자: 법인등록번호 숨기고, 사업자등록번호와 개인사업자명만 표시
+            if hasattr(self, 'label_20'): self.label_20.setVisible(False)  # 법인등록번호 라벨 숨김
+            if hasattr(self, 'label_21'): self.label_21.setVisible(False)  # 법인등록번호 값 숨김
+            if hasattr(self, 'label_22'): self.label_22.setVisible(True)   # 사업자등록번호 라벨 표시
+            if hasattr(self, 'label_23'): self.label_23.setVisible(True)   # 사업자등록번호 값 표시
+            if hasattr(self, 'label_24'): self.label_24.setVisible(True)   # 개인사업자명 라벨 표시
+            if hasattr(self, 'label_25'): self.label_25.setVisible(True)   # 개인사업자명 값 표시
+        else:
+            # 법인: 모든 필드 표시
+            if hasattr(self, 'label_20'): self.label_20.setVisible(True)
+            if hasattr(self, 'label_21'): self.label_21.setVisible(True)
+            if hasattr(self, 'label_22'): self.label_22.setVisible(True)
+            if hasattr(self, 'label_23'): self.label_23.setVisible(True)
+            if hasattr(self, 'label_24'): self.label_24.setVisible(True)
+            if hasattr(self, 'label_25'): self.label_25.setVisible(True)
     
     def _reset_label_styles(self):
         """모든 라벨의 스타일을 기본값으로 초기화한다."""
@@ -182,6 +196,15 @@ class DetailFormDialog(QDialog):
         biz_data = fetch_gemini_business_results(rn)
         is_corporation = biz_data.get('is_법인', False)
         
+        # 개인사업자 여부 확인 (is_법인이 False이지만 사업자 데이터가 있는 경우)
+        is_individual_business = False
+        if not is_corporation:
+            # 사업자등록번호나 개인사업자명이 있으면 개인사업자로 판단
+            사업자등록번호 = biz_data.get('사업자등록번호', '')
+            개인사업자명 = biz_data.get('개인사업자명', '')
+            if 사업자등록번호 or 개인사업자명:
+                is_individual_business = True
+        
         if is_corporation:
             # 법인인 경우: 개인정보 필드 숨기고 법인 필드 표시
             if hasattr(self, 'horizontalLayout'): self.horizontalLayout.setEnabled(False) # 레이아웃 자체를 숨기는 대신 내부 위젯들을 숨김
@@ -193,8 +216,8 @@ class DetailFormDialog(QDialog):
             self.label_5.setVisible(False)
             self.label_gender.setVisible(False)
             
-            # 법인 필드 표시
-            self._show_enterprise_fields()
+            # 법인 필드 표시 (모든 필드 표시)
+            self._show_enterprise_fields(is_individual_business=False)
             
             # 데이터 채우기
             self.label_17.setText(str(biz_data.get('기관명', '')))
@@ -206,8 +229,35 @@ class DetailFormDialog(QDialog):
             # 신청 유형 표시
             self.label_apply_type.setText("법인")
             
+        elif is_individual_business:
+            # 개인사업자인 경우: 개인정보 필드 표시하고 사업자 필드 일부 표시
+            self.label_2.setVisible(True)
+            self.label_name_1.setVisible(True)
+            self.label_4.setVisible(True)
+            self.label_birth_date.setVisible(True)
+            self.label_5.setVisible(True)
+            self.label_gender.setVisible(True)
+            
+            # 개인사업자 필드 표시 (기관명, 대표자, 법인등록번호 제외)
+            # horizontalLayout_ent_1 숨김 (기관명, 대표자)
+            if hasattr(self, 'label_16'): self.label_16.setVisible(False)
+            if hasattr(self, 'label_17'): self.label_17.setVisible(False)
+            if hasattr(self, 'label_18'): self.label_18.setVisible(False)
+            if hasattr(self, 'label_19'): self.label_19.setVisible(False)
+            
+            # horizontalLayout_ent_2 일부 표시 (법인등록번호 제외)
+            self._show_enterprise_fields(is_individual_business=True)
+            
+            # 데이터 채우기 (법인등록번호는 숨김)
+            # label_21 (법인등록번호)는 숨김 처리됨
+            self.label_23.setText(str(biz_data.get('사업자등록번호', '')))
+            self.label_25.setText(str(biz_data.get('개인사업자명', '')))
+            
+            # 신청 유형 표시
+            self.label_apply_type.setText("개인사업자")
+            
         else:
-            # 개인인 경우: 개인정보 필드 표시하고 법인 필드 숨김
+            # 일반 개인인 경우: 개인정보 필드 표시하고 법인 필드 숨김
             self.label_2.setVisible(True)
             self.label_name_1.setVisible(True)
             self.label_4.setVisible(True)
@@ -234,7 +284,7 @@ class DetailFormDialog(QDialog):
         # 3. 플래그 확인
         flags = check_gemini_flags(rn)
 
-        # 4. 주소 처리 (법인인 경우 법인주소, 개인인 경우 초본 주소)
+        # 4. 주소 처리 (법인인 경우 법인주소, 개인사업자/개인인 경우 초본 주소)
         if is_corporation:
             # 법인인 경우: 법인주소 사용
             법인주소 = biz_data.get('법인주소', '')
@@ -312,7 +362,7 @@ class DetailFormDialog(QDialog):
             else:
                 self._clear_chobon_fields()
             
-        # 이름 설정 (최종 결정된 이름) - 개인인 경우에만
+        # 이름 설정 (최종 결정된 이름) - 법인이 아닌 경우에만 (개인사업자 포함)
         if not is_corporation:
             self.label_name_1.setText(name)
 

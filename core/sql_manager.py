@@ -1140,7 +1140,7 @@ def fetch_subsidy_amount(region: str, model: str, rn: str = None) -> str:
     target_column = model_mapping[model]
     
     # 만원 단위 표기 지역 목록
-    만원_단위_지역 = ['성남시', '의정부시']
+    만원_단위_지역 = ['성남시', '의정부시', '시흥시']
     
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
