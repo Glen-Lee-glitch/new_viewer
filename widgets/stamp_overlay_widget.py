@@ -32,6 +32,13 @@ class StampOverlayWidget(QWidget):
                 {'path': 'assets/체크.png', 'width': 50}
             ))
             menu.addAction(check_action)
+            
+            circle_action = QAction("원", self)
+            circle_action.triggered.connect(lambda: self._on_stamp_button_clicked(
+                {'path': 'assets/circle.png', 'width': 50}
+            ))
+            menu.addAction(circle_action)
+            
             self.stamp_button_5.setMenu(menu)
 
     def _connect_signals(self):
