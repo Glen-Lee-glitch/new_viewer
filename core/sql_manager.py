@@ -1026,7 +1026,7 @@ def fetch_gemini_business_results(rn: str) -> dict:
 def fetch_gemini_joint_results(rn: str) -> dict:
     """
     test_ai_공동명의 테이블에서 RN으로 데이터를 조회한다.
-    first_person 정보를 반환한다 (초본 데이터 대체용).
+    first_person과 second_person 정보를 모두 반환한다.
     """
     if not rn:
         return {}
@@ -1035,7 +1035,9 @@ def fetch_gemini_joint_results(rn: str) -> dict:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = """
                 SELECT first_person_name, first_person_birth_date, first_person_gender, 
-                       first_person_address_1, first_person_address_2
+                       first_person_address_1, first_person_address_2,
+                       second_person_name, second_person_birth_date, second_person_gender,
+                       second_person_address_1, second_person_address_2
                 FROM test_ai_공동명의
                 WHERE RN = %s
             """
@@ -1044,11 +1046,18 @@ def fetch_gemini_joint_results(rn: str) -> dict:
                 row = cursor.fetchone()
                 if row:
                     return {
+                        # first_person 정보 (초본 데이터 대체용)
                         'name': row[0],
                         'birth_date': row[1],
                         'gender': row[2],
                         'address_1': row[3],
-                        'address_2': row[4]
+                        'address_2': row[4],
+                        # second_person 정보
+                        'second_person_name': row[5],
+                        'second_person_birth_date': row[6],
+                        'second_person_gender': row[7],
+                        'second_person_address_1': row[8],
+                        'second_person_address_2': row[9]
                     }
                 return {}
     except Exception:

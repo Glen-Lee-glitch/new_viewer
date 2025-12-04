@@ -337,7 +337,38 @@ class DetailFormDialog(QDialog):
         else:
             self.label_deliver_date.setText("")
         
-        # 7. 다자녀 데이터 로드
+        # 7. 공동명의 데이터 로드 (second_person 정보 표시용)
+        has_joint = False
+        if flags.get('공동명의', False):
+            joint_data = fetch_gemini_joint_results(rn)
+            if joint_data:
+                # second_person 정보 표시
+                second_person_name = joint_data.get('second_person_name')
+                second_person_birth_date = joint_data.get('second_person_birth_date')
+                
+                if second_person_name:
+                    self.label_name_2.setText(str(second_person_name))
+                    has_joint = True
+                else:
+                    self.label_name_2.setText("")
+                
+                if second_person_birth_date:
+                    if not isinstance(second_person_birth_date, str):
+                        birth_date_str = second_person_birth_date.strftime('%Y-%m-%d')
+                    else:
+                        birth_date_str = second_person_birth_date
+                    self.label_birth_date_2.setText(birth_date_str)
+                    has_joint = True
+                else:
+                    self.label_birth_date_2.setText("")
+            else:
+                self.label_name_2.setText("")
+                self.label_birth_date_2.setText("")
+        else:
+            self.label_name_2.setText("")
+            self.label_birth_date_2.setText("")
+        
+        # 8. 다자녀 데이터 로드
         has_multichild = False
         if flags.get('다자녀', False):
             multichild_data = fetch_gemini_multichild_results(rn)
@@ -352,10 +383,9 @@ class DetailFormDialog(QDialog):
         else:
             self.label_children.setText("")
             
-        # 8. 하단 레이아웃 가시성 제어 (공동명의, 다자녀, 청년생애, 기타)
-        # 일단 모두 숨김
+        # 9. 하단 레이아웃 가시성 제어 (공동명의, 다자녀, 청년생애, 기타)
         self._set_bottom_layout_visibility(
-            show_joint=False, # 공동명의 (아직 로직 없음)
+            show_joint=has_joint,  # 공동명의 second_person 정보가 있으면 표시
             show_multichild=has_multichild, 
             show_youth=flags.get('청년생애', False), 
             show_etc=False # 기타 (아직 로직 없음)
