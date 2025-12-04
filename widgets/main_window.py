@@ -895,6 +895,9 @@ class MainWindow(QMainWindow):
             if outlier_type == 'contract':
                 title = "구매계약서 이상"
                 message = "구매계약서 이상!"
+            elif outlier_type == 'contract_missing':
+                title = "구매계약서 확인 불가"
+                message = "구매계약서 확인 불가!"
             elif outlier_type == 'chobon_missing':
                 title = "초본 없음"
                 message = "초본 없음!"
@@ -918,7 +921,9 @@ class MainWindow(QMainWindow):
         
         Returns:
             'contract': 구매계약서 이상치
+            'contract_missing': 구매계약서 없음
             'chobon': 초본 이상치
+            'chobon_missing': 초본 없음
             'other': 기타 이상치
         """
         if not metadata:
@@ -927,6 +932,17 @@ class MainWindow(QMainWindow):
         구매계약서 = metadata.get('구매계약서', 0) == 1
         초본 = metadata.get('초본', 0) == 1
         공동명의 = metadata.get('공동명의', 0) == 1
+        
+        # 필수 서류 확인: 구매계약서 또는 초본 중 하나라도 없으면 체크
+        구매계약서값 = metadata.get('구매계약서', 0)
+        초본값 = metadata.get('초본', 0)
+        
+        # 구매계약서가 0이고 초본이 1인 경우
+        if 구매계약서값 == 0 and 초본값 == 1:
+            return 'contract_missing'
+        
+        # 초본이 0이고 구매계약서가 1인 경우 (초본 없음은 이미 chobon_missing으로 처리됨)
+        # 하지만 명시적으로 체크할 수도 있음
         
         # 구매계약서 이상치 체크
         if 구매계약서 and (초본 or 공동명의):
