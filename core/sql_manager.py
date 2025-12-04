@@ -1023,6 +1023,38 @@ def fetch_gemini_business_results(rn: str) -> dict:
         traceback.print_exc()
         return {}
 
+def fetch_gemini_joint_results(rn: str) -> dict:
+    """
+    test_ai_공동명의 테이블에서 RN으로 데이터를 조회한다.
+    first_person 정보를 반환한다 (초본 데이터 대체용).
+    """
+    if not rn:
+        return {}
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT first_person_name, first_person_birth_date, first_person_gender, 
+                       first_person_address_1, first_person_address_2
+                FROM test_ai_공동명의
+                WHERE RN = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'name': row[0],
+                        'birth_date': row[1],
+                        'gender': row[2],
+                        'address_1': row[3],
+                        'address_2': row[4]
+                    }
+                return {}
+    except Exception:
+        traceback.print_exc()
+        return {}
+
 def fetch_subsidy_model(rn: str) -> str:
     """
     subsidy_applications 테이블에서 RN으로 차종(model) 정보를 조회한다.

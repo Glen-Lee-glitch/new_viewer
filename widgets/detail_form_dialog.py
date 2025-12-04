@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt, QEvent
 
 from core.sql_manager import (fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_chobon_results, 
                               fetch_subsidy_model, fetch_gemini_multichild_results, fetch_subsidy_region, 
-                              calculate_delivery_date, fetch_gemini_business_results)
+                              calculate_delivery_date, fetch_gemini_business_results, fetch_gemini_joint_results)
 
 class DetailFormDialog(QDialog):
     """상세 정보 표시 다이얼로그 (form.ui 사용)"""
@@ -246,34 +246,50 @@ class DetailFormDialog(QDialog):
                 self.label_address_2.setText(address_2)
         else:
             # 개인인 경우: 초본 데이터 로드
+            chobon_data = None
             if flags.get('초본', False):
                 chobon_data = fetch_gemini_chobon_results(rn)
-                if chobon_data:
-                    # 초본 이름이 있으면 우선 사용
-                    chobon_name = chobon_data.get('name')
-                    if chobon_name:
-                        name = str(chobon_name)
-                    
-                    # 생년월일
-                    birth_date = chobon_data.get('birth_date')
-                    if birth_date:
-                        if not isinstance(birth_date, str):
-                             birth_date_str = birth_date.strftime('%Y-%m-%d')
-                        else:
-                            birth_date_str = birth_date
+            
+            # 초본 데이터가 없고 공동명의가 있는 경우, 공동명의의 first_person 데이터 사용
+            if not chobon_data and flags.get('공동명의', False):
+                chobon_data = fetch_gemini_joint_results(rn)
+            
+            if chobon_data:
+                # 초본 이름이 있으면 우선 사용
+                chobon_name = chobon_data.get('name')
+                if chobon_name:
+                    name = str(chobon_name)
+                
+                # 생년월일
+                birth_date = chobon_data.get('birth_date')
+                if birth_date:
+                    if not isinstance(birth_date, str):
+                         birth_date_str = birth_date.strftime('%Y-%m-%d')
                     else:
-                        birth_date_str = ''
-                    self.label_birth_date.setText(birth_date_str)
-                    
-                    # 주소
-                    self.label_address_1.setText(str(chobon_data.get('address_1', '')))
-                    self.label_address_2.setText(str(chobon_data.get('address_2', '')))
-                    
-                    # 성별
-                    gender_val = chobon_data.get('gender')
-                    if gender_val is not None:
-                        try:
-                            # 0이면 여자, 1이면 남자
+                        birth_date_str = birth_date
+                else:
+                    birth_date_str = ''
+                self.label_birth_date.setText(birth_date_str)
+                
+                # 주소
+                self.label_address_1.setText(str(chobon_data.get('address_1', '')))
+                self.label_address_2.setText(str(chobon_data.get('address_2', '')))
+                
+                # 성별
+                gender_val = chobon_data.get('gender')
+                if gender_val is not None:
+                    try:
+                        # 0이면 여자, 1이면 남자 (또는 문자열 처리)
+                        if isinstance(gender_val, str):
+                            # 문자열인 경우 직접 사용
+                            if gender_val.lower() in ['0', '여', '여자', 'female', 'f']:
+                                self.label_gender.setText("여자")
+                            elif gender_val.lower() in ['1', '남', '남자', 'male', 'm']:
+                                self.label_gender.setText("남자")
+                            else:
+                                self.label_gender.setText(str(gender_val))
+                        else:
+                            # 숫자인 경우
                             gender_int = int(gender_val)
                             if gender_int == 0:
                                 self.label_gender.setText("여자")
@@ -281,12 +297,10 @@ class DetailFormDialog(QDialog):
                                 self.label_gender.setText("남자")
                             else:
                                 self.label_gender.setText(str(gender_val))
-                        except (ValueError, TypeError):
-                            self.label_gender.setText(str(gender_val))
-                    else:
-                        self.label_gender.setText("")
+                    except (ValueError, TypeError):
+                        self.label_gender.setText(str(gender_val))
                 else:
-                     self._clear_chobon_fields()
+                    self.label_gender.setText("")
             else:
                 self._clear_chobon_fields()
             
