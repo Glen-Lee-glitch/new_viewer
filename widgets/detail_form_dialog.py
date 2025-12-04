@@ -92,13 +92,21 @@ class DetailFormDialog(QDialog):
         """법인/사업자 관련 필드를 보여준다.
         
         Args:
-            is_individual_business: 개인사업자인 경우 True. 법인등록번호를 숨기고 사업자등록번호와 개인사업자명만 표시.
+            is_individual_business: 개인사업자인 경우 True. 기관명/대표자/법인등록번호를 숨기고 사업자등록번호와 개인사업자명만 표시.
         """
         # horizontalLayout_ent_1 관련
-        if hasattr(self, 'label_16'): self.label_16.setVisible(True)
-        if hasattr(self, 'label_17'): self.label_17.setVisible(True)
-        if hasattr(self, 'label_18'): self.label_18.setVisible(True)
-        if hasattr(self, 'label_19'): self.label_19.setVisible(True)
+        if is_individual_business:
+            # 개인사업자: 기관명, 대표자 숨김
+            if hasattr(self, 'label_16'): self.label_16.setVisible(False)
+            if hasattr(self, 'label_17'): self.label_17.setVisible(False)
+            if hasattr(self, 'label_18'): self.label_18.setVisible(False)
+            if hasattr(self, 'label_19'): self.label_19.setVisible(False)
+        else:
+            # 법인: 기관명, 대표자 표시
+            if hasattr(self, 'label_16'): self.label_16.setVisible(True)
+            if hasattr(self, 'label_17'): self.label_17.setVisible(True)
+            if hasattr(self, 'label_18'): self.label_18.setVisible(True)
+            if hasattr(self, 'label_19'): self.label_19.setVisible(True)
         
         # horizontalLayout_ent_2 관련
         if is_individual_business:
@@ -239,13 +247,7 @@ class DetailFormDialog(QDialog):
             self.label_gender.setVisible(True)
             
             # 개인사업자 필드 표시 (기관명, 대표자, 법인등록번호 제외)
-            # horizontalLayout_ent_1 숨김 (기관명, 대표자)
-            if hasattr(self, 'label_16'): self.label_16.setVisible(False)
-            if hasattr(self, 'label_17'): self.label_17.setVisible(False)
-            if hasattr(self, 'label_18'): self.label_18.setVisible(False)
-            if hasattr(self, 'label_19'): self.label_19.setVisible(False)
-            
-            # horizontalLayout_ent_2 일부 표시 (법인등록번호 제외)
+            # _show_enterprise_fields에서 기관명/대표자/법인등록번호 숨김 처리
             self._show_enterprise_fields(is_individual_business=True)
             
             # 데이터 채우기 (법인등록번호는 숨김)
