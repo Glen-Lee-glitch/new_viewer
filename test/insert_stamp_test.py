@@ -1,11 +1,18 @@
 import pymupdf
 from pathlib import Path
 import os
+import sys
 import platform
 from PIL import Image, ImageDraw, ImageFont
 import pymysql
 from contextlib import closing
 from datetime import datetime
+
+# 프로젝트 루트를 sys.path에 추가하여 core 모듈 import 가능하도록 설정
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from core.sql_manager import calculate_delivery_date
 
 DB_CONFIG = {
@@ -243,7 +250,7 @@ def insert_text_to_pdf(pdf_path: str, page_num: int, text: str, font_size: int =
     
     # 페이지 중앙 좌표 계산 후 살짝 아래로 이동
     x = (page_width - img_width) / 2
-    y = (page_height - img_height) / 2 + 30  # 중앙에서 30pt 아래로 이동
+    y = (page_height - img_height) / 2 + 60  # 중앙에서 30pt 아래로 이동
     
     # 이미지를 PDF 페이지에 삽입
     image_rect = pymupdf.Rect(x, y, x + img_width, y + img_height)
