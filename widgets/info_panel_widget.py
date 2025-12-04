@@ -97,8 +97,8 @@ class InfoPanelWidget(QWidget):
                     print(f"지역({region}) 또는 모델({model}) 정보 부족으로 보조금 조회 불가")
                     return
                 
-                # 보조금 조회
-                amount_str = fetch_subsidy_amount(region, model)
+                # 보조금 조회 (RN 전달하여 다자녀 추가 보조금 계산 포함)
+                amount_str = fetch_subsidy_amount(region, model, rn)
                 
                 if amount_str:
                     self.text_edit.setText(amount_str)

@@ -1059,13 +1059,15 @@ def fetch_subsidy_region(rn: str) -> str:
         traceback.print_exc()
         return ""
 
-def fetch_subsidy_amount(region: str, model: str) -> str:
+def fetch_subsidy_amount(region: str, model: str, rn: str = None) -> str:
     """
     지역과 모델명으로 subsidy_amounts 테이블에서 보조금 금액을 조회한다.
+    RN이 제공되면 다자녀 추가 보조금을 합산한다.
     
     Args:
         region: 지역명
         model: 모델명
+        rn: RN 번호 (선택사항, 다자녀 확인용)
         
     Returns:
         포맷팅된 보조금 금액 문자열 (예: "1,230,000원") 또는 빈 문자열
@@ -1101,35 +1103,60 @@ def fetch_subsidy_amount(region: str, model: str) -> str:
     
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            # SQL Injection 방지를 위해 컬럼명은 포맷팅으로 넣지 않고 화이트리스트 검증(매핑) 사용
-            query = f"SELECT {target_column} FROM subsidy_amounts WHERE region = %s"
-            
             with connection.cursor() as cursor:
+                # 1. 기본 보조금 조회
+                # SQL Injection 방지를 위해 컬럼명은 포맷팅으로 넣지 않고 화이트리스트 검증(매핑) 사용
+                query = f"SELECT {target_column} FROM subsidy_amounts WHERE region = %s"
                 cursor.execute(query, (region,))
                 row = cursor.fetchone()
                 
-                if row and row[0] is not None:
-                    amount = int(row[0])
-                    
-                    # 1. 만원 단위 표기 지역 처리
-                    if region in 만원_단위_지역:
-                        # 10000으로 나누기
-                        amount_in_manwon = amount / 10000
-                        
-                        # 정수로 딱 떨어지면 정수로, 아니면 소수점까지 표시
-                        if amount_in_manwon.is_integer():
-                            return f"{int(amount_in_manwon)}"
-                        else:
-                            return f"{amount_in_manwon}"
-                    
-                    # 2. '원' 제외 지역 (추후 추가 예정)
-                    # if region in 원_제외_지역:
-                    #     return f"{amount:,}"
-
-                    # 3. 일반적인 경우 (천 단위 콤마 + 원)
-                    return f"{amount:,}원"
+                if not row or row[0] is None:
+                    return ""
                 
-                return ""
+                amount = int(row[0])
+                
+                # 2. 다자녀 추가 보조금 계산 (RN이 있고 다자녀인 경우)
+                if rn:
+                    # 다자녀 여부 확인
+                    check_query = "SELECT 다자녀 FROM gemini_results WHERE RN = %s"
+                    cursor.execute(check_query, (rn,))
+                    check_row = cursor.fetchone()
+                    
+                    if check_row and check_row[0] == 1:
+                        # 자녀 수 확인
+                        count_query = "SELECT child_count FROM test_ai_다자녀 WHERE RN = %s"
+                        cursor.execute(count_query, (rn,))
+                        count_row = cursor.fetchone()
+                        
+                        if count_row and count_row[0]:
+                            child_count = count_row[0]
+                            additional_amount = 0
+                            
+                            if child_count == 2:
+                                additional_amount = 1000000
+                            elif child_count == 3:
+                                additional_amount = 2000000
+                            elif child_count >= 4:
+                                additional_amount = 3000000
+                            
+                            if additional_amount > 0:
+                                amount += additional_amount
+                                print(f"다자녀 추가 보조금 적용: +{additional_amount:,}원 (자녀수: {child_count}명)")
+
+                # 3. 포맷팅 및 반환
+                # 만원 단위 표기 지역 처리
+                if region in 만원_단위_지역:
+                    # 10000으로 나누기
+                    amount_in_manwon = amount / 10000
+                    
+                    # 정수로 딱 떨어지면 정수로, 아니면 소수점까지 표시
+                    if amount_in_manwon.is_integer():
+                        return f"{int(amount_in_manwon)}"
+                    else:
+                        return f"{amount_in_manwon}"
+                
+                # 일반적인 경우 (천 단위 콤마 + 원)
+                return f"{amount:,}원"
                 
     except Exception:
         traceback.print_exc()
