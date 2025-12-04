@@ -22,6 +22,9 @@ class InfoPanelWidget(QWidget):
         # 라디오 버튼 시그널 연결
         if hasattr(self, 'radioButton_2'):
             self.radioButton_2.toggled.connect(self._on_radio_button_2_toggled)
+            
+        if hasattr(self, 'radioButton_3'):
+            self.radioButton_3.toggled.connect(self._on_radio_button_subsidy_toggled)
 
     def set_delivery_day_gap(self, day_gap: int | None):
         """출고예정일 계산을 위한 day_gap을 설정한다."""
@@ -70,6 +73,38 @@ class InfoPanelWidget(QWidget):
                 
                 # 텍스트 에디트에 설정
                 self.text_edit.setText(formatted_date)
+
+    def _on_radio_button_subsidy_toggled(self, checked: bool):
+        """보조금 라디오 버튼 상태 변경 시 호출"""
+        if checked:
+            if hasattr(self, 'text_edit') and hasattr(self, 'lineEdit_rn_num'):
+                from core.sql_manager import fetch_subsidy_region, fetch_subsidy_model, fetch_subsidy_amount
+                
+                rn = self.lineEdit_rn_num.text().strip()
+                if not rn:
+                    print("RN 정보가 없어 보조금을 조회할 수 없습니다.")
+                    return
+                
+                # DB에서 지역과 모델 조회
+                region = fetch_subsidy_region(rn)
+                model = fetch_subsidy_model(rn)
+                
+                # 지역이 DB에 없으면 UI 값 사용
+                if not region and hasattr(self, 'lineEdit_region'):
+                    region = self.lineEdit_region.text().strip()
+                
+                if not region or not model:
+                    print(f"지역({region}) 또는 모델({model}) 정보 부족으로 보조금 조회 불가")
+                    return
+                
+                # 보조금 조회
+                amount_str = fetch_subsidy_amount(region, model)
+                
+                if amount_str:
+                    self.text_edit.setText(amount_str)
+                else:
+                    print(f"보조금 정보 없음 (지역: {region}, 모델: {model})")
+                    self.text_edit.setText("보조금 정보 없음")
 
     def clear_info(self):
         """모든 정보 라벨을 'N/A'로 초기화한다."""

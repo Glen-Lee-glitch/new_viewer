@@ -1059,6 +1059,62 @@ def fetch_subsidy_region(rn: str) -> str:
         traceback.print_exc()
         return ""
 
+def fetch_subsidy_amount(region: str, model: str) -> str:
+    """
+    지역과 모델명으로 subsidy_amounts 테이블에서 보조금 금액을 조회한다.
+    
+    Args:
+        region: 지역명
+        model: 모델명
+        
+    Returns:
+        포맷팅된 보조금 금액 문자열 (예: "1,230,000원") 또는 빈 문자열
+    """
+    if not region or not model:
+        return ""
+    
+    # 모델명 매핑
+    model_mapping = {
+        'Model 3 R': 'model_3_rwd_2025',
+        'Model Y R': 'model_y_new_rwd',
+        'Model Y L': 'model_y_lr_battery_change',
+        # 형식상 매핑
+        'Model 3 L': 'model_3_lr',
+        'Model 3 P': 'model_3_p',
+        'Model Y P': 'model_y_p',
+        'Model Y RWD 2024': 'model_y_rwd',
+        'Model Y New LR': 'model_y_new_lr_launch',
+        'Model Y LR 19': 'model_y_lr_19',
+        'Model Y LR 20': 'model_y_lr_20',
+    }
+    
+    # 모델명 정리 (좌우 공백 제거)
+    model = model.strip()
+    
+    if model not in model_mapping:
+        return ""
+        
+    target_column = model_mapping[model]
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            # SQL Injection 방지를 위해 컬럼명은 포맷팅으로 넣지 않고 화이트리스트 검증(매핑) 사용
+            query = f"SELECT {target_column} FROM subsidy_amounts WHERE region = %s"
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query, (region,))
+                row = cursor.fetchone()
+                
+                if row and row[0] is not None:
+                    amount = int(row[0])
+                    return f"{amount:,}원"
+                
+                return ""
+                
+    except Exception:
+        traceback.print_exc()
+        return ""
+
 def calculate_delivery_date(region: str) -> str:
     """
     오늘 날짜와 지역을 기반으로 출고예정일을 계산한다.
