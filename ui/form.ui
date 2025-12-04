@@ -656,6 +656,17 @@
     </layout>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_reverse_tool">
+     <item>
+      <widget class="QLineEdit" name="lineEdit_reverse_tool">
+       <property name="placeholderText">
+        <string>역순 도구 (스페이스바를 누르면 텍스트가 역순으로 변환됩니다)</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
       <enum>Qt::Orientation::Horizontal</enum>

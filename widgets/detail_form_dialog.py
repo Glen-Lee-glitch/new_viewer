@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, QEvent
 from core.sql_manager import (fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_chobon_results, 
                               fetch_subsidy_model, fetch_gemini_multichild_results, fetch_subsidy_region, 
                               calculate_delivery_date, fetch_gemini_business_results, fetch_gemini_joint_results)
+from core.ui_helpers import ReverseToolHandler
 
 class DetailFormDialog(QDialog):
     """상세 정보 표시 다이얼로그 (form.ui 사용)"""
@@ -31,6 +32,10 @@ class DetailFormDialog(QDialog):
         if hasattr(self, 'buttonBox'):
             self.buttonBox.accepted.connect(self.accept)
             self.buttonBox.rejected.connect(self.reject)
+            
+        # 역순 도구 핸들러 초기화
+        if hasattr(self, 'lineEdit_reverse_tool'):
+            self.reverse_tool_handler = ReverseToolHandler(self.lineEdit_reverse_tool)
             
         # 초기에는 법인/사업자 필드 숨김
         self._hide_enterprise_fields()
