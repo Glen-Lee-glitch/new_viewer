@@ -60,6 +60,9 @@ class DetailFormDialog(QDialog):
             self.label_21,
             self.label_23,
             self.label_25,
+            # 공동명의 관련 라벨 추가
+            self.label_name_2,
+            self.label_birth_date_2,
             # RN 라벨 추가
             self.label_RN
         ]
