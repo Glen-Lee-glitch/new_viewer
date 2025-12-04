@@ -166,7 +166,7 @@ class MainWindow(QMainWindow):
         self.menu_file.addSeparator()
         
         # 원본 불러오기 액션 추가 (초기에는 비활성화)
-        self.load_original_action = QAction("원본 불러오기", self)
+        self.load_original_action = QAction("원본으로 바꾸기", self)
         self.load_original_action.setEnabled(False)
         self.load_original_action.triggered.connect(self._load_original_document)
         self.menu_file.addAction(self.load_original_action)
