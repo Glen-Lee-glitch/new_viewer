@@ -5,6 +5,8 @@ import platform
 from PIL import Image, ImageDraw, ImageFont
 import pymysql
 from contextlib import closing
+from datetime import datetime
+from core.sql_manager import calculate_delivery_date
 
 DB_CONFIG = {
     'host': '192.168.0.114',
@@ -20,7 +22,7 @@ A4_WIDTH_PT = 595.276
 A4_HEIGHT_PT = 841.890
 
 file_path = 'stamp_test.pdf'
-page_num = 9
+page_num = 5
 
 
 def _normalize_file_path(raw_path):
@@ -54,7 +56,7 @@ def fetch_table_data():
     데이터베이스에서 3개의 테이블을 JOIN하여 데이터를 가져옵니다.
     
     - test_ai_구매계약서의 ['modified_date', 'RN', 'page_number']
-    - subsidy_applications의 ['RN', 'recent_thread_id']를 RN으로 매칭
+    - subsidy_applications의 ['RN', 'recent_thread_id', 'region']를 RN으로 매칭
     - emails의 ['thread_id', 'attached_file_path']를 recent_thread_id로 매칭
     - attached_file_path가 없는 row는 제외
     - 최종 10개만 반환
@@ -70,6 +72,7 @@ def fetch_table_data():
                     c.RN,
                     c.page_number,
                     sa.recent_thread_id,
+                    sa.region,
                     e.attached_file_path
                 FROM test_ai_구매계약서 c
                 INNER JOIN subsidy_applications sa 
@@ -263,7 +266,6 @@ def process_batch_files():
     """
     데이터베이스에서 가져온 10개 데이터를 순회하며 각 PDF 파일에 텍스트를 삽입합니다.
     """
-    text = '출고예정일 11/28'
     font_size = 16
     
     # 데이터베이스에서 데이터 가져오기
@@ -282,6 +284,7 @@ def process_batch_files():
         pdf_path = data.get('attached_file_path')
         page_number = data.get('page_number')
         rn = data.get('RN')
+        region = data.get('region')
         
         if not pdf_path:
             print(f"[{idx}/{len(data_list)}] ❌ RN {rn}: attached_file_path가 없습니다.")
@@ -293,7 +296,29 @@ def process_batch_files():
             error_count += 1
             continue
         
-        print(f"[{idx}/{len(data_list)}] 처리 중: RN {rn}, 파일: {Path(pdf_path).name}, 페이지: {page_number}")
+        # 출고예정일 계산
+        if not region:
+            print(f"[{idx}/{len(data_list)}] ⚠️ RN {rn}: region이 없어 출고예정일을 계산할 수 없습니다.")
+            error_count += 1
+            continue
+        
+        delivery_date_str = calculate_delivery_date(region)
+        if not delivery_date_str:
+            print(f"[{idx}/{len(data_list)}] ⚠️ RN {rn}: 출고예정일 계산 실패 (region: {region})")
+            error_count += 1
+            continue
+        
+        # YYYY-MM-DD 형식을 MM/DD 형식으로 변환
+        try:
+            delivery_date = datetime.strptime(delivery_date_str, '%Y-%m-%d')
+            date_formatted = delivery_date.strftime('%m/%d')
+            text = f'출고예정일 {date_formatted}'
+        except Exception as e:
+            print(f"[{idx}/{len(data_list)}] ⚠️ RN {rn}: 날짜 형식 변환 실패: {e}")
+            error_count += 1
+            continue
+        
+        print(f"[{idx}/{len(data_list)}] 처리 중: RN {rn}, 파일: {Path(pdf_path).name}, 페이지: {page_number}, 출고예정일: {text}")
         
         try:
             # PDF 파일 존재 확인
