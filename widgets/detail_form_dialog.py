@@ -303,7 +303,7 @@ class DetailFormDialog(QDialog):
                     address_2 = ""
                 
                 self.label_address_1.setText(address_1)
-                self.label_address_2.setText(address_2)
+                self.label_address_2.setText(self._process_address_2(address_2))
         else:
             # 개인인 경우: 초본 데이터 로드
             chobon_data = None
@@ -333,7 +333,7 @@ class DetailFormDialog(QDialog):
                 
                 # 주소
                 self.label_address_1.setText(str(chobon_data.get('address_1', '')))
-                self.label_address_2.setText(str(chobon_data.get('address_2', '')))
+                self.label_address_2.setText(self._process_address_2(chobon_data.get('address_2', '')))
                 
                 # 성별
                 gender_val = chobon_data.get('gender')
@@ -522,6 +522,30 @@ class DetailFormDialog(QDialog):
             self.label_15.setVisible(False)
             self.label_etc.setVisible(False)
 
+    def _process_address_2(self, address_2: str) -> str:
+        """주소2 값을 처리한다. 괄호로만 감싸진 경우 '.'로 변경한다.
+        
+        Args:
+            address_2: 원본 주소2 값
+            
+        Returns:
+            처리된 주소2 값
+        """
+        if not address_2:
+            return address_2
+        
+        address_2_str = str(address_2).strip()
+        
+        # 괄호로 시작하고 끝나며, 괄호 밖에 다른 텍스트가 없는 경우
+        if address_2_str.startswith('(') and address_2_str.endswith(')'):
+            # 괄호를 제거한 후 공백이 있는지 확인
+            inner_text = address_2_str[1:-1].strip()
+            # 괄호 안에만 텍스트가 있고, 괄호 밖에는 아무것도 없는 경우
+            if inner_text:  # 괄호 안에 텍스트가 있으면
+                return "."
+        
+        return address_2_str
+    
     def _clear_chobon_fields(self):
         """초본 관련 필드 초기화"""
         self.label_birth_date.setText("")
