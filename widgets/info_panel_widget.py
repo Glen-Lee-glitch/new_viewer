@@ -107,10 +107,10 @@ class InfoPanelWidget(QWidget):
                     self.text_edit.setText("보조금 정보 없음")
 
     def clear_info(self):
-        """모든 정보 라벨을 'N/A'로 초기화한다."""
-        self.label_current_page.setText("N/A")
-        self.label_page_dims.setText("N/A")
-        self.label_page_rotation.setText("N/A")
+        """정보 패널 초기화"""
+        # 작업 리스트 체크박스 초기화
+        self.reset_task_checkboxes()
+        
         self.lineEdit_name.clear()
         self.lineEdit_region.clear()
         self.lineEdit_special.clear()
@@ -126,10 +126,17 @@ class InfoPanelWidget(QWidget):
         pass
 
     def update_page_info(self, page_num: int, width: float, height: float, rotation: int):
-        """현재 페이지 관련 정보를 업데이트한다."""
-        self.label_current_page.setText(str(page_num + 1))  # 0-based to 1-based
-        self.label_page_dims.setText(f"{width:.2f} x {height:.2f} (pt)")
-        self.label_page_rotation.setText(f"{rotation}°")
+        """현재 페이지 관련 정보를 업데이트한다. (UI 요소가 제거되어 더 이상 사용되지 않음)"""
+        pass
+
+    def reset_task_checkboxes(self):
+        """작업 리스트 체크박스들을 모두 해제 상태로 초기화한다."""
+        if hasattr(self, 'checkBox_task_1'):
+            self.checkBox_task_1.setChecked(False)
+        if hasattr(self, 'checkBox_task_2'):
+            self.checkBox_task_2.setChecked(False)
+        if hasattr(self, 'checkBox_task_3'):
+            self.checkBox_task_3.setChecked(False)
 
     def reset_text_radio_buttons(self):
         """텍스트 삽입 라디오 버튼을 '일반'으로 초기화한다."""

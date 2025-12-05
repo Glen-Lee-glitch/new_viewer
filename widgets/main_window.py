@@ -540,6 +540,8 @@ class MainWindow(QMainWindow):
         self._thumbnail_viewer.show()
         self._alarm_widget.hide()
         self._info_panel.show()
+        # alarm_widget에서 info_panel_widget으로 전환될 때 체크박스 초기화
+        self._info_panel.reset_task_checkboxes()
 
         # 기본 스플리터 사이즈를 즉시 한 번 강제하여 초기 힌트를 통일
         self.set_splitter_sizes(False)
