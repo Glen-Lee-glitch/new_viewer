@@ -874,7 +874,7 @@ class MainWindow(QMainWindow):
             self.ui_thumbnail_container.setFixedWidth(thumbnail_width)
             
             # 정보 패널 컨테이너 고정 크기 설정
-            info_width = 340 if is_landscape else 300
+            info_width = 490 if is_landscape else 450
             self.ui_info_panel_container.setFixedWidth(info_width)
             
             # 중앙 컨테이너는 나머지 공간을 차지하도록 설정 (기본 확장 정책 유지)
@@ -1074,8 +1074,8 @@ class MainWindow(QMainWindow):
             # 즉시 일반 상태로 복원
             self.showNormal()
             
-            # 너비는 1200으로 고정, 높이는 최대화 상태의 높이 사용
-            target_width = 1200
+            # 너비는 1350으로 고정, 높이는 최대화 상태의 높이 사용
+            target_width = 1350
             target_height = max_geometry.height()
             
             # 화면 중앙에 배치 (전체 창 높이가 화면 높이와 일치하도록)
