@@ -28,7 +28,7 @@
       <item>
        <widget class="QPushButton" name="open_maildialog">
         <property name="text">
-         <string>이메일 전송</string>
+         <string>메일 전달 요청</string>
         </property>
        </widget>
       </item>
