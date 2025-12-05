@@ -1,8 +1,9 @@
 import re
+import json
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from PyQt6 import uic
-from PyQt6.QtWidgets import QWidget, QMessageBox
+from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox
 from PyQt6.QtCore import pyqtSignal
 
 class InfoPanelWidget(QWidget):
@@ -15,6 +16,7 @@ class InfoPanelWidget(QWidget):
         uic.loadUi(str(ui_path), self)
         
         self._delivery_day_gap: int | None = None # day_gap 저장 변수
+        self._dynamic_checkboxes = [] # 동적으로 생성된 체크박스 리스트
 
         if hasattr(self, 'pushButton_insert_text'):
             self.pushButton_insert_text.clicked.connect(self._on_insert_text_clicked)
@@ -130,13 +132,23 @@ class InfoPanelWidget(QWidget):
         pass
 
     def reset_task_checkboxes(self):
-        """작업 리스트 체크박스들을 모두 해제 상태로 초기화한다."""
+        """작업 리스트 체크박스들을 모두 해제 상태로 초기화하고 동적 체크박스를 제거한다."""
+        # 정적 체크박스 해제 및 보이기 (기본 상태)
         if hasattr(self, 'checkBox_task_1'):
             self.checkBox_task_1.setChecked(False)
+            self.checkBox_task_1.setVisible(True)
         if hasattr(self, 'checkBox_task_2'):
             self.checkBox_task_2.setChecked(False)
+            self.checkBox_task_2.setVisible(True)
         if hasattr(self, 'checkBox_task_3'):
             self.checkBox_task_3.setChecked(False)
+            self.checkBox_task_3.setVisible(True)
+        
+        # 동적 체크박스 제거
+        for checkbox in self._dynamic_checkboxes:
+            self.verticalLayout_task_list.removeWidget(checkbox)
+            checkbox.deleteLater()
+        self._dynamic_checkboxes = []
 
     def reset_text_radio_buttons(self):
         """텍스트 삽입 라디오 버튼을 '일반'으로 초기화한다."""
@@ -150,6 +162,50 @@ class InfoPanelWidget(QWidget):
         self.lineEdit_special.setText(special_note)
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.setText(rn)
+        
+        # 지역 정보에 따라 작업 리스트 업데이트
+        self.update_task_list(region)
+
+    def update_task_list(self, region: str):
+        """지역에 따라 작업 리스트 체크박스를 동적으로 업데이트한다."""
+        # 기존 작업 리스트 초기화 (정적 체크박스는 보이기 상태로 복귀됨)
+        self.reset_task_checkboxes()
+        
+        if not region:
+            return
+
+        try:
+            # region_data.json 파일 로드
+            json_path = Path(__file__).parent.parent / "core" / "region_data.json"
+            if not json_path.exists():
+                return
+                
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 해당 지역의 체크리스트 데이터 확인
+            if region in data and 'check' in data[region]:
+                check_items = data[region]['check']
+                
+                # 체크리스트 항목이 있으면 정적 체크박스 숨기기
+                if check_items:
+                    if hasattr(self, 'checkBox_task_1'): self.checkBox_task_1.setVisible(False)
+                    if hasattr(self, 'checkBox_task_2'): self.checkBox_task_2.setVisible(False)
+                    if hasattr(self, 'checkBox_task_3'): self.checkBox_task_3.setVisible(False)
+                    
+                    # 동적 체크박스 생성 및 추가
+                    for item in check_items:
+                        checkbox = QCheckBox(item)
+                        # 폰트 크기 조정 (기본보다 2pt 작게)
+                        font = checkbox.font()
+                        font.setPointSize(font.pointSize() - 2)
+                        checkbox.setFont(font)
+                        
+                        self.verticalLayout_task_list.addWidget(checkbox)
+                        self._dynamic_checkboxes.append(checkbox)
+                        
+        except Exception as e:
+            print(f"작업 리스트 업데이트 중 오류 발생: {e}")
 
     def _validate_date_format(self, text: str) -> bool:
         """날짜 형식(MM/DD 또는 M/D)을 검증한다."""
