@@ -874,11 +874,11 @@ class MainWindow(QMainWindow):
             self.ui_thumbnail_container.setFixedWidth(thumbnail_width)
             
             # 정보 패널 컨테이너 고정 크기 설정
-            info_width = 490 if is_landscape else 450
+            info_width = 450 if is_landscape else 450
             self.ui_info_panel_container.setFixedWidth(info_width)
             
             # 중앙 컨테이너는 나머지 공간을 차지하도록 설정 (기본 확장 정책 유지)
-            self.ui_content_container.setMinimumWidth(400)
+            self.ui_content_container.setMinimumWidth(440)
             
         except Exception:
             # 안전 장치: 실패해도 크래시 방지
