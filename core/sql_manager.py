@@ -1154,35 +1154,55 @@ def fetch_subsidy_amount(region: str, model: str, rn: str = None) -> str:
                 if not row or row[0] is None:
                     return ""
                 
+                base_amount = int(row[0])
                 amount = int(row[0])
                 
-                # 2. 다자녀 추가 보조금 계산 (RN이 있고 다자녀인 경우)
+                # 2. 다자녀 및 청년생애 추가 보조금 계산
                 if rn:
-                    # 다자녀 여부 확인
-                    check_query = "SELECT 다자녀 FROM gemini_results WHERE RN = %s"
+                    # 다자녀 및 청년생애 플래그 한 번에 조회
+                    check_query = "SELECT 다자녀, 청년생애 FROM gemini_results WHERE RN = %s"
                     cursor.execute(check_query, (rn,))
-                    check_row = cursor.fetchone()
+                    flags_row = cursor.fetchone()
                     
-                    if check_row and check_row[0] == 1:
-                        # 자녀 수 확인
-                        count_query = "SELECT child_count FROM test_ai_다자녀 WHERE RN = %s"
-                        cursor.execute(count_query, (rn,))
-                        count_row = cursor.fetchone()
+                    if flags_row:
+                        is_multichild = flags_row[0] == 1
+                        is_youth = flags_row[1] == 1
                         
-                        if count_row and count_row[0]:
-                            child_count = count_row[0]
-                            additional_amount = 0
+                        # 다자녀 추가 보조금
+                        if is_multichild:
+                            # 자녀 수 확인
+                            count_query = "SELECT child_count FROM test_ai_다자녀 WHERE RN = %s"
+                            cursor.execute(count_query, (rn,))
+                            count_row = cursor.fetchone()
                             
-                            if child_count == 2:
-                                additional_amount = 1000000
-                            elif child_count == 3:
-                                additional_amount = 2000000
-                            elif child_count >= 4:
-                                additional_amount = 3000000
-                            
-                            if additional_amount > 0:
-                                amount += additional_amount
-                                print(f"다자녀 추가 보조금 적용: +{additional_amount:,}원 (자녀수: {child_count}명)")
+                            if count_row and count_row[0]:
+                                child_count = count_row[0]
+                                additional_amount = 0
+                                
+                                if child_count == 2:
+                                    additional_amount = 1000000
+                                elif child_count == 3:
+                                    additional_amount = 2000000
+                                elif child_count >= 4:
+                                    additional_amount = 3000000
+                                
+                                if additional_amount > 0:
+                                    amount += additional_amount
+                                    print(f"다자녀 추가 보조금 적용: +{additional_amount:,}원 (자녀수: {child_count}명)")
+                        
+                        # 청년생애 추가 보조금 (모델별 고정 금액)
+                        if is_youth:
+                            youth_additional_amounts = {
+                                'Model Y L': 420000,
+                                'Model Y R': 376000,
+                                'Model 3 R': 372000,
+                                'Model 3 L': 414000,
+                            }
+                            # model 변수는 함수 인자로 전달받은 값을 사용
+                            additional_youth_amount = youth_additional_amounts.get(model.strip(), 0)
+                            if additional_youth_amount > 0:
+                                amount += additional_youth_amount
+                                print(f"청년생애 추가 보조금 적용: +{additional_youth_amount:,}원 ({model.strip()})")
 
                 # 3. 포맷팅 및 반환
                 # 만원 단위 표기 지역 처리
