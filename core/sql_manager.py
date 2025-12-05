@@ -4,8 +4,12 @@ import pytz
 import pandas as pd
 import traceback
 import json
+import warnings
 
 from contextlib import closing
+
+# pandas read_sql 경고 억제
+warnings.filterwarnings('ignore', message='pandas only supports SQLAlchemy', category=UserWarning)
 
 FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
 FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id', 'file_rendered']  # 'file_status'는 주석 처리됨
