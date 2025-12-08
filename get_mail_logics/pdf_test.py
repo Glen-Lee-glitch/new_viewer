@@ -198,13 +198,116 @@ def extract_as_is():
         limit_size = 7 * 1024 * 1024  # 7MB
 
         if file_size > limit_size:
-            print(f"[INFO] 파일 크기가 7MB를 초과합니다 ({file_size / 1024 / 1024:.2f} MB). 압축 저장을 시도합니다.")
+            print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 초과)")
+            print(f"[INFO] 이미지 압축을 시작합니다...")
+            
+            # 각 페이지의 이미지를 압축
+            for page_num, page in enumerate(doc):
+                image_list = page.get_images()
+                if image_list:
+                    print(f"[INFO] Page {page_num + 1}: {len(image_list)}개 이미지 처리 중...")
+                    
+                    for img_index, img in enumerate(image_list):
+                        try:
+                            xref = img[0]
+                            img_name = img[7]  # 이미지 이름 추출
+                            
+                            # 이미지 위치 찾기 (get_image_rects 사용)
+                            img_rects = []
+                            try:
+                                # xref로 시도
+                                img_rects = page.get_image_rects(xref)
+                            except:
+                                try:
+                                    # 이름으로 시도
+                                    img_rects = page.get_image_rects(img_name)
+                                except:
+                                    pass
+                            
+                            if not img_rects:
+                                print(f"[WARNING] Page {page_num + 1}, Image {img_index + 1}: 위치를 찾을 수 없어 압축을 건너뜁니다.")
+                                continue
+                                
+                            # 첫 번째 위치 사용 (이미지가 여러 번 사용된 경우 첫 번째만 처리하거나 모두 처리)
+                            img_rect = img_rects[0]
+                            
+                            base_image = doc.extract_image(xref)
+                            image_bytes = base_image["image"]
+                            image_ext = base_image["ext"]
+                            
+                            # PIL로 이미지 열기
+                            img_pil = Image.open(io.BytesIO(image_bytes))
+                            original_size = len(image_bytes)
+                            
+                            # 원본 이미지의 표시 크기 (PDF 포인트 단위) - img_rect에서 가져옴
+                            display_width = img_rect.width
+                            display_height = img_rect.height
+                            
+                            # 이미지가 너무 크면 리샘플링 (너무 강하게 압축하지 않기 위해 최대 2000px 유지)
+                            if img_pil.width > 2000 or img_pil.height > 2000:
+                                # 비율 유지하며 리샘플링
+                                ratio = min(2000 / img_pil.width, 2000 / img_pil.height)
+                                new_width = int(img_pil.width * ratio)
+                                new_height = int(img_pil.height * ratio)
+                                img_pil = img_pil.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                            
+                            # JPEG로 압축 (품질 85 - 너무 강하게 압축하지 않음)
+                            compressed_bytes = io.BytesIO()
+                            
+                            # 이미 JPEG인 경우 품질만 조정
+                            if image_ext.lower() in ['jpeg', 'jpg']:
+                                # JPEG는 품질만 조정하여 재압축
+                                if img_pil.mode != 'RGB':
+                                    img_pil = img_pil.convert('RGB')
+                                img_pil.save(compressed_bytes, format='JPEG', quality=85, optimize=True)
+                            else:
+                                # PNG/GIF는 JPEG로 변환
+                                if img_pil.mode == 'RGBA':
+                                    # 흰색 배경에 합성
+                                    background = Image.new('RGB', img_pil.size, (255, 255, 255))
+                                    background.paste(img_pil, mask=img_pil.split()[3])
+                                    img_pil = background
+                                elif img_pil.mode != 'RGB':
+                                    img_pil = img_pil.convert('RGB')
+                                img_pil.save(compressed_bytes, format='JPEG', quality=85, optimize=True)
+                            
+                            compressed_image_bytes = compressed_bytes.getvalue()
+                            compressed_size = len(compressed_image_bytes)
+                            
+                            # 압축 효과가 있으면 교체 (10% 이상 압축된 경우만)
+                            if compressed_size < original_size * 0.9:
+                                # 원본 이미지의 정확한 위치와 크기를 유지하여 교체
+                                # 기존 이미지 삭제
+                                page.delete_image(xref)
+                                
+                                # 원본 이미지의 표시 크기(img_rect)를 그대로 사용하여 압축된 이미지 삽입
+                                # insert_image는 rect 크기에 맞춰 이미지를 자동 스케일링하므로,
+                                # 원본 rect를 그대로 사용하면 원본과 동일한 크기로 표시됨
+                                page.insert_image(img_rect, stream=compressed_image_bytes)
+                                
+                        except Exception as e:
+                            print(f"[WARNING] Page {page_num + 1}, Image {img_index + 1} 압축 실패: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            continue
+            
+            print(f"[INFO] 압축 저장 중...")
             # deflate=True: 스트림 압축, garbage=4: 중복 객체 제거 및 정리
-            # 너무 강하게 압축하지 않기 위해 이미지 다운샘플링 등은 하지 않음
             doc.save(output_pdf, deflate=True, garbage=4)
+            
+            # 압축된 결과물 크기 확인
+            output_size = output_pdf.stat().st_size
+            compression_ratio = (1 - output_size / file_size) * 100
+            print(f"[INFO] 출력 파일 크기: {output_size / 1024 / 1024:.2f} MB")
+            print(f"[INFO] 압축률: {compression_ratio:.1f}% ({(file_size - output_size) / 1024 / 1024:.2f} MB 감소)")
         else:
-            print(f"[INFO] 파일 크기가 7MB 이하입니다 ({file_size / 1024 / 1024:.2f} MB). 일반 저장합니다.")
+            print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 이하)")
+            print(f"[INFO] 일반 저장합니다...")
             doc.save(output_pdf)
+            
+            # 저장된 결과물 크기 확인
+            output_size = output_pdf.stat().st_size
+            print(f"[INFO] 출력 파일 크기: {output_size / 1024 / 1024:.2f} MB")
             
         doc.close()
         
