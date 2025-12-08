@@ -31,6 +31,7 @@ from widgets.alarm_widget import AlarmWidget
 from widgets.detail_form_dialog import DetailFormDialog
 from widgets.config_dialog import ConfigDialog
 from widgets.necessary_widget import NecessaryWidget
+from widgets.multi_child_check_dialog import MultiChildCheckDialog
 
 
 class MainWindow(QMainWindow):
@@ -891,8 +892,27 @@ class MainWindow(QMainWindow):
             
             # 이상치 종류 판단
             outlier_type = self._determine_outlier_type(self._pending_outlier_metadata)
+            
+            # 메타데이터 복사본 저장 (다자녀 다이얼로그에서 사용하기 위함)
+            self._pending_outlier_metadata_copy = self._pending_outlier_metadata
             self._pending_outlier_metadata = None  # 메타데이터 리셋
             
+            # 다자녀 이상치인 경우 전용 다이얼로그 표시
+            if outlier_type == 'multichild':
+                child_birth_date_str = self._pending_outlier_metadata_copy.get('child_birth_date')
+                dates = []
+                try:
+                    import json
+                    dates = json.loads(child_birth_date_str) if isinstance(child_birth_date_str, str) else child_birth_date_str
+                    if not isinstance(dates, list):
+                        dates = []
+                except Exception:
+                    dates = []
+                
+                dialog = MultiChildCheckDialog(dates, self)
+                dialog.exec()
+                return
+
             # 메시지 설정
             if outlier_type == 'contract':
                 title = "구매계약서 이상"
@@ -946,6 +966,47 @@ class MainWindow(QMainWindow):
         # 초본이 0이고 구매계약서가 1인 경우 (초본 없음은 이미 chobon_missing으로 처리됨)
         # 하지만 명시적으로 체크할 수도 있음
         
+        # 다자녀 이상치 체크
+        다자녀값 = metadata.get('다자녀', 0)
+        if 다자녀값 == 1:
+            child_birth_date_str = metadata.get('child_birth_date')
+            if child_birth_date_str:
+                try:
+                    import json
+                    from datetime import datetime
+                    
+                    dates = json.loads(child_birth_date_str) if isinstance(child_birth_date_str, str) else child_birth_date_str
+                    # 리스트가 아니면 빈 리스트 처리
+                    if not isinstance(dates, list):
+                        dates = []
+                        
+                    today = datetime.now().date()
+                    for d_str in dates:
+                        try:
+                            # 문자열 형식에 따라 파싱
+                            if len(d_str) > 10: # YYYY-MM-DD HH:MM:SS 등
+                                d_str = d_str.split()[0]
+                            
+                            birth_date = datetime.strptime(d_str, "%Y-%m-%d").date()
+                            
+                            # 만나이 19세 이상 체크 (만 18세 초과)
+                            age = today.year - birth_date.year
+                            is_over_18 = False
+                            
+                            if age > 19:
+                                is_over_18 = True
+                            elif age == 19:
+                                # 생일이 지났거나 같으면 만 19세
+                                if (today.month, today.day) >= (birth_date.month, birth_date.day):
+                                    is_over_18 = True
+                            
+                            if is_over_18:
+                                return 'multichild'
+                        except (ValueError, TypeError):
+                            pass
+                except Exception:
+                    pass
+
         # 구매계약서 이상치 체크
         if 구매계약서 and (초본 or 공동명의):
             ai_계약일자 = metadata.get('ai_계약일자')

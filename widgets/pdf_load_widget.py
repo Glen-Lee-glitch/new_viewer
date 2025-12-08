@@ -218,6 +218,8 @@ class PdfLoadWidget(QWidget):
                 'mail_count': row.get('mail_count', 0),  # mail_count 추가
                 'outlier': self._sanitize_text(row.get('outlier', '')),  # 이상치 정보 추가
                 'original_filepath': self._normalize_file_path(row.get('original_filepath')), # 이 줄을 추가
+                'child_birth_date': row.get('child_birth_date', ''), # 다자녀 생년월일 추가
+                '다자녀': row.get('다자녀', 0), # 다자녀 플래그 추가
                 'ai_계약일자': row.get('ai_계약일자'),  # 구매계약서 필드 추가
                 'ai_이름': row.get('ai_이름'),
                 '전화번호': row.get('전화번호'),
@@ -575,6 +577,14 @@ class PdfLoadWidget(QWidget):
             QMessageBox.warning(self, "파일 없음", f"파일을 찾을 수 없습니다.\n{resolved_path}")
             return
             
+        
+        # SQL 함수 수정 필요 (sql_manager.py의 fetch_application_data_by_rn에 child_birth_date와 다자녀 칼럼 추가 필요)
+        # 이미 쿼리에 포함되어 있다면 data 딕셔너리에 자동으로 들어옴.
+        # 위 fetch_application_data_by_rn 함수 확인 결과:
+        # "       gr.구매계약서, gr.초본, gr.공동명의, gr.다자녀, "
+        # "       d.child_birth_date, cb.issue_date, "
+        # ... 로 child_birth_date와 다자녀가 조회되고 있음.
+        
         # 메타데이터 구성 (start_selected_work와 포맷 통일)
         metadata = {
             'rn': data.get('RN', rn),
@@ -685,7 +695,9 @@ class PdfLoadWidget(QWidget):
             'chobon_address_1': data.get('chobon_address_1'),
             'chobon': data.get('chobon', 0),  # chobon 칼럼 추가
             'is_법인': data.get('is_법인', 0),  # is_법인 칼럼 추가
-            'is_context_menu_work': False  # 기본값은 False, 실제 값은 start_selected_work에서 설정
+            'is_context_menu_work': False,  # 기본값은 False, 실제 값은 start_selected_work에서 설정
+            'child_birth_date': data.get('child_birth_date', ''), # 다자녀 자녀 생년월일 목록 추가
+            '다자녀': data.get('다자녀', 0) # 다자녀 플래그 추가
         }
 
     def _handle_cell_double_clicked(self, row, column):
