@@ -283,6 +283,90 @@ def extract_as_is():
                     # 내용 복사 (보정된 회전값 적용)
                     new_page.show_pdf_page(dest_rect, doc, page.number, rotate=apply_rot)
                     
+                    # 주석 보존 (원본 페이지의 주석을 새 페이지에 복사)
+                    try:
+                        annotations_list = list(page.annots())  # 제너레이터를 리스트로 변환
+                        if annotations_list:
+                            for annot in annotations_list:
+                                try:
+                                    # 원본 주석의 좌표
+                                    annot_rect = annot.rect
+                                    
+                                    # 스케일 및 중앙 정렬에 맞춰 좌표 변환
+                                    new_x0 = x + (annot_rect.x0 - src_rect.x0) * scale
+                                    new_y0 = y + (annot_rect.y0 - src_rect.y0) * scale
+                                    new_x1 = x + (annot_rect.x1 - src_rect.x0) * scale
+                                    new_y1 = y + (annot_rect.y1 - src_rect.y0) * scale
+                                    
+                                    new_annot_rect = pymupdf.Rect(new_x0, new_y0, new_x1, new_y1)
+                                    
+                                    # 주석 타입 확인 및 복사
+                                    annot_type = annot.type[0] if annot.type else -1
+                                    
+                                    # 1. FreeText (텍스트 박스, 타자기) - 타입 2
+                                    if annot_type == 2:
+                                        content = annot.info.get("content", "") if annot.info else ""
+                                        if content:
+                                            new_annot = new_page.add_freetext_annot(new_annot_rect, content)
+                                            try:
+                                                # FreeText 주석의 배경색은 update(fill_color=...)로 설정해야 함
+                                                fill_color = annot.colors.get("fill") if annot.colors else None
+                                                if fill_color:
+                                                    # fill_color는 (r, g, b) 튜플 형태 (0-1 범위)
+                                                    new_annot.update(fill_color=fill_color)
+                                                
+                                                # 테두리 색상은 set_colors로 설정
+                                                stroke_color = annot.colors.get("stroke") if annot.colors else None
+                                                if stroke_color:
+                                                    new_annot.set_colors(stroke=stroke_color)
+                                                
+                                                # 기타 속성 복사 (폰트 크기, 텍스트 색상 등)
+                                                if annot.info:
+                                                    if "fontsize" in annot.info:
+                                                        new_annot.update(fontsize=annot.info.get("fontsize"))
+                                                    if "text_color" in annot.info:
+                                                        new_annot.update(text_color=annot.info.get("text_color"))
+                                                
+                                                new_annot.update()
+                                            except Exception as e:
+                                                # 디버깅을 위해 예외 출력 (필요시 주석 처리)
+                                                # print(f"[WARNING] FreeText 주석 속성 복사 실패: {e}")
+                                                pass
+                                    
+                                    # 2. Text (스티커 메모) - 타입 0
+                                    elif annot_type == 0:
+                                        content = annot.info.get("content", "") if annot.info else ""
+                                        if content:
+                                            new_annot = new_page.add_text_annot(new_annot_rect.tl, content)
+                                            try:
+                                                stroke_color = annot.colors.get("stroke") if annot.colors else None
+                                                if stroke_color:
+                                                    new_annot.set_colors(stroke=stroke_color)
+                                                new_annot.update()
+                                            except:
+                                                pass
+                                    
+                                    # 3. Highlight (형광펜) - 타입 8
+                                    elif annot_type == 8:
+                                        new_annot = new_page.add_highlight_annot(new_annot_rect)
+                                        try:
+                                            stroke_color = annot.colors.get("stroke") if annot.colors else None
+                                            if stroke_color:
+                                                new_annot.set_colors(stroke=stroke_color)
+                                            new_annot.update()
+                                        except:
+                                            pass
+                                    
+                                    # 기타 타입은 일단 건너뜀 (Ink 등은 나중에 추가)
+                                    
+                                except Exception as annot_error:
+                                    # 개별 주석 처리 실패 시 계속 진행
+                                    continue
+                                
+                    except Exception as e:
+                        # 주석 목록 가져오기 실패 시 무시
+                        pass
+                    
                     # 회전값 적용하지 않음 (모든 페이지를 정방향 A4 세로형으로 통일)
                     # new_page.set_rotation(rot)
                     
