@@ -298,6 +298,69 @@ def extract_as_is():
             print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 이하)")
             print(f"[INFO] 압축 없이 진행합니다...")
         
+        # A4 리사이징 로직 (압축 후, 텍스트 삽입 전)
+        try:
+            print("[INFO] 페이지 크기 검사 및 리사이징 시작...")
+            needs_resize = False
+            A4_WIDTH, A4_HEIGHT = 595.276, 841.890
+            TOLERANCE = 5.0
+
+            for page in doc:
+                w, h = page.rect.width, page.rect.height
+                long_side, short_side = max(w, h), min(w, h)
+                if abs(long_side - A4_HEIGHT) > TOLERANCE or abs(short_side - A4_WIDTH) > TOLERANCE:
+                    needs_resize = True
+                    break
+            
+            if needs_resize:
+                print("[INFO] A4 규격이 아닌 페이지가 감지되어 리사이징을 진행합니다.")
+                new_doc = pymupdf.open()
+                
+                for page in doc:
+                    src_rect = page.rect
+                    rot = page.rotation
+                    
+                    # 타겟 A4 크기 결정 (가로/세로 비율에 따라)
+                    if src_rect.width > src_rect.height:
+                        tgt_width, tgt_height = A4_HEIGHT, A4_WIDTH
+                    else:
+                        tgt_width, tgt_height = A4_WIDTH, A4_HEIGHT
+                    
+                    new_page = new_doc.new_page(width=tgt_width, height=tgt_height)
+                    
+                    # 비율 유지하며 fit 계산
+                    src_ratio = src_rect.width / src_rect.height
+                    tgt_ratio = tgt_width / tgt_height
+                    
+                    if abs(src_ratio - tgt_ratio) < 0.01:
+                        dest_rect = new_page.rect
+                    else:
+                        scale = min(tgt_width / src_rect.width, tgt_height / src_rect.height)
+                        new_w = src_rect.width * scale
+                        new_h = src_rect.height * scale
+                        x = (tgt_width - new_w) / 2
+                        y = (tgt_height - new_h) / 2
+                        dest_rect = pymupdf.Rect(x, y, x + new_w, y + new_h)
+                    
+                    # 내용 복사 (압축된 이미지 포함)
+                    new_page.show_pdf_page(dest_rect, doc, page.number)
+                    
+                    # 회전값 적용
+                    new_page.set_rotation(rot)
+                
+                # 문서 교체
+                old_doc = doc
+                doc = new_doc
+                old_doc.close()
+                print("[INFO] 모든 페이지를 A4 규격으로 리사이징 완료.")
+            else:
+                print("[INFO] 모든 페이지가 이미 A4 규격 내에 있습니다.")
+                
+        except Exception as e:
+            print(f"[WARNING] 리사이징 중 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+
         # 압축 여부와 관계없이 모든 페이지에 텍스트 삽입
         print(f"[INFO] 텍스트 삽입을 시작합니다...")
         for page_num, page in enumerate(doc):
@@ -357,6 +420,11 @@ def extract_as_is():
                 traceback.print_exc()
                 continue
         
+        # 텍스트 삽입 후 최종 결과 검증
+        print("[DEBUG] 텍스트 삽입 완료 후 최종 페이지 정보:")
+        for i, page in enumerate(doc):
+            print(f"[DEBUG] Page {i+1} - Rotation: {page.rotation}, Size: (Width: {page.rect.width:.2f}, Height: {page.rect.height:.2f})")
+        
         # 텍스트 삽입 후 모든 경우에 저장
         print(f"[INFO] 텍스트 삽입 완료. 최종 저장 중...")
         if file_size > limit_size:
@@ -377,6 +445,16 @@ def extract_as_is():
             print(f"[INFO] 최종 출력 파일 크기: {output_size / 1024 / 1024:.2f} MB")
         
         doc.close()
+        
+        # 저장된 결과 파일 검증
+        print("[DEBUG] 저장된 결과 PDF 검증:")
+        try:
+            result_doc = pymupdf.open(output_pdf)
+            for i, page in enumerate(result_doc):
+                print(f"[DEBUG] 결과 Page {i+1} - Rotation: {page.rotation}, Size: (Width: {page.rect.width:.2f}, Height: {page.rect.height:.2f})")
+            result_doc.close()
+        except Exception as e:
+            print(f"[WARNING] 결과 파일 검증 중 오류: {e}")
         
         print(f"완료: {output_pdf} 에 저장되었습니다.")
         
