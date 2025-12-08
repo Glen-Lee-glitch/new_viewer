@@ -17,8 +17,8 @@ def extract_as_is():
     try:
         doc = pymupdf.open(input_pdf)
         
-        text_content = "11"
-        font_size = 50
+        text_content = "출고예정일 12/09"
+        font_size = 20
 
         for i, page in enumerate(doc):
             # 1. 원본 회전값 저장 및 확인
@@ -35,6 +35,12 @@ def extract_as_is():
             rect = page.rect
             x = (rect.width - text_width) / 2
             y = (rect.height / 2) + (font_size * 0.35)
+            
+            # 회전값에 따른 좌표 조정
+            if original_rot == 270:
+                x = x - 60  # 270도 회전 페이지: x 좌표 -60 (시각적으로 왼쪽으로 이동)
+            elif original_rot == 0:
+                y = y + 60  # 0도 회전 페이지: y 좌표 +60 (시각적으로 아래로 이동)
 
             # 3. 텍스트 삽입
             # 이전 시도: rotate=-original_rot (실패: 글자가 거꾸로/누워 보임)
