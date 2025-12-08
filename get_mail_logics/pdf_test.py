@@ -117,7 +117,7 @@ def extract_as_is():
         doc = pymupdf.open(input_pdf)
         
         text_content = "출고예정일 12/09"
-        font_size = 20
+        font_size = 15
 
         for i, page in enumerate(doc):
             # 1. 원본 회전값 저장 및 확인
@@ -290,25 +290,88 @@ def extract_as_is():
                             import traceback
                             traceback.print_exc()
                             continue
-            
-            print(f"[INFO] 압축 저장 중...")
-            # deflate=True: 스트림 압축, garbage=4: 중복 객체 제거 및 정리
+        else:
+            print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 이하)")
+            print(f"[INFO] 압축 없이 진행합니다...")
+        
+        # 압축 여부와 관계없이 모든 페이지에 텍스트 삽입
+        print(f"[INFO] 텍스트 삽입을 시작합니다...")
+        for page_num, page in enumerate(doc):
+            try:
+                # 원본 회전값 저장
+                original_rot = page.rotation
+                
+                # 좌표 계산을 위해 잠시 페이지 회전을 0으로 초기화
+                page.set_rotation(0)
+                
+                # 텍스트를 이미지로 변환
+                text_image_bytes = create_text_image(text_content, font_size)
+                
+                # 페이지 회전값이 있으면 텍스트 이미지를 같은 방향으로 회전시켜서 올곧게 보이도록 함
+                if original_rot != 0:
+                    # PIL로 이미지를 열어서 회전
+                    img = Image.open(io.BytesIO(text_image_bytes))
+                    # 페이지 회전과 같은 방향으로 회전 (뷰어가 보정할 때 올곧게 보이도록)
+                    # PIL rotate는 반시계 방향이므로, original_rot 그대로 사용
+                    rotated_img = img.rotate(original_rot, expand=True, fillcolor=(255, 255, 255, 0))
+                    
+                    # 회전된 이미지를 바이트로 변환
+                    rotated_bytes = io.BytesIO()
+                    rotated_img.save(rotated_bytes, format='PNG')
+                    text_image_bytes = rotated_bytes.getvalue()
+                
+                # 이미지 크기 계산
+                text_image = pymupdf.open(stream=text_image_bytes, filetype="png")
+                img_page = text_image[0]
+                img_rect = img_page.rect
+                img_width = img_rect.width
+                img_height = img_rect.height
+                text_image.close()
+                
+                # 페이지 중앙 좌표 계산
+                rect = page.rect
+                x = (rect.width - img_width) / 2
+                y = (rect.height / 2) - (img_height / 2) + (font_size * 0.35)
+                
+                # 회전값에 따른 좌표 조정
+                if original_rot == 270:
+                    x = x - 60
+                elif original_rot == 0:
+                    y = y + 60
+                
+                # 텍스트 이미지를 PDF 페이지에 삽입
+                image_rect = pymupdf.Rect(x, y, x + img_width, y + img_height)
+                page.insert_image(image_rect, stream=text_image_bytes)
+                
+                # 페이지 회전값 원상복구
+                page.set_rotation(original_rot)
+                
+                print(f"[INFO] Page {page_num + 1}에 텍스트 '{text_content}' 삽입 완료 (회전: {original_rot}°)")
+            except Exception as e:
+                print(f"[WARNING] Page {page_num + 1} 텍스트 삽입 실패: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # 텍스트 삽입 후 모든 경우에 저장
+        print(f"[INFO] 텍스트 삽입 완료. 최종 저장 중...")
+        if file_size > limit_size:
+            # 압축된 경우: 텍스트 삽입 후 압축 저장
             doc.save(output_pdf, deflate=True, garbage=4)
             
             # 압축된 결과물 크기 확인
             output_size = output_pdf.stat().st_size
             compression_ratio = (1 - output_size / file_size) * 100
-            print(f"[INFO] 출력 파일 크기: {output_size / 1024 / 1024:.2f} MB")
+            print(f"[INFO] 최종 출력 파일 크기: {output_size / 1024 / 1024:.2f} MB")
             print(f"[INFO] 압축률: {compression_ratio:.1f}% ({(file_size - output_size) / 1024 / 1024:.2f} MB 감소)")
         else:
-            print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 이하)")
-            print(f"[INFO] 일반 저장합니다...")
+            # 압축하지 않은 경우: 일반 저장
             doc.save(output_pdf)
             
             # 저장된 결과물 크기 확인
             output_size = output_pdf.stat().st_size
-            print(f"[INFO] 출력 파일 크기: {output_size / 1024 / 1024:.2f} MB")
-            
+            print(f"[INFO] 최종 출력 파일 크기: {output_size / 1024 / 1024:.2f} MB")
+        
         doc.close()
         
         print(f"완료: {output_pdf} 에 저장되었습니다.")
