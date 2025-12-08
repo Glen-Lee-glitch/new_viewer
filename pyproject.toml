@@ -11,4 +11,5 @@ dependencies = [
     "pynput>=1.8.1",
     "pyinstaller>=6.16.0",
     "xlrd>=2.0.2",
+    "pypdf>=6.4.1",
 ]
