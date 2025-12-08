@@ -197,6 +197,10 @@ def extract_as_is():
         file_size = input_pdf.stat().st_size
         limit_size = 7 * 1024 * 1024  # 7MB
 
+        print("[DEBUG] PDF 압축 전 페이지 정보:")
+        for i, page in enumerate(doc):
+            print(f"[DEBUG] Page {i+1} - Rotation: {page.rotation}, Size: (Width: {page.rect.width:.2f}, Height: {page.rect.height:.2f})")
+
         if file_size > limit_size:
             print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 초과)")
             print(f"[INFO] 이미지 압축을 시작합니다...")
