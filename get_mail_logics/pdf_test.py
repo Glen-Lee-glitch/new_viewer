@@ -120,9 +120,8 @@ def extract_as_is():
         font_size = 15
 
         for i, page in enumerate(doc):
-            # 1. 원본 회전값 저장 및 확인
+            # 1. 원본 회전값 저장
             original_rot = page.rotation
-            print(f"[DEBUG] Page {i+1} Original Rotation: {original_rot}")
 
             # 2. 좌표 계산을 위해 잠시 페이지 회전을 0으로 초기화
             page.set_rotation(0)
@@ -306,7 +305,12 @@ def extract_as_is():
             TOLERANCE = 5.0
 
             for page in doc:
+                # 회전값을 0으로 초기화하여 물리적 크기 확인
+                original_rot = page.rotation
+                page.set_rotation(0)
                 w, h = page.rect.width, page.rect.height
+                page.set_rotation(original_rot)  # 원상복구
+                
                 long_side, short_side = max(w, h), min(w, h)
                 if abs(long_side - A4_HEIGHT) > TOLERANCE or abs(short_side - A4_WIDTH) > TOLERANCE:
                     needs_resize = True
@@ -317,36 +321,45 @@ def extract_as_is():
                 new_doc = pymupdf.open()
                 
                 for page in doc:
-                    src_rect = page.rect
+                    # 원본 회전값 저장
                     rot = page.rotation
                     
-                    # 타겟 A4 크기 결정 (가로/세로 비율에 따라)
-                    if src_rect.width > src_rect.height:
-                        tgt_width, tgt_height = A4_HEIGHT, A4_WIDTH
-                    else:
-                        tgt_width, tgt_height = A4_WIDTH, A4_HEIGHT
+                    # 회전값을 0으로 초기화하여 물리적 크기 확인
+                    page.set_rotation(0)
+                    src_rect = page.rect
+                    
+                    # 모든 페이지를 A4 세로형으로 통일 (원본이 세로형이므로)
+                    tgt_width, tgt_height = A4_WIDTH, A4_HEIGHT
                     
                     new_page = new_doc.new_page(width=tgt_width, height=tgt_height)
                     
-                    # 비율 유지하며 fit 계산
-                    src_ratio = src_rect.width / src_rect.height
-                    tgt_ratio = tgt_width / tgt_height
-                    
-                    if abs(src_ratio - tgt_ratio) < 0.01:
-                        dest_rect = new_page.rect
+                    # 스케일 및 회전값 계산
+                    if rot in [90, 270]:
+                        # 회전 시 가로/세로가 바뀌므로 교차해서 스케일 계산
+                        src_w, src_h = src_rect.height, src_rect.width
+                        # 270도일 때 거꾸로 나오면 90도로 보정 (180도 뒤집기)
+                        apply_rot = 90 if rot == 270 else rot
                     else:
-                        scale = min(tgt_width / src_rect.width, tgt_height / src_rect.height)
-                        new_w = src_rect.width * scale
-                        new_h = src_rect.height * scale
-                        x = (tgt_width - new_w) / 2
-                        y = (tgt_height - new_h) / 2
-                        dest_rect = pymupdf.Rect(x, y, x + new_w, y + new_h)
+                        src_w, src_h = src_rect.width, src_rect.height
+                        apply_rot = rot
                     
-                    # 내용 복사 (압축된 이미지 포함)
-                    new_page.show_pdf_page(dest_rect, doc, page.number)
+                    # 화면에 꽉 차게 Fit (비율 유지)
+                    scale = min(tgt_width / src_w, tgt_height / src_h)
                     
-                    # 회전값 적용
-                    new_page.set_rotation(rot)
+                    new_w = src_w * scale
+                    new_h = src_h * scale
+                    x = (tgt_width - new_w) / 2
+                    y = (tgt_height - new_h) / 2
+                    dest_rect = pymupdf.Rect(x, y, x + new_w, y + new_h)
+                    
+                    # 내용 복사 (보정된 회전값 적용)
+                    new_page.show_pdf_page(dest_rect, doc, page.number, rotate=apply_rot)
+                    
+                    # 회전값 적용하지 않음 (모든 페이지를 정방향 A4 세로형으로 통일)
+                    # new_page.set_rotation(rot)
+                    
+                    # 원본 페이지 회전값 원상복구 (다음 처리를 위해)
+                    page.set_rotation(rot)
                 
                 # 문서 교체
                 old_doc = doc
