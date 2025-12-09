@@ -22,6 +22,9 @@ class Toast(QWidget):
             Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        
+        self._last_active_hwnd = None  # 외부 윈도우 핸들 저장 변수
         
         # 레이아웃 설정
         layout = QVBoxLayout(self)
@@ -79,7 +82,8 @@ class Toast(QWidget):
         close_button.setStyleSheet(button_style)
 
         confirm_button.clicked.connect(self.close)
-        close_button.clicked.connect(self.close)
+        # '닫기' 버튼 클릭 시 기존 활성 윈도우 포커스 유지
+        close_button.clicked.connect(self._on_close_button_clicked)
 
         button_layout.addWidget(confirm_button)
         button_layout.addWidget(close_button)
@@ -102,6 +106,19 @@ class Toast(QWidget):
         self._close_timer.setSingleShot(True)
         self._close_timer.timeout.connect(self._start_fade_out)
     
+    def enterEvent(self, event):
+        """마우스가 알림창에 들어올 때 현재 활성 윈도우(예: 크롬)의 핸들을 저장"""
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            current_hwnd = user32.GetForegroundWindow()
+            # 현재 활성 창이 내 자신(토스트)이 아니면 저장
+            if current_hwnd != int(self.winId()):
+                self._last_active_hwnd = current_hwnd
+        except Exception:
+            pass
+        super().enterEvent(event)
+
     def paintEvent(self, event):
         """둥근 모서리와 배경을 그린다"""
         painter = QPainter(self)
@@ -157,6 +174,19 @@ class Toast(QWidget):
     def opacity(self, value):
         self._opacity = value
         self.update()
+
+    def _on_close_button_clicked(self):
+        """닫기 버튼 클릭 시 호출되며, 알림창을 닫고 이전 외부 윈도우의 포커스를 복원합니다."""
+        self.close()
+        
+        if self._last_active_hwnd:
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                # 저장된 핸들의 윈도우를 다시 활성화
+                user32.SetForegroundWindow(self._last_active_hwnd)
+            except Exception:
+                pass
 
 
 def show_alert(title: str, message: str, parent=None):
