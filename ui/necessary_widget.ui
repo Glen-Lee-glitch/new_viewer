@@ -101,11 +101,22 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="pushButton_copy_folder">
-          <property name="text">
-           <string>복사</string>
-          </property>
-         </widget>
+         <layout class="QHBoxLayout" name="horizontalLayout_folder_buttons">
+          <item>
+           <widget class="QPushButton" name="pushButton_copy_folder">
+            <property name="text">
+             <string>복사</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_open_folder">
+            <property name="text">
+             <string>열기</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
        </layout>
       </item>
