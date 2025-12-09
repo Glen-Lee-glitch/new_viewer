@@ -79,6 +79,7 @@ def _build_subsidy_query_base():
     """지원금 신청 데이터 조회용 기본 쿼리 문자열을 반환한다."""
     return (
         "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, sa.recent_received_date, "
+        "       sa.finished_file_path, " # finished_file_path 추가
         # "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "  # 주석 처리됨
         "       e.attached_file_path AS original_filepath, "
         "       sa.recent_thread_id, "
@@ -524,6 +525,7 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             query = (
                 "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
+                "       sa.finished_file_path, "  # finished_file_path 추가
                 "       e.attached_file_path AS original_filepath, "
                 "       sa.recent_thread_id, "
                 "       e.file_rendered, "

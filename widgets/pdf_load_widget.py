@@ -268,6 +268,10 @@ class PdfLoadWidget(QWidget):
             ai_item = QTableWidgetItem(ai_status)
             table.setItem(row_index, 4, ai_item)
 
+            # finished_file_path를 row_data에 추가
+            row_data['finished_file_path'] = self._normalize_file_path(row.get('finished_file_path'))
+            rn_item.setData(Qt.ItemDataRole.UserRole, row_data)
+
             # --- Row Highlighting ---
             # urgent 칼럼이 1이면 전체 행에 빨간색 하이라이트 (최우선)
             if row_data['urgent'] == 1:
@@ -508,13 +512,18 @@ class PdfLoadWidget(QWidget):
             self._is_context_menu_work = False
             return
 
-        file_path = row_data.get('original_filepath')
-        if not file_path:
-            QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
-            self._is_context_menu_work = False
-            return
+        worker = row_data.get('worker')
+        finished_file_path = row_data.get('finished_file_path')
+        original_file_path = row_data.get('original_filepath')
 
-        file_path = self._normalize_file_path(file_path)
+        file_path = ""
+        # 작업자가 할당된 경우, finished_file_path 우선 사용
+        if worker and finished_file_path:
+            file_path = finished_file_path
+        # 그 외의 경우 original_filepath 사용
+        else:
+            if original_file_path:
+                file_path = self._normalize_file_path(original_file_path)
 
         if not file_path:
             QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
@@ -571,7 +580,7 @@ class PdfLoadWidget(QWidget):
         path_str = path_str.strip()
 
         if path_str.upper().startswith('C:'):
-            path_str = r'\\DESKTOP-KMJ' + path_str[2:]
+            path_str = r'\\DESKTOP-KMJ' + path_str[2:].lstrip('\\')
 
         return path_str.strip()
     
@@ -653,7 +662,22 @@ class PdfLoadWidget(QWidget):
         if not file_path:
             QMessageBox.warning(self, "파일 없음", "해당 RN에 연결된 파일 경로가 DB에 없습니다.")
             return
-            
+
+        worker = data.get('worker')
+        finished_file_path = data.get('finished_file_path')
+        original_file_path = data.get('original_filepath')
+
+        file_path = ""
+        if worker and finished_file_path:
+            file_path = finished_file_path
+        else:
+            if original_file_path:
+                file_path = self._normalize_file_path(original_file_path)
+
+        if not file_path:
+            QMessageBox.warning(self, "파일 없음", "해당 RN에 연결된 파일 경로가 DB에 없습니다.")
+            return
+
         resolved_path = Path(file_path)
         if not resolved_path.exists():
             QMessageBox.warning(self, "파일 없음", f"파일을 찾을 수 없습니다.\n{resolved_path}")
@@ -673,6 +697,7 @@ class PdfLoadWidget(QWidget):
             'name': data.get('name', ''),
             'region': data.get('region', ''),
             'worker': data.get('worker', ''),
+            'finished_file_path': data.get('finished_file_path', ''), # 추가
             '구매계약서': data.get('구매계약서', 0),
             '초본': data.get('초본', 0),
             '공동명의': data.get('공동명의', 0),
@@ -690,7 +715,7 @@ class PdfLoadWidget(QWidget):
             'urgent': data.get('urgent', 0),
             'mail_count': data.get('mail_count', 0),
             'outlier': data.get('outlier', ''),
-            'original_filepath': file_path,
+            'original_filepath': original_file_path, # original_filepath로 수정
             'is_법인': data.get('is_법인', 0),
             'is_context_menu_work': True # 컨텍스트 메뉴와 동일하게 동작하도록 True로 설정
         }
@@ -765,6 +790,7 @@ class PdfLoadWidget(QWidget):
             'mail_count': data.get('mail_count', 0),
             'outlier': data.get('outlier', ""),
             'original_filepath': data.get('original_filepath', ""), # 이 줄을 추가
+            'finished_file_path': data.get('finished_file_path', ''), # 추가
             '구매계약서': data.get('구매계약서', 0),  # 구매계약서 플래그 추가
             '초본': data.get('초본', 0),  # 초본 플래그 추가
             '공동명의': data.get('공동명의', 0),  # 공동명의 플래그 추가
