@@ -30,7 +30,7 @@ from core.sql_manager import (
 )
 from widgets.email_view_dialog import EmailViewDialog
 from widgets.detail_form_dialog import DetailFormDialog
-from widgets.alert_dialog import show_alert
+from widgets.alert_dialog import show_alert, show_toast
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -308,8 +308,7 @@ class PdfLoadWidget(QWidget):
                 # 작업자가 없거나 비어있는 경우
                 if not worker_val or pd.isna(worker_val) or str(worker_val).strip() == "":
                     recent_received_date = row.get('recent_received_date')
-                    # 미할당된 경우에만 디버그 메시지를 출력
-                    print(f"[Debug] Unassigned RN: {rn_val}, Received: {recent_received_date}")
+                    
 
                     if pd.notna(recent_received_date):
                         # pandas timestamp 등을 python datetime으로 변환
@@ -331,11 +330,11 @@ class PdfLoadWidget(QWidget):
                                     # 첫 로드 시에는 알림창을 띄우지 않고 목록에만 추가
                                     if not self._is_first_load:
                                         alert_message = (
-                                            f"5분 이상 작업자가 배정되지 않았습니다.\n\n"
+                                            f"5분 이상 작업자가 배정되지 않았습니다.\n"
                                             f"RN: {rn_val}\n"
                                             f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
                                         )
-                                        show_alert("미배정 알림", alert_message, self)
+                                        show_toast("미배정 알림", alert_message, self)
                                     
                                     self._alerted_rns.add(rn_val)
                 else:
