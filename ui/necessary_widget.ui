@@ -91,6 +91,24 @@
         </item>
        </layout>
       </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_folder_copy">
+        <item>
+         <widget class="QLabel" name="label_folder_copy">
+          <property name="text">
+           <string>내 폴더 경로 복사</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButton_copy_folder">
+          <property name="text">
+           <string>복사</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
      </layout>
     </widget>
    </item>
