@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QMessageBox, QApplication, QWidget, QLabel, QVBoxLayout
+from PyQt6.QtWidgets import QMessageBox, QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QPoint, pyqtProperty, QRectF
 from PyQt6.QtGui import QColor, QPainter, QPainterPath
 
@@ -13,7 +13,7 @@ class Toast(QWidget):
     def __init__(self, title: str, message: str, parent=None):
         super().__init__(parent)
         self._opacity = 1.0
-        self._duration = 4000  # 4초 후 자동으로 사라짐
+        self._duration = 7000  # 4초 후 자동으로 사라짐
         
         # 프레임리스, 항상 위에 표시
         self.setWindowFlags(
@@ -49,6 +49,42 @@ class Toast(QWidget):
         """)
         message_label.setWordWrap(True)
         layout.addWidget(message_label)
+
+        # --- 버튼 추가 시작 ---
+        
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        button_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        confirm_button = QPushButton("확인")
+        close_button = QPushButton("닫기")
+
+        button_style = """
+            QPushButton {
+                background-color: #555;
+                color: #fff;
+                border: 1px solid #777;
+                border-radius: 5px;
+                padding: 5px 10px;
+                min-width: 60px;
+            }
+            QPushButton:hover {
+                background-color: #777;
+            }
+            QPushButton:pressed {
+                background-color: #444;
+            }
+        """
+        confirm_button.setStyleSheet(button_style)
+        close_button.setStyleSheet(button_style)
+
+        confirm_button.clicked.connect(self.close)
+        close_button.clicked.connect(self.close)
+
+        button_layout.addWidget(confirm_button)
+        button_layout.addWidget(close_button)
+        layout.addLayout(button_layout)
+        # --- 버튼 추가 끝 ---
         
         # 최소 크기 설정
         self.setMinimumWidth(320)
