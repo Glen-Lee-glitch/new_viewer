@@ -8,7 +8,7 @@ _active_toasts = []  # 토스트 알림 목록
 
 
 class Toast(QWidget):
-    """화면 우측 상단에 표시되는 토스트 알림 위젯"""
+    """화면 중앙 상단에 표시되는 토스트 알림 위젯"""
     
     def __init__(self, title: str, message: str, parent=None):
         super().__init__(parent)
@@ -91,7 +91,7 @@ class Toast(QWidget):
         self._close_timer.start(self._duration)
     
     def _position_toast(self):
-        """화면 우측 상단에 토스트를 배치한다 (여러 개일 경우 쌓임)"""
+        """화면 중앙 상단에 토스트를 배치한다 (여러 개일 경우 쌓임)"""
         screen = QApplication.primaryScreen()
         if not screen:
             return
@@ -103,8 +103,8 @@ class Toast(QWidget):
         # 현재 활성 토스트 개수 계산 (자기 자신 제외)
         active_count = len([t for t in _active_toasts if t.isVisible() and t != self])
         
-        # 우측 상단 기준 위치 계산
-        x = geometry.right() - self.width() - margin
+        # 중앙 상단 기준 위치 계산
+        x = geometry.left() + (geometry.width() - self.width()) // 2
         y = geometry.top() + margin + (active_count * (self.height() + spacing))
         
         self.move(x, y)
@@ -158,7 +158,7 @@ def show_alert(title: str, message: str, parent=None):
 
 def show_toast(title: str, message: str, parent=None):
     """
-    화면 우측 상단에 토스트 알림을 표시한다.
+    화면 중앙 상단에 토스트 알림을 표시한다.
     
     Args:
         title: 알림 제목
