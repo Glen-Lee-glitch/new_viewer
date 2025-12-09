@@ -68,6 +68,7 @@ class PdfLoadWidget(QWidget):
         self._filter_mode = 'all'  # 필터 모드: 'all', 'my', 'unfinished'
         self._worker_name = ''  # 현재 로그인한 작업자 이름
         self._payment_request_load_enabled = True  # 지급신청 로드 체크박스 상태 (기본값: True)
+        self._is_first_load = True # 프로그램 시작 시 첫 로드 여부 플래그
         self.init_ui()
         self.setup_connections()
     
@@ -326,12 +327,16 @@ class PdfLoadWidget(QWidget):
                             if (now - received_time).total_seconds() >= 300: # 5분 = 300초
                                 if rn_val not in self._alerted_rns:
                                     print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})") # 5분 경과 알림 디버그
-                                    alert_message = (
-                                        f"5분 이상 작업자가 배정되지 않았습니다.\n\n"
-                                        f"RN: {rn_val}\n"
-                                        f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
-                                    )
-                                    show_alert("미배정 알림", alert_message, self)
+                                    
+                                    # 첫 로드 시에는 알림창을 띄우지 않고 목록에만 추가
+                                    if not self._is_first_load:
+                                        alert_message = (
+                                            f"5분 이상 작업자가 배정되지 않았습니다.\n\n"
+                                            f"RN: {rn_val}\n"
+                                            f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                        )
+                                        show_alert("미배정 알림", alert_message, self)
+                                    
                                     self._alerted_rns.add(rn_val)
                 else:
                     # 작업자가 할당된 경우, 이미 알림 보낸 목록에 있다면 제거 (나중에 다시 미할당되면 알림 뜰 수 있게)
@@ -341,6 +346,10 @@ class PdfLoadWidget(QWidget):
             except Exception as e:
                 # Log the error for debugging, but don't crash the UI
                 print(f"Error checking unassigned subsidy for RN {row.get('RN', 'N/A')}: {e}")
+        
+        # 첫 로드 완료 처리
+        if self._is_first_load:
+            self._is_first_load = False
 
 
     def show_context_menu(self, pos: QPoint):
