@@ -293,14 +293,18 @@ class PdfLoadWidget(QWidget):
                     rn_item.setForeground(mail_text_color)
 
     def _check_unassigned_subsidies(self, df: pd.DataFrame):
-        """Checks for subsidies that have been unassigned for more than 5 minutes and shows an alert."""
+        """
+        5분 이상 할당되지 않은 보조금에 대해 확인하고 알림을 표시합니다.
+        미할당 상태가 지속되면 한 주기를 건너뛰고 다시 알림을 보냅니다.
+        """
         if df is None or df.empty:
             return
 
         for _, row in df.iterrows():
             try:
-                if not hasattr(self, '_alerted_rns'):
-                    self._alerted_rns = set()
+                # _alert_tracker 딕셔너리가 없으면 생성
+                if not hasattr(self, '_alert_tracker'):
+                    self._alert_tracker = {}
 
                 worker_val = row.get('worker')
                 rn_val = row.get('RN')
@@ -308,7 +312,6 @@ class PdfLoadWidget(QWidget):
                 # 작업자가 없거나 비어있는 경우
                 if not worker_val or pd.isna(worker_val) or str(worker_val).strip() == "":
                     recent_received_date = row.get('recent_received_date')
-                    
 
                     if pd.notna(recent_received_date):
                         # pandas timestamp 등을 python datetime으로 변환
@@ -322,25 +325,39 @@ class PdfLoadWidget(QWidget):
                         # received_time이 datetime 객체인 경우에만 계산
                         if isinstance(received_time, datetime):
                             now = datetime.now()
-                            # DB 시간이 Naive하다고 가정 (KST/Local)
-                            if (now - received_time).total_seconds() >= 300: # 5분 = 300초
-                                if rn_val not in self._alerted_rns:
-                                    print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})") # 5분 경과 알림 디버그
-                                    
-                                    # 첫 로드 시에는 알림창을 띄우지 않고 목록에만 추가
-                                    if not self._is_first_load:
-                                        alert_message = (
-                                            f"5분 이상 작업자가 배정되지 않았습니다.\n"
-                                            f"RN: {rn_val}\n"
-                                            f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
-                                        )
-                                        show_toast("미배정 알림", alert_message, self)
-                                        # 알림을 표시한 경우에만 _alerted_rns에 추가
-                                        self._alerted_rns.add(rn_val)
+                            # 5분 이상 미할당된 경우
+                            if (now - received_time).total_seconds() >= 300:
+                                
+                                # 첫 로드 시에는 알림을 보내지 않음
+                                if self._is_first_load:
+                                    continue
+
+                                alert_state = self._alert_tracker.get(rn_val, 0)
+                                alert_message = (
+                                    f"5분 이상 작업자가 배정되지 않았습니다.\n"
+                                    f"RN: {rn_val}\n"
+                                    f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                )
+                                
+                                if alert_state == 0:
+                                    # 상태 0: 첫 알림
+                                    print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
+                                    show_toast("미배정 알림", alert_message, self)
+                                    self._alert_tracker[rn_val] = 1
+                                
+                                elif alert_state == 1:
+                                    # 상태 1: 알림 후 첫 새로고침, 알림 건너뛰기
+                                    self._alert_tracker[rn_val] = 2
+
+                                elif alert_state == 2:
+                                    # 상태 2: 알림 후 두 번째 새로고침, 다시 알림
+                                    print(f"[알림] 미할당 지속: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
+                                    show_toast("미배정 지속 알림", alert_message, self)
+                                    self._alert_tracker[rn_val] = 1 # 다시 다음 주기는 건너뛰도록 상태 1로 복귀
                 else:
-                    # 작업자가 할당된 경우, 이미 알림 보낸 목록에 있다면 제거 (나중에 다시 미할당되면 알림 뜰 수 있게)
-                    if rn_val in self._alerted_rns:
-                        self._alerted_rns.discard(rn_val)
+                    # 작업자가 할당된 경우, 추적 목록에서 제거하여 알림 로직 초기화
+                    if rn_val in self._alert_tracker:
+                        del self._alert_tracker[rn_val]
 
             except Exception as e:
                 # Log the error for debugging, but don't crash the UI
