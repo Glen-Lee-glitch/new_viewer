@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionViewItem,
     QInputDialog,
     QButtonGroup,
+    QApplication, # QApplication import 추가
 )
 
 from core.sql_manager import (
@@ -200,8 +201,6 @@ class PdfLoadWidget(QWidget):
             table.setRowCount(0)
             return
 
-        print(f"[populate_recent_subsidy_rows] 조회된 지원금 신청 데이터: {len(df)}개")
-
         self._check_unassigned_subsidies(df)
 
         row_count = len(df)
@@ -332,28 +331,30 @@ class PdfLoadWidget(QWidget):
                                 if self._is_first_load:
                                     continue
 
-                                alert_state = self._alert_tracker.get(rn_val, 0)
-                                alert_message = (
-                                    f"5분 이상 작업자가 배정되지 않았습니다.\n"
-                                    f"RN: {rn_val}\n"
-                                    f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
-                                )
-                                
-                                if alert_state == 0:
-                                    # 상태 0: 첫 알림
-                                    print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
-                                    show_toast("미배정 알림", alert_message, self)
-                                    self._alert_tracker[rn_val] = 1
-                                
-                                elif alert_state == 1:
-                                    # 상태 1: 알림 후 첫 새로고침, 알림 건너뛰기
-                                    self._alert_tracker[rn_val] = 2
+                                # 애플리케이션이 활성화되어 있지 않을 때만 토스트 알림을 띄움
+                                if not QApplication.activeWindow() == self.window():
+                                    alert_state = self._alert_tracker.get(rn_val, 0)
+                                    alert_message = (
+                                        f"5분 이상 작업자가 배정되지 않았습니다.\n"
+                                        f"RN: {rn_val}\n"
+                                        f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                    )
+                                    
+                                    if alert_state == 0:
+                                        # 상태 0: 첫 알림
+                                        print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
+                                        show_toast("미배정 알림", alert_message, self)
+                                        self._alert_tracker[rn_val] = 1
+                                    
+                                    elif alert_state == 1:
+                                        # 상태 1: 알림 후 첫 새로고침, 알림 건너뛰기
+                                        self._alert_tracker[rn_val] = 2
 
-                                elif alert_state == 2:
-                                    # 상태 2: 알림 후 두 번째 새로고침, 다시 알림
-                                    print(f"[알림] 미할당 지속: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
-                                    show_toast("미배정 지속 알림", alert_message, self)
-                                    self._alert_tracker[rn_val] = 1 # 다시 다음 주기는 건너뛰도록 상태 1로 복귀
+                                    elif alert_state == 2:
+                                        # 상태 2: 알림 후 두 번째 새로고침, 다시 알림
+                                        print(f"[알림] 미할당 지속: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
+                                        show_toast("미배정 지속 알림", alert_message, self)
+                                        self._alert_tracker[rn_val] = 1 # 다시 다음 주기는 건너뛰도록 상태 1로 복귀
                 else:
                     # 작업자가 할당된 경우, 추적 목록에서 제거하여 알림 로직 초기화
                     if rn_val in self._alert_tracker:
