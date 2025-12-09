@@ -395,6 +395,12 @@ class MainWindow(QMainWindow):
     def _show_login_dialog(self):
         """로그인 다이얼로그를 표시하고 작업자 이름을 설정한다."""
         if self._login_dialog.exec() == QDialog.DialogCode.Accepted:
+            # 로그인 창이 있던 모니터(스크린)를 감지하여 메인 윈도우를 해당 모니터로 이동
+            # 이렇게 해야 showEvent 시 해당 모니터 해상도 기준으로 크기가 계산됨
+            target_screen = self._login_dialog.screen()
+            self.setScreen(target_screen)
+            self.move(target_screen.geometry().topLeft())
+
             self._worker_name = self._login_dialog.get_worker_name()
             self._update_worker_label()
             # 로그인 후 알람 위젯 업데이트
