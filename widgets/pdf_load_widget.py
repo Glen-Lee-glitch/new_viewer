@@ -30,6 +30,7 @@ from core.sql_manager import (
 )
 from widgets.email_view_dialog import EmailViewDialog
 from widgets.detail_form_dialog import DetailFormDialog
+from widgets.alert_dialog import show_alert
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -194,52 +195,18 @@ class PdfLoadWidget(QWidget):
             return
 
         if df is None or df.empty:
+            print("[populate_recent_subsidy_rows] 조회된 지원금 신청 데이터 없음.")
             table.setRowCount(0)
             return
 
-        # 전체보기는 이미 30개로 제한되어 있고, 내신청건/미작업건도 SQL에서 30개로 제한됨
-        # 추가 필터링 불필요
+        print(f"[populate_recent_subsidy_rows] 조회된 지원금 신청 데이터: {len(df)}개")
+
+        self._check_unassigned_subsidies(df)
 
         row_count = len(df)
         table.setRowCount(row_count)
 
         for row_index, (_, row) in enumerate(df.iterrows()):
-            # [알림] 미배정 건 5분 경과 체크
-            try:
-                if not hasattr(self, '_alerted_rns'):
-                    self._alerted_rns = set()
-
-                worker_val = row.get('worker')
-                rn_val = row.get('RN')
-
-                # 작업자가 없거나 비어있는 경우
-                if not worker_val or pd.isna(worker_val) or str(worker_val).strip() == "":
-                    recent_received_date = row.get('recent_received_date')
-                    if pd.notna(recent_received_date):
-                        # pandas timestamp 등을 python datetime으로 변환
-                        if isinstance(recent_received_date, pd.Timestamp):
-                            received_time = recent_received_date.to_pydatetime()
-                        elif isinstance(recent_received_date, str):
-                            received_time = datetime.strptime(str(recent_received_date), "%Y-%m-%d %H:%M:%S")
-                        else:
-                            received_time = recent_received_date
-
-                        # received_time이 datetime 객체인 경우에만 계산
-                        if isinstance(received_time, datetime):
-                            now = datetime.now()
-                            # DB 시간이 Naive하다고 가정 (KST/Local)
-                            if (now - received_time).total_seconds() >= 300: # 5분 = 300초
-                                if rn_val not in self._alerted_rns:
-                                    print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {recent_received_date})")
-                                    self._alerted_rns.add(rn_val)
-                else:
-                    # 작업자가 할당된 경우, 이미 알림 보낸 목록에 있다면 제거 (나중에 다시 미할당되면 알림 뜰 수 있게)
-                    if rn_val in self._alerted_rns:
-                        self._alerted_rns.discard(rn_val)
-
-            except Exception:
-                pass
-
             row_data = {
                 'rn': self._sanitize_text(row.get('RN', '')),
                 'region': self._sanitize_text(row.get('region', '')),
@@ -323,6 +290,58 @@ class PdfLoadWidget(QWidget):
                 if rn_item:
                     rn_item.setData(HighlightRole, mail_highlight_color)
                     rn_item.setForeground(mail_text_color)
+
+    def _check_unassigned_subsidies(self, df: pd.DataFrame):
+        """Checks for subsidies that have been unassigned for more than 5 minutes and shows an alert."""
+        if df is None or df.empty:
+            return
+
+        for _, row in df.iterrows():
+            try:
+                if not hasattr(self, '_alerted_rns'):
+                    self._alerted_rns = set()
+
+                worker_val = row.get('worker')
+                rn_val = row.get('RN')
+                
+                # 작업자가 없거나 비어있는 경우
+                if not worker_val or pd.isna(worker_val) or str(worker_val).strip() == "":
+                    recent_received_date = row.get('recent_received_date')
+                    # 미할당된 경우에만 디버그 메시지를 출력
+                    print(f"[Debug] Unassigned RN: {rn_val}, Received: {recent_received_date}")
+
+                    if pd.notna(recent_received_date):
+                        # pandas timestamp 등을 python datetime으로 변환
+                        if isinstance(recent_received_date, pd.Timestamp):
+                            received_time = recent_received_date.to_pydatetime()
+                        elif isinstance(recent_received_date, str):
+                            received_time = datetime.strptime(str(recent_received_date), "%Y-%m-%d %H:%M:%S")
+                        else:
+                            received_time = recent_received_date
+
+                        # received_time이 datetime 객체인 경우에만 계산
+                        if isinstance(received_time, datetime):
+                            now = datetime.now()
+                            # DB 시간이 Naive하다고 가정 (KST/Local)
+                            if (now - received_time).total_seconds() >= 300: # 5분 = 300초
+                                if rn_val not in self._alerted_rns:
+                                    print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})") # 5분 경과 알림 디버그
+                                    alert_message = (
+                                        f"5분 이상 작업자가 배정되지 않았습니다.\n\n"
+                                        f"RN: {rn_val}\n"
+                                        f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                    )
+                                    show_alert("미배정 알림", alert_message, self)
+                                    self._alerted_rns.add(rn_val)
+                else:
+                    # 작업자가 할당된 경우, 이미 알림 보낸 목록에 있다면 제거 (나중에 다시 미할당되면 알림 뜰 수 있게)
+                    if rn_val in self._alerted_rns:
+                        self._alerted_rns.discard(rn_val)
+
+            except Exception as e:
+                # Log the error for debugging, but don't crash the UI
+                print(f"Error checking unassigned subsidy for RN {row.get('RN', 'N/A')}: {e}")
+
 
     def show_context_menu(self, pos: QPoint):
         """테이블 컨텍스트 메뉴 표시"""
