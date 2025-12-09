@@ -78,7 +78,7 @@ def claim_subsidy_work(rn: str, worker: str) -> bool:
 def _build_subsidy_query_base():
     """지원금 신청 데이터 조회용 기본 쿼리 문자열을 반환한다."""
     return (
-        "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
+        "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, sa.recent_received_date, "
         # "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "  # 주석 처리됨
         "       e.attached_file_path AS original_filepath, "
         "       sa.recent_thread_id, "

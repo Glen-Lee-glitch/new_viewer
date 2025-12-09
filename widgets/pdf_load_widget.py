@@ -1,6 +1,7 @@
 from pathlib import Path
 import math
 import pandas as pd
+from datetime import datetime
 
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, QPoint, Qt, QSettings
@@ -203,6 +204,42 @@ class PdfLoadWidget(QWidget):
         table.setRowCount(row_count)
 
         for row_index, (_, row) in enumerate(df.iterrows()):
+            # [알림] 미배정 건 5분 경과 체크
+            try:
+                if not hasattr(self, '_alerted_rns'):
+                    self._alerted_rns = set()
+
+                worker_val = row.get('worker')
+                rn_val = row.get('RN')
+
+                # 작업자가 없거나 비어있는 경우
+                if not worker_val or pd.isna(worker_val) or str(worker_val).strip() == "":
+                    recent_received_date = row.get('recent_received_date')
+                    if pd.notna(recent_received_date):
+                        # pandas timestamp 등을 python datetime으로 변환
+                        if isinstance(recent_received_date, pd.Timestamp):
+                            received_time = recent_received_date.to_pydatetime()
+                        elif isinstance(recent_received_date, str):
+                            received_time = datetime.strptime(str(recent_received_date), "%Y-%m-%d %H:%M:%S")
+                        else:
+                            received_time = recent_received_date
+
+                        # received_time이 datetime 객체인 경우에만 계산
+                        if isinstance(received_time, datetime):
+                            now = datetime.now()
+                            # DB 시간이 Naive하다고 가정 (KST/Local)
+                            if (now - received_time).total_seconds() >= 300: # 5분 = 300초
+                                if rn_val not in self._alerted_rns:
+                                    print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {recent_received_date})")
+                                    self._alerted_rns.add(rn_val)
+                else:
+                    # 작업자가 할당된 경우, 이미 알림 보낸 목록에 있다면 제거 (나중에 다시 미할당되면 알림 뜰 수 있게)
+                    if rn_val in self._alerted_rns:
+                        self._alerted_rns.discard(rn_val)
+
+            except Exception:
+                pass
+
             row_data = {
                 'rn': self._sanitize_text(row.get('RN', '')),
                 'region': self._sanitize_text(row.get('region', '')),
