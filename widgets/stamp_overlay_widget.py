@@ -1,9 +1,31 @@
 from pathlib import Path
+import sys
+import os
 
 from PyQt6 import uic
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QWidget, QMenu
+
+
+# PyInstaller로 빌드된 경우와 개발 환경 구분
+def get_resource_path(relative_path):
+    """리소스 파일의 절대 경로를 반환"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller로 빌드된 경우
+        # onedir 모드: _internal 폴더에 모든 파일이 있음
+        if hasattr(sys, '_MEIPASS'):
+            # onefile 모드 (임시 폴더)
+            base_path = Path(sys._MEIPASS)
+        else:
+            # onedir 모드: 실행 파일과 같은 디렉토리의 _internal 폴더
+            base_path = Path(sys.executable).parent / '_internal'
+    else:
+        # 개발 환경
+        base_path = Path(__file__).parent.parent
+    
+    full_path = base_path / relative_path
+    return full_path
 
 
 class StampOverlayWidget(QWidget):
@@ -29,13 +51,13 @@ class StampOverlayWidget(QWidget):
             menu = QMenu(self)
             check_action = QAction("체크", self)
             check_action.triggered.connect(lambda: self._on_stamp_button_clicked(
-                {'path': 'assets/체크.png', 'width': 50}
+                {'path': str(get_resource_path('assets/체크.png')), 'width': 50}
             ))
             menu.addAction(check_action)
             
             circle_action = QAction("원", self)
             circle_action.triggered.connect(lambda: self._on_stamp_button_clicked(
-                {'path': 'assets/circle.png', 'width': 50}
+                {'path': str(get_resource_path('assets/circle.png')), 'width': 50}
             ))
             menu.addAction(circle_action)
             
@@ -44,15 +66,15 @@ class StampOverlayWidget(QWidget):
     def _connect_signals(self):
         if hasattr(self, 'stamp_button_1'):
             self.stamp_button_1.clicked.connect(lambda: self._on_stamp_button_clicked(
-                {'path': 'assets/도장1.png', 'width': 90}
+                {'path': str(get_resource_path('assets/도장1.png')), 'width': 90}
             ))
         if hasattr(self, 'stamp_button_2'):
             self.stamp_button_2.clicked.connect(lambda: self._on_stamp_button_clicked(
-                {'path': 'assets/원본대조필.png', 'width': 320}
+                {'path': str(get_resource_path('assets/원본대조필.png')), 'width': 320}
             ))
         if hasattr(self, 'stamp_button_3'):
             self.stamp_button_3.clicked.connect(lambda: self._on_stamp_button_clicked(
-                {'path': 'assets/명판.png', 'width': 360}
+                {'path': str(get_resource_path('assets/명판.png')), 'width': 360}
             ))
         if hasattr(self, 'stamp_button_4'):
             self.stamp_button_4.clicked.connect(self._on_stamp_selected)
@@ -97,16 +119,16 @@ class StampOverlayWidget(QWidget):
         key = event.key()
 
         if key == Qt.Key.Key_1:
-            self._on_stamp_button_clicked({'path': 'assets/도장1.png', 'width': 90})
+            self._on_stamp_button_clicked({'path': str(get_resource_path('assets/도장1.png')), 'width': 90})
             return
 
         if key == Qt.Key.Key_2:
             # 여기에 2번 이미지 경로와 너비를 넣으세요.
-            self._on_stamp_button_clicked({'path': 'assets/원본대조필.png', 'width': 320}) # 예시
+            self._on_stamp_button_clicked({'path': str(get_resource_path('assets/원본대조필.png')), 'width': 320}) # 예시
             return
 
         if key == Qt.Key.Key_3:
-            self._on_stamp_button_clicked({'path': 'assets/명판.png', 'width': 360})
+            self._on_stamp_button_clicked({'path': str(get_resource_path('assets/명판.png')), 'width': 360})
             return
 
         if key == Qt.Key.Key_4:
