@@ -335,8 +335,8 @@ class PdfLoadWidget(QWidget):
                                             f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
                                         )
                                         show_toast("미배정 알림", alert_message, self)
-                                    
-                                    self._alerted_rns.add(rn_val)
+                                        # 알림을 표시한 경우에만 _alerted_rns에 추가
+                                        self._alerted_rns.add(rn_val)
                 else:
                     # 작업자가 할당된 경우, 이미 알림 보낸 목록에 있다면 제거 (나중에 다시 미할당되면 알림 뜰 수 있게)
                     if rn_val in self._alerted_rns:
