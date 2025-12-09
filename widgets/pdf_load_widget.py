@@ -580,7 +580,7 @@ class PdfLoadWidget(QWidget):
         path_str = path_str.strip()
 
         if path_str.upper().startswith('C:'):
-            path_str = r'\\DESKTOP-KMJ' + path_str[2:].lstrip('\\')
+            path_str = r'\\DESKTOP-KMJ' + path_str[2:]
 
         return path_str.strip()
     
