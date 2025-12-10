@@ -1,7 +1,7 @@
 import sys
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import pymupdf
 
@@ -1044,6 +1044,30 @@ class MainWindow(QMainWindow):
             # NULL 체크
             if ai_계약일자 is None or ai_이름 is None or 전화번호 is None or 이메일 is None:
                 return 'contract'
+            
+            # 계약일자 > 오늘-4일 체크
+            try:
+                from datetime import datetime, date, timedelta
+                import pandas as pd
+                
+                contract_date = None
+                if isinstance(ai_계약일자, str):
+                    try:
+                        contract_date = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
+                    except (ValueError, AttributeError):
+                        pass
+                elif isinstance(ai_계약일자, (datetime, date)):
+                    contract_date = ai_계약일자 if isinstance(ai_계약일자, date) else ai_계약일자.date()
+                elif isinstance(ai_계약일자, pd.Timestamp):
+                    contract_date = ai_계약일자.date()
+                
+                if contract_date:
+                    today = datetime.now().date()
+                    four_days_ago = today - timedelta(days=4)
+                    if contract_date > four_days_ago:
+                        return 'contract'
+            except Exception:
+                pass
             
             # 2025년 이전 체크
             try:

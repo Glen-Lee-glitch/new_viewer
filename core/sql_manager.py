@@ -224,6 +224,35 @@ def fetch_recent_subsidy_applications():
             except (ValueError, TypeError, AttributeError, KeyError):
                 return False
 
+        def is_contract_date_outlier(row) -> bool:
+            """ai_계약일자가 오늘-4일보다 나중인 경우 True 반환"""
+            try:
+                contract_date_val = row['ai_계약일자']
+                if pd.isna(contract_date_val) or contract_date_val is None:
+                    return False
+                
+                contract_date = None
+                if isinstance(contract_date_val, str):
+                    try:
+                        contract_date = datetime.strptime(contract_date_val.split()[0], "%Y-%m-%d").date()
+                    except ValueError:
+                        return False
+                elif isinstance(contract_date_val, datetime):
+                    contract_date = contract_date_val.date()
+                elif isinstance(contract_date_val, date):
+                    contract_date = contract_date_val
+                elif isinstance(contract_date_val, pd.Timestamp):
+                    contract_date = contract_date_val.date()
+                else:
+                    return False
+
+                today = datetime.now().date()
+                four_days_ago = today - timedelta(days=4)
+                
+                return contract_date > four_days_ago
+            except (ValueError, TypeError, AttributeError, KeyError):
+                return False
+
         def update_outlier(row):
             """outlier 값을 업데이트하는 함수"""
             # 기존 outlier 값 확인
@@ -240,6 +269,10 @@ def fetch_recent_subsidy_applications():
             if current_outlier_str == 'O':
                 return 'O'
             
+            # 계약일자 이상치 체크
+            if is_contract_date_outlier(row):
+                return 'O'
+
             # 다자녀 이상치 체크
             if is_multichild_outlier(row):
                 return 'O'
@@ -358,6 +391,35 @@ def fetch_today_subsidy_applications_by_worker(worker_name: str):
             except (ValueError, TypeError, AttributeError, KeyError):
                 return False
 
+        def is_contract_date_outlier(row) -> bool:
+            """ai_계약일자가 오늘-4일보다 나중인 경우 True 반환"""
+            try:
+                contract_date_val = row['ai_계약일자']
+                if pd.isna(contract_date_val) or contract_date_val is None:
+                    return False
+                
+                contract_date = None
+                if isinstance(contract_date_val, str):
+                    try:
+                        contract_date = datetime.strptime(contract_date_val.split()[0], "%Y-%m-%d").date()
+                    except ValueError:
+                        return False
+                elif isinstance(contract_date_val, datetime):
+                    contract_date = contract_date_val.date()
+                elif isinstance(contract_date_val, date):
+                    contract_date = contract_date_val
+                elif isinstance(contract_date_val, pd.Timestamp):
+                    contract_date = contract_date_val.date()
+                else:
+                    return False
+
+                today = datetime.now().date()
+                four_days_ago = today - timedelta(days=4)
+                
+                return contract_date > four_days_ago
+            except (ValueError, TypeError, AttributeError, KeyError):
+                return False
+
         def update_outlier(row):
             current_outlier = row['outlier']
             if pd.isna(current_outlier):
@@ -471,6 +533,35 @@ def fetch_today_unfinished_subsidy_applications():
             except (ValueError, TypeError, AttributeError, KeyError):
                 return False
 
+        def is_contract_date_outlier(row) -> bool:
+            """ai_계약일자가 오늘-4일보다 나중인 경우 True 반환"""
+            try:
+                contract_date_val = row['ai_계약일자']
+                if pd.isna(contract_date_val) or contract_date_val is None:
+                    return False
+                
+                contract_date = None
+                if isinstance(contract_date_val, str):
+                    try:
+                        contract_date = datetime.strptime(contract_date_val.split()[0], "%Y-%m-%d").date()
+                    except ValueError:
+                        return False
+                elif isinstance(contract_date_val, datetime):
+                    contract_date = contract_date_val.date()
+                elif isinstance(contract_date_val, date):
+                    contract_date = contract_date_val
+                elif isinstance(contract_date_val, pd.Timestamp):
+                    contract_date = contract_date_val.date()
+                else:
+                    return False
+
+                today = datetime.now().date()
+                four_days_ago = today - timedelta(days=4)
+                
+                return contract_date > four_days_ago
+            except (ValueError, TypeError, AttributeError, KeyError):
+                return False
+
         def update_outlier(row):
             current_outlier = row['outlier']
             if pd.isna(current_outlier):
@@ -546,9 +637,29 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 # 이상치(outlier) 계산 로직 (fetch_recent_subsidy_applications의 로직 간소화 적용)
                 # 필요하다면 여기서 outlier 계산 로직을 추가하거나, 기본값만 설정
                 result['outlier'] = '' 
+
+                # 계약일자 이상치 체크
+                try:
+                    contract_date_val = result.get('ai_계약일자')
+                    if contract_date_val is not None:
+                        contract_date = None
+                        if isinstance(contract_date_val, str):
+                            contract_date = datetime.strptime(contract_date_val.split()[0], "%Y-%m-%d").date()
+                        elif isinstance(contract_date_val, (datetime, date)):
+                            contract_date = contract_date_val if isinstance(contract_date_val, date) else contract_date_val.date()
+                        elif isinstance(contract_date_val, pd.Timestamp):
+                            contract_date = contract_date_val.date()
+
+                        if contract_date:
+                            today = datetime.now().date()
+                            four_days_ago = today - timedelta(days=4)
+                            if contract_date > four_days_ago:
+                                result['outlier'] = 'O'
+                except Exception:
+                    pass
                 
                 # 0. 구매계약서 이상치 체크 (구매계약서가 있고 초본 또는 공동명의가 있는 경우)
-                if result.get('구매계약서') == 1 and (result.get('초본') == 1 or result.get('공동명의') == 1):
+                if result['outlier'] != 'O' and result.get('구매계약서') == 1 and (result.get('초본') == 1 or result.get('공동명의') == 1):
                     try:
                         ai_계약일자 = result.get('ai_계약일자')
                         ai_이름 = result.get('ai_이름')
