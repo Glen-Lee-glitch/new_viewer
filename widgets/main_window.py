@@ -1019,6 +1019,11 @@ class MainWindow(QMainWindow):
             ai_이름 = metadata.get('ai_이름')
             전화번호 = metadata.get('전화번호')
             이메일 = metadata.get('이메일')
+            차종 = metadata.get('차종')
+            
+            # 차종이 None인 경우 구매계약서 이상으로 처리
+            if 차종 is None or (isinstance(차종, str) and 차종.strip() == ''):
+                return 'contract'
             
             # NULL 체크
             if ai_계약일자 is None or ai_이름 is None or 전화번호 is None or 이메일 is None:

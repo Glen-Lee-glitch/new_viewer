@@ -278,6 +278,7 @@ class PdfLoadWidget(QWidget):
                 'ai_이름': row.get('ai_이름'),
                 '전화번호': row.get('전화번호'),
                 '이메일': row.get('이메일'),
+                '차종': row.get('차종'),  # 차종 필드 추가
                 'chobon_name': row.get('chobon_name'),  # 초본 필드 추가
                 'chobon_birth_date': row.get('chobon_birth_date'),
                 'chobon_address_1': row.get('chobon_address_1'),
@@ -784,6 +785,7 @@ class PdfLoadWidget(QWidget):
             'ai_이름': data.get('ai_이름'),
             '전화번호': data.get('전화번호'),
             '이메일': data.get('이메일'),
+            '차종': data.get('차종'),  # 차종 필드 추가
             'chobon_name': data.get('chobon_name'),
             'chobon_birth_date': data.get('chobon_birth_date'),
             'chobon_address_1': data.get('chobon_address_1'),
@@ -887,6 +889,7 @@ class PdfLoadWidget(QWidget):
             'ai_이름': data.get('ai_이름'),
             '전화번호': data.get('전화번호'),
             '이메일': data.get('이메일'),
+            '차종': data.get('차종'),  # 차종 필드 추가
             'chobon_name': data.get('chobon_name'),  # 초본 필드 추가
             'chobon_birth_date': data.get('chobon_birth_date'),
             'chobon_address_1': data.get('chobon_address_1'),
