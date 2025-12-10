@@ -98,8 +98,13 @@
     <property name="title">
      <string>설정</string>
     </property>
-  </widget>
-  <action name="action_gu_contract">
+   </widget>
+   <widget class="QMenu" name="menu_help">
+    <property name="title">
+     <string>도움말</string>
+    </property>
+   </widget>
+   <action name="action_gu_contract">
    <property name="text">
     <string>구계약관</string>
    </property>
@@ -113,6 +118,7 @@
   <addaction name="menu_edit"/>
   <addaction name="menu_view"/>
   <addaction name="menu_settings"/>
+  <addaction name="menu_help"/>
   </widget>
   <widget class="QStatusBar" name="ui_status_bar">
    <widget class="QWidget" name="ui_nav_widget" native="true">
