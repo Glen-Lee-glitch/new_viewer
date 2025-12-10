@@ -189,6 +189,13 @@
                </widget>
               </item>
               <item>
+               <widget class="QPushButton" name="pushButton_more">
+                <property name="text">
+                 <string>More</string>
+                </property>
+               </widget>
+              </item>
+              <item>
                <widget class="QLabel" name="necessary_apply_count_label">
                 <property name="text">
                  <string/>
