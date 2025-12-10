@@ -9,8 +9,9 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QStyleOptionViewItem, QStyleOptionButton, 
     QStyle, QStyledItemDelegate, QHBoxLayout, QLabel, QApplication
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush, QPainter
+from pathlib import Path
 
 from core.sql_manager import DB_CONFIG, _build_subsidy_query_base
 
@@ -48,6 +49,10 @@ class ButtonDelegate(QStyledItemDelegate):
         QApplication.style().drawControl(QStyle.ControlElement.CE_PushButton, button_opt, painter)
 
 class SubsidyHistoryDialog(QDialog):
+    # 시그널 정의
+    work_started = pyqtSignal(list, dict)  # 작업 시작 시그널 (파일 경로 리스트, 메타데이터)
+    ai_review_requested = pyqtSignal(str) # AI 검토 요청 시그널 (RN)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("지원금 신청 전체 목록")
@@ -126,11 +131,60 @@ class SubsidyHistoryDialog(QDialog):
     def _handle_cell_clicked(self, row, column):
         """테이블 셀 클릭 핸들러"""
         if column == 5: # 버튼 컬럼
-            rn_item = self.table_widget.item(row, 1)
-            rn = rn_item.text() if rn_item else "Unknown"
-            # 실제 작업 시작 로직은 부모나 다른 컴포넌트와 연동해야 할 수 있지만,
-            # 여기서는 정보 표시 정도로 구현하거나 필요시 시그널을 emit할 수 있음.
-            QMessageBox.information(self, "작업 시작", f"RN: {rn}\n(메인 윈도우에서 작업을 시작해주세요)")
+            self._start_work_by_row(row)
+
+    def _start_work_by_row(self, row):
+        """특정 행의 작업을 시작한다."""
+        table = self.table_widget
+        rn_item = table.item(row, 1)  # RN은 1번 컬럼
+
+        # AI 결과가 있는 경우 -> AI 결과 요청 시그널 emit
+        ai_item = table.item(row, 4)
+        if ai_item and ai_item.text() == 'O':
+            if rn_item:
+                self.ai_review_requested.emit(rn_item.text())
+
+        # 파일 경로는 SQL의 original_filepath에서 가져옴
+        row_data = rn_item.data(Qt.ItemDataRole.UserRole)
+        if not row_data or not isinstance(row_data, dict):
+            QMessageBox.warning(self, "파일 없음", "데이터를 불러올 수 없습니다.")
+            return
+
+        worker = row_data.get('worker')
+        finished_file_path = row_data.get('finished_file_path')
+        original_file_path = row_data.get('original_filepath')
+
+        file_path = ""
+        # 작업자가 할당된 경우, finished_file_path 우선 사용
+        if worker and finished_file_path:
+            file_path = finished_file_path
+        # 그 외의 경우 original_filepath 사용
+        else:
+            if original_file_path:
+                file_path = self._normalize_file_path(original_file_path)
+
+        if not file_path:
+            QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
+            return
+
+        # 정규화된 파일 경로
+        resolved_path = Path(file_path)
+        if not resolved_path.exists():
+            QMessageBox.warning(
+                self,
+                "파일 없음",
+                f"경로를 찾을 수 없습니다.\n{resolved_path}"
+            )
+            return
+
+        # 메타데이터 구성 (PdfLoadWidget과 동일한 구조)
+        metadata = row_data.copy()
+        
+        # 원본 파일 경로를 그대로 전달 (pdf_render.py에서 분할 파일 ex. RN123_1.pdf, RN123_2.pdf 등 감지 처리)
+        self.work_started.emit([str(resolved_path)], metadata)
+        
+        # 다이얼로그 닫기
+        self.accept()
 
     def fetch_data(self):
         """데이터베이스에서 페이징 처리하여 데이터를 조회합니다."""
@@ -207,6 +261,8 @@ class SubsidyHistoryDialog(QDialog):
                 'result': self._sanitize_text(row.get('result', '')),
                 'urgent': row.get('urgent', 0),
                 'mail_count': row.get('mail_count', 0),
+                'finished_file_path': row.get('finished_file_path', ''),  # 추가됨
+                'original_filepath': row.get('original_filepath', ''),    # 추가됨
                 # AI 관련 플래그들
                 '구매계약서': row.get('구매계약서', 0),
                 '초본': row.get('초본', 0),

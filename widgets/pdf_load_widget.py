@@ -805,6 +805,11 @@ class PdfLoadWidget(QWidget):
     def open_history_dialog(self):
         """더보기(More) 버튼 클릭 시 전체 내역 다이얼로그 표시"""
         dialog = SubsidyHistoryDialog(parent=self)
+        
+        # 다이얼로그의 시그널을 메인 위젯의 시그널과 연결 (릴레이)
+        dialog.work_started.connect(self.work_started.emit)
+        dialog.ai_review_requested.connect(self.ai_review_requested.emit)
+        
         dialog.exec()
 
     def open_pdf_file(self):
