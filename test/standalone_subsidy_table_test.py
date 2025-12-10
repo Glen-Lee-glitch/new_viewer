@@ -58,8 +58,11 @@ class ButtonDelegate(QStyledItemDelegate):
 class StandaloneSubsidyTable(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("지원금 신청 목록 테스트 (100 rows)")
-        self.resize(1000, 600)
+        self.setWindowTitle("지원금 신청 목록 테스트 (페이지네이션)")
+        self.resize(1000, 650)
+        
+        self.current_page = 0  # 현재 페이지 (0부터 시작)
+        self.page_size = 100   # 페이지 당 행 수
         
         # 메인 위젯 설정
         central_widget = QWidget()
@@ -81,6 +84,30 @@ class StandaloneSubsidyTable(QMainWindow):
         self.table_widget = QTableWidget()
         self.setup_table()
         layout.addWidget(self.table_widget)
+        
+        # 페이지네이션 컨트롤 영역
+        pagination_layout = QHBoxLayout()
+        
+        self.prev_btn = QPushButton("◀ 이전")
+        self.prev_btn.setFixedWidth(100)
+        self.prev_btn.clicked.connect(self.go_prev_page)
+        
+        self.page_label = QLabel("1 페이지")
+        self.page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.page_label.setFixedWidth(120)
+        self.page_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        
+        self.next_btn = QPushButton("다음 ▶")
+        self.next_btn.setFixedWidth(100)
+        self.next_btn.clicked.connect(self.go_next_page)
+        
+        pagination_layout.addStretch()
+        pagination_layout.addWidget(self.prev_btn)
+        pagination_layout.addWidget(self.page_label)
+        pagination_layout.addWidget(self.next_btn)
+        pagination_layout.addStretch()
+        
+        layout.addLayout(pagination_layout)
         
         # 초기 데이터 로드
         self.populate_table()
@@ -113,27 +140,27 @@ class StandaloneSubsidyTable(QMainWindow):
             rn = rn_item.text() if rn_item else "Unknown"
             QMessageBox.information(self, "작업 시작", f"RN: {rn}\n작업을 시작합니다.")
 
-    def fetch_data_limit_100(self):
-        """데이터베이스에서 최대 100개의 데이터를 조회합니다."""
+    def fetch_data(self):
+        """데이터베이스에서 페이징 처리하여 데이터를 조회합니다."""
         try:
             with closing(pymysql.connect(**DB_CONFIG)) as connection:
                 # 기본 쿼리 가져오기
                 base_query = _build_subsidy_query_base()
                 
-                # LIMIT 100으로 설정하여 쿼리 완성
+                # 페이지네이션을 위한 OFFSET 계산
+                offset = self.current_page * self.page_size
+                
+                # LIMIT과 OFFSET을 사용하여 쿼리 완성
                 query = base_query + (
                     "WHERE sa.recent_received_date >= %s "
                     "ORDER BY sa.recent_received_date DESC "
-                    "LIMIT 100"
+                    f"LIMIT {self.page_size} OFFSET {offset}"
                 )
                 params = ('2025-01-01 00:00',) # 날짜 조건은 넉넉하게 설정
                 
                 df = pd.read_sql(query, connection, params=params)
                 
-                # 이상치 계산 로직 (sql_manager에서 사용하는 로직과 유사하게 처리 필요하지만, 
-                # 여기서는 테스트 목적이므로 간단히 처리하거나 필요한 경우 sql_manager의 로직을 복사해와야 함.
-                # 편의상 outlier 컬럼이 쿼리 결과에 포함되어 있다고 가정하고(쿼리에 계산 로직 있음),
-                # 파이썬 레벨의 추가 계산 로직은 생략하거나 간단히 구현)
+                # 이상치 계산 로직 생략 (테스트 목적)
                 
                 return df
                 
@@ -141,18 +168,46 @@ class StandaloneSubsidyTable(QMainWindow):
             QMessageBox.critical(self, "에러", f"데이터 조회 중 오류 발생:\n{e}")
             return pd.DataFrame()
 
+    def go_prev_page(self):
+        """이전 페이지로 이동"""
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.populate_table()
+
+    def go_next_page(self):
+        """다음 페이지로 이동"""
+        self.current_page += 1
+        self.populate_table()
+
     def populate_table(self):
         """테이블에 데이터를 채웁니다."""
         table = self.table_widget
+        
+        # UI 업데이트
+        self.page_label.setText(f"{self.current_page + 1} 페이지")
+        self.prev_btn.setEnabled(self.current_page > 0)
         self.status_label.setText("데이터 로딩 중...")
         QApplication.processEvents()
         
-        df = self.fetch_data_limit_100()
+        df = self.fetch_data()
         
+        # 데이터가 없거나 페이지 크기보다 적으면 '다음' 버튼 비활성화 여부 결정
+        # (정확히 page_size만큼 가져왔다면 다음 페이지가 있을 수도 있고 없을 수도 있음.
+        #  완벽하게 하려면 count(*)를 하거나 page_size + 1개를 가져와야 하지만 여기선 간단히 처리)
         if df.empty:
+            if self.current_page > 0:
+                self.status_label.setText("데이터 없음 (마지막 페이지)")
+            else:
+                self.status_label.setText("데이터 없음")
             table.setRowCount(0)
-            self.status_label.setText("데이터 없음")
+            self.next_btn.setEnabled(False)
             return
+
+        # 가져온 데이터가 페이지 크기보다 작으면 마지막 페이지임
+        if len(df) < self.page_size:
+            self.next_btn.setEnabled(False)
+        else:
+            self.next_btn.setEnabled(True)
 
         table.setRowCount(len(df))
         
@@ -245,4 +300,3 @@ if __name__ == "__main__":
     window = StandaloneSubsidyTable()
     window.show()
     sys.exit(app.exec())
-
