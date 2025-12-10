@@ -250,7 +250,7 @@ class SpecialNoteDialog(QDialog):
             missing_docs=results['missing'] if results['missing'] else None,
             requirements=results['requirements'] if results['requirements'] else None,
             other_detail=results['other'],
-            target_status='작업자 확인'
+            target_status='서류미비 요청'
         )
         
         if success:
