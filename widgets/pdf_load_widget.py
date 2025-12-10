@@ -135,7 +135,7 @@ class PdfLoadWidget(QWidget):
         
         # 마지막 컬럼(5번)에 버튼 델리게이트 적용
         # setItemDelegateForColumn은 전체 델리게이트보다 우선순위가 높음
-        table.setItemDelegateForColumn(5, ButtonDelegate(table, "열기"))
+        table.setItemDelegateForColumn(5, ButtonDelegate(table, "시작"))
 
         self.populate_recent_subsidy_rows()
         table.customContextMenuRequested.connect(self.show_context_menu)
@@ -153,9 +153,16 @@ class PdfLoadWidget(QWidget):
     def setup_give_works_table(self):
         """지급 테이블 위젯 초기 설정"""
         table = self.tableWidget
-        # UI 파일에서 이미 컬럼이 설정되어 있지만, 헤더 리사이즈 모드 설정
+        
+        # 컬럼 수 6개로 증가 (기존 5개 + 버튼 컬럼)
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels(['RN', '작업자', '지역', '상태', '메모', '보기'])
+
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        # 마지막 컬럼(5번)에 버튼 델리게이트 적용
+        table.setItemDelegateForColumn(5, ButtonDelegate(table, "시작"))
         
         self.populate_give_works_rows()
     
@@ -208,6 +215,10 @@ class PdfLoadWidget(QWidget):
             # 메모 컬럼 (4번) - 빈 값으로 설정
             memo_item = QTableWidgetItem("")
             table.setItem(row_index, 4, memo_item)
+
+            # 버튼 컬럼 (5번) - 델리게이트가 그려줌
+            button_item = QTableWidgetItem("")
+            table.setItem(row_index, 5, button_item)
         
         # 디버그: RN 목록 출력
         print(f"[지급 테이블] 미완료 건수: {len(rn_list)}개")
