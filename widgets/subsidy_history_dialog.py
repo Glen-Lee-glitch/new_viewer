@@ -180,6 +180,9 @@ class SubsidyHistoryDialog(QDialog):
         # 메타데이터 구성 (PdfLoadWidget과 동일한 구조)
         metadata = row_data.copy()
         
+        # 다이얼로그를 먼저 숨겨서 사용자에게 즉각적인 피드백 제공
+        self.hide()
+        
         # 원본 파일 경로를 그대로 전달 (pdf_render.py에서 분할 파일 ex. RN123_1.pdf, RN123_2.pdf 등 감지 처리)
         self.work_started.emit([str(resolved_path)], metadata)
         
