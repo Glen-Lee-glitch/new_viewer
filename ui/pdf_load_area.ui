@@ -179,6 +179,16 @@
                </widget>
               </item>
               <item>
+               <widget class="QCheckBox" name="ai_checkbox">
+                <property name="text">
+                 <string>AI = O</string>
+                </property>
+                <property name="checked">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
                <widget class="QLabel" name="necessary_apply_count_label">
                 <property name="text">
                  <string/>

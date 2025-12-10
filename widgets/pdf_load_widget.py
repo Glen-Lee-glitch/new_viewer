@@ -294,6 +294,9 @@ class PdfLoadWidget(QWidget):
                 if rn_item:
                     rn_item.setData(HighlightRole, mail_highlight_color)
                     rn_item.setForeground(mail_text_color)
+        
+        # AI 체크박스 필터링 적용
+        self._apply_ai_filter()
 
     def _check_unassigned_subsidies(self, df: pd.DataFrame):
         """
@@ -615,6 +618,26 @@ class PdfLoadWidget(QWidget):
         # 테이블 데이터 다시 로드 (필터 적용)
         self.populate_recent_subsidy_rows()
     
+    def _on_ai_filter_changed(self):
+        """AI 체크박스 상태 변경 시 호출되는 슬롯"""
+        self._apply_ai_filter()
+    
+    def _apply_ai_filter(self):
+        """AI 체크박스 상태에 따라 테이블 행을 필터링한다."""
+        if not hasattr(self, 'ai_checkbox') or not hasattr(self, 'complement_table_widget'):
+            return
+        
+        table = self.complement_table_widget
+        is_checked = self.ai_checkbox.isChecked()
+        
+        # 체크박스가 체크되어 있으면 AI='O'인 row만 표시
+        for row_index in range(table.rowCount()):
+            ai_item = table.item(row_index, 4)  # AI 컬럼은 4번 인덱스
+            if ai_item:
+                ai_value = ai_item.text()
+                # AI='O'인 경우에만 표시, 체크박스가 해제되어 있으면 모두 표시
+                table.setRowHidden(row_index, is_checked and ai_value != 'O')
+    
     def set_worker_name(self, worker_name: str):
         """작업자 이름을 설정한다."""
         self._worker_name = worker_name or ''
@@ -631,6 +654,8 @@ class PdfLoadWidget(QWidget):
             self.center_refresh_btn.clicked.connect(lambda: self.refresh_data(force_refresh_give_works=True))
         if hasattr(self, 'pushButton'):
             self.pushButton.clicked.connect(self.open_by_rn)
+        if hasattr(self, 'ai_checkbox'):
+            self.ai_checkbox.stateChanged.connect(self._on_ai_filter_changed)
     
     def open_by_rn(self):
         """RN 번호를 입력받아 작업을 시작한다."""
