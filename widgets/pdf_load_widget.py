@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import (
     QInputDialog,
     QButtonGroup,
     QApplication, # QApplication import 추가
+    QStyle,
+    QStyleOptionButton,
 )
 
 from core.sql_manager import (
@@ -53,6 +55,28 @@ class HighlightDelegate(QStyledItemDelegate):
         else:
             # 커스텀 배경색이 없으면 기본 동작 수행
             super().paint(painter, option, index)
+
+
+class ButtonDelegate(QStyledItemDelegate):
+    """버튼 모양을 그리는 델리게이트 (최적화용)"""
+    def __init__(self, parent=None, text="보기"):
+        super().__init__(parent)
+        self.text = text
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index):
+        # 기본 배경 그리기 (선택 상태 등 처리)
+        super().paint(painter, option, index)
+        
+        # 버튼 스타일 옵션 설정
+        button_opt = QStyleOptionButton()
+        # 셀 크기보다 약간 작게 설정하여 여백 주기
+        margin = 4
+        button_opt.rect = option.rect.adjusted(margin, margin, -margin, -margin)
+        button_opt.text = self.text
+        button_opt.state = QStyle.StateFlag.State_Enabled | QStyle.StateFlag.State_Active
+        
+        # 버튼 그리기
+        QApplication.style().drawControl(QStyle.ControlElement.CE_PushButton, button_opt, painter)
 
 
 class PdfLoadWidget(QWidget):
@@ -96,8 +120,9 @@ class PdfLoadWidget(QWidget):
     def setup_table(self):
         """테이블 위젯 초기 설정"""
         table = self.complement_table_widget
-        table.setColumnCount(5)
-        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '결과', 'AI'])
+        # 컬럼 수 6개로 증가 (기존 5개 + 버튼 컬럼)
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '결과', 'AI', '보기'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -105,8 +130,12 @@ class PdfLoadWidget(QWidget):
         # 커스텀 배경색이 alternatingRowColors에 의해 덮어씌워지는 것을 방지
         table.setAlternatingRowColors(False)
         
-        # 커스텀 델리게이트 적용
+        # 커스텀 델리게이트 적용 (기존 HighlightDelegate)
         table.setItemDelegate(HighlightDelegate(table))
+        
+        # 마지막 컬럼(5번)에 버튼 델리게이트 적용
+        # setItemDelegateForColumn은 전체 델리게이트보다 우선순위가 높음
+        table.setItemDelegateForColumn(5, ButtonDelegate(table, "열기"))
 
         self.populate_recent_subsidy_rows()
         table.customContextMenuRequested.connect(self.show_context_menu)
@@ -268,6 +297,10 @@ class PdfLoadWidget(QWidget):
             ai_item = QTableWidgetItem(ai_status)
             table.setItem(row_index, 4, ai_item)
 
+            # 버튼 컬럼 아이템 추가 (5번) - 델리게이트가 그려줌
+            button_item = QTableWidgetItem("")
+            table.setItem(row_index, 5, button_item)
+            
             # finished_file_path를 row_data에 추가
             row_data['finished_file_path'] = self._normalize_file_path(row.get('finished_file_path'))
             rn_item.setData(Qt.ItemDataRole.UserRole, row_data)
