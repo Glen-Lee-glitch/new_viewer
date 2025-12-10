@@ -1060,9 +1060,9 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         return self.page_rotations
 
     def set_mail_content(self, content: str):
-        """메일 content를 오버레이에 표시"""
+        """메일 content를 오버레이에 설정 (기본적으로 숨김 상태)"""
         if content:
             self.mail_overlay.set_content(content)
-            self.mail_overlay.show_overlay(self.size())  # 처음에는 자동으로 보임
+            # 기본적으로 숨김 상태로 유지 (m 키나 툴바 버튼으로 표시)
         else:
             self.mail_overlay.hide()
