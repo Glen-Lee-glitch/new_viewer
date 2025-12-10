@@ -942,6 +942,22 @@ class MainWindow(QMainWindow):
             msg_box.setText(message)
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
+
+            # 구매계약서 이상인 경우 자동 페이지 이동
+            if outlier_type == 'contract':
+                try:
+                    page_number_raw = self._pending_outlier_metadata_copy.get('page_number')
+                    if page_number_raw:
+                        # 1-based page number를 0-based로 변환
+                        page_number = int(page_number_raw) - 1
+                        
+                        # 유효성 검증 및 페이지 이동
+                        total_pages = self.renderer.get_page_count()
+                        if 0 <= page_number < total_pages:
+                            # 약간의 지연 후 페이지 이동 (메시지박스가 완전히 닫힌 후)
+                            QTimer.singleShot(100, lambda: self.go_to_page(page_number))
+                except (ValueError, TypeError):
+                    pass
     
     def _determine_outlier_type(self, metadata: dict | None) -> str:
         """
