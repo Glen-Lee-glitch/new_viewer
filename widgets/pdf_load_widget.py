@@ -34,6 +34,7 @@ from core.sql_manager import (
 from widgets.email_view_dialog import EmailViewDialog
 from widgets.detail_form_dialog import DetailFormDialog
 from widgets.alert_dialog import show_alert, show_toast
+from widgets.subsidy_history_dialog import SubsidyHistoryDialog
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -705,6 +706,8 @@ class PdfLoadWidget(QWidget):
             self.center_refresh_btn.clicked.connect(lambda: self.refresh_data(force_refresh_give_works=True))
         if hasattr(self, 'pushButton'):
             self.pushButton.clicked.connect(self.open_by_rn)
+        if hasattr(self, 'pushButton_more'):
+            self.pushButton_more.clicked.connect(self.open_history_dialog)
         if hasattr(self, 'ai_checkbox'):
             self.ai_checkbox.stateChanged.connect(self._on_ai_filter_changed)
     
@@ -798,6 +801,11 @@ class PdfLoadWidget(QWidget):
         
         # 작업 시작 시그널 발생
         self.work_started.emit([str(resolved_path)], metadata)
+
+    def open_history_dialog(self):
+        """더보기(More) 버튼 클릭 시 전체 내역 다이얼로그 표시"""
+        dialog = SubsidyHistoryDialog(parent=self)
+        dialog.exec()
 
     def open_pdf_file(self):
         """로컬에서 PDF 또는 이미지 파일을 연다 (다중 선택 가능)"""
