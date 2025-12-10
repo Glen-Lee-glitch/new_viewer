@@ -109,6 +109,9 @@ class MainWindow(QMainWindow):
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 여부
         self._pending_outlier_check = False  # PDF 렌더 완료 후 이상치 체크 플래그
         self._pending_outlier_metadata = None  # 이상치 메타데이터 저장용
+        self._pending_outlier_metadata_copy = None # 이상치 처리 중 사용할 메타데이터 복사본
+        self._outlier_queue = [] # 순차 처리를 위한 이상치 큐
+        self._original_outlier_types = [] # 페이지 이동 로직을 위한 원본 이상치 목록
         
         # 초기 상태에서 작업자 현황 버튼 숨김
         if hasattr(self, 'pushButton_worker_progress'):
@@ -897,81 +900,95 @@ class MainWindow(QMainWindow):
             self._pending_outlier_check = False  # 플래그 리셋
             
             # 이상치 종류 판단
-            outlier_type = self._determine_outlier_type(self._pending_outlier_metadata)
+            self._original_outlier_types = self._determine_outlier_type(self._pending_outlier_metadata)
+            self._outlier_queue = self._original_outlier_types[:] # 처리할 큐 복사
             
-            # 메타데이터 복사본 저장 (다자녀 다이얼로그에서 사용하기 위함)
+            # 메타데이터 복사본 저장
             self._pending_outlier_metadata_copy = self._pending_outlier_metadata
-            self._pending_outlier_metadata = None  # 메타데이터 리셋
+            self._pending_outlier_metadata = None  # 원본 메타데이터 리셋
             
-            # 다자녀 이상치인 경우 전용 다이얼로그 표시
-            if outlier_type == 'multichild':
-                child_birth_date_str = self._pending_outlier_metadata_copy.get('child_birth_date')
-                dates = []
-                try:
-                    import json
-                    dates = json.loads(child_birth_date_str) if isinstance(child_birth_date_str, str) else child_birth_date_str
-                    if not isinstance(dates, list):
-                        dates = []
-                except Exception:
-                    dates = []
-                
-                dialog = MultiChildCheckDialog(dates, self)
-                dialog.exec()
-                return
+            # 순차적으로 이상치 처리 시작
+            self._process_outlier_queue()
 
-            # 메시지 설정
-            if outlier_type == 'contract':
-                title = "구매계약서 이상"
-                message = "구매계약서 이상!"
-            elif outlier_type == 'contract_missing':
-                title = "구매계약서 확인 불가"
-                message = "구매계약서 확인 불가!"
-            elif outlier_type == 'chobon_missing':
-                title = "초본 없음"
-                message = "초본 없음!"
-            elif outlier_type == 'chobon':
-                title = "초본 이상"
-                message = "초본 이상!"
-            else:
-                title = "서류 이상"
-                message = "서류 이상!"
-            
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle(title)
-            msg_box.setText(message)
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
-
-            # 구매계약서 이상인 경우 자동 페이지 이동
-            if outlier_type == 'contract':
+    def _process_outlier_queue(self):
+        """이상치 큐를 순차적으로 처리하여 다이얼로그를 표시한다."""
+        if not self._outlier_queue:
+            # 큐가 비었으면 페이지 이동 로직 처리 후 종료
+            if 'contract' in self._original_outlier_types:
                 try:
                     page_number_raw = self._pending_outlier_metadata_copy.get('page_number')
                     if page_number_raw:
-                        # 1-based page number를 0-based로 변환
                         page_number = int(page_number_raw) - 1
-                        
-                        # 유효성 검증 및 페이지 이동
                         total_pages = self.renderer.get_page_count()
                         if 0 <= page_number < total_pages:
-                            # 약간의 지연 후 페이지 이동 (메시지박스가 완전히 닫힌 후)
-                            QTimer.singleShot(100, lambda: self.go_to_page(page_number))
+                            self.go_to_page(page_number)
                 except (ValueError, TypeError):
                     pass
+            
+            # 정리
+            self._original_outlier_types = []
+            self._pending_outlier_metadata_copy = None
+            return
+
+        outlier_type = self._outlier_queue.pop(0)
+
+        # 타입에 따라 다이얼로그 표시
+        if outlier_type == 'multichild':
+            child_birth_date_str = self._pending_outlier_metadata_copy.get('child_birth_date')
+            dates = []
+            try:
+                import json
+                dates = json.loads(child_birth_date_str) if isinstance(child_birth_date_str, str) else child_birth_date_str
+                if not isinstance(dates, list): dates = []
+            except Exception:
+                dates = []
+            
+            dialog = MultiChildCheckDialog(dates, self)
+            dialog.exec()
+
+        elif outlier_type == 'contract':
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("구매계약서 이상")
+            msg_box.setText("구매계약서 이상!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+
+        elif outlier_type == 'contract_missing':
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("구매계약서 확인 불가")
+            msg_box.setText("구매계약서 확인 불가!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+
+        elif outlier_type == 'chobon':
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("초본 이상")
+            msg_box.setText("초본 이상!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+
+        elif outlier_type == 'chobon_missing':
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("초본 없음")
+            msg_box.setText("초본 없음!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+
+        # 현재 다이얼로그가 닫힌 후, 다음 큐 아이템을 처리하도록 스케줄링
+        QTimer.singleShot(0, self._process_outlier_queue)
     
-    def _determine_outlier_type(self, metadata: dict | None) -> str:
+    def _determine_outlier_type(self, metadata: dict | None) -> list[str]:
         """
-        메타데이터를 기반으로 이상치 종류를 판단한다.
-        
-        Returns:
-            'contract': 구매계약서 이상치
-            'contract_missing': 구매계약서 없음
-            'chobon': 초본 이상치
-            'chobon_missing': 초본 없음
-            'other': 기타 이상치
+        메타데이터를 기반으로 이상치 종류를 판단하여 리스트로 반환한다.
         """
         if not metadata:
-            return 'other'
+            return []
+        
+        outlier_types = []
         
         구매계약서 = metadata.get('구매계약서', 0) == 1
         초본 = metadata.get('초본', 0) == 1
@@ -983,7 +1000,7 @@ class MainWindow(QMainWindow):
         
         # 구매계약서가 0이고 초본이 1인 경우
         if 구매계약서값 == 0 and 초본값 == 1:
-            return 'contract_missing'
+            outlier_types.append('contract_missing')
         
         # 초본이 0이고 구매계약서가 1인 경우 (초본 없음은 이미 chobon_missing으로 처리됨)
         # 하지만 명시적으로 체크할 수도 있음
@@ -1023,7 +1040,8 @@ class MainWindow(QMainWindow):
                                     is_over_18 = True
                             
                             if is_over_18:
-                                return 'multichild'
+                                outlier_types.append('multichild')
+                                break # 한 명이라도 발견되면 중단
                         except (ValueError, TypeError):
                             pass
                 except Exception:
@@ -1039,11 +1057,11 @@ class MainWindow(QMainWindow):
             
             # 차종이 None인 경우 구매계약서 이상으로 처리
             if 차종 is None or (isinstance(차종, str) and 차종.strip() == ''):
-                return 'contract'
+                if 'contract' not in outlier_types: outlier_types.append('contract')
             
             # NULL 체크
             if ai_계약일자 is None or ai_이름 is None or 전화번호 is None or 이메일 is None:
-                return 'contract'
+                if 'contract' not in outlier_types: outlier_types.append('contract')
             
             # 계약일자 > 오늘-4일 체크
             try:
@@ -1065,7 +1083,7 @@ class MainWindow(QMainWindow):
                     today = datetime.now().date()
                     four_days_ago = today - timedelta(days=4)
                     if contract_date > four_days_ago:
-                        return 'contract'
+                        if 'contract' not in outlier_types: outlier_types.append('contract')
             except Exception:
                 pass
             
@@ -1078,16 +1096,16 @@ class MainWindow(QMainWindow):
                     try:
                         contract_date = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
                         if contract_date < date(2025, 1, 1):
-                            return 'contract'
+                            if 'contract' not in outlier_types: outlier_types.append('contract')
                     except (ValueError, AttributeError):
                         pass
                 elif isinstance(ai_계약일자, (datetime, date)):
                     contract_date = ai_계약일자 if isinstance(ai_계약일자, date) else ai_계약일자.date()
                     if contract_date < date(2025, 1, 1):
-                        return 'contract'
+                        if 'contract' not in outlier_types: outlier_types.append('contract')
                 elif isinstance(ai_계약일자, pd.Timestamp):
                     if ai_계약일자.date() < date(2025, 1, 1):
-                        return 'contract'
+                        if 'contract' not in outlier_types: outlier_types.append('contract')
             except Exception:
                 pass
         
@@ -1100,12 +1118,12 @@ class MainWindow(QMainWindow):
             
             # chobon == 0이면 "초본 없음"으로 처리
             if chobon == 0:
-                return 'chobon_missing'
+                outlier_types.append('chobon_missing')
             
             if chobon_name is None or chobon_birth_date is None or chobon_address_1 is None:
-                return 'chobon'
+                outlier_types.append('chobon')
         
-        return 'other'
+        return outlier_types
     
     def _on_data_refreshed(self):
         """데이터 새로고침 완료 시 호출되는 슬롯"""
