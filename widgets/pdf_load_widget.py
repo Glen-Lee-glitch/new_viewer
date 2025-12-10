@@ -140,6 +140,15 @@ class PdfLoadWidget(QWidget):
         self.populate_recent_subsidy_rows()
         table.customContextMenuRequested.connect(self.show_context_menu)
         table.cellDoubleClicked.connect(self._handle_cell_double_clicked)
+        table.cellClicked.connect(self._handle_cell_clicked)
+    
+    def _handle_cell_clicked(self, row, column):
+        """테이블 셀 클릭 시 처리"""
+        # 버튼 컬럼(5번) 클릭 시 작업 시작
+        if column == 5:
+            self._is_context_menu_work = True
+            self._start_work_by_row(row)
+            self._is_context_menu_work = False
     
     def setup_give_works_table(self):
         """지급 테이블 위젯 초기 설정"""
@@ -522,18 +531,22 @@ class PdfLoadWidget(QWidget):
 
     def start_selected_work(self):
         """선택된 행을 emit하여 다운로드 로직이 처리하도록 한다."""
-        # 컨텍스트 메뉴를 통한 작업 시작임을 표시
-        self._is_context_menu_work = True
-        
         table = self.complement_table_widget
         selected_items = table.selectedItems()
         if not selected_items:
             QMessageBox.information(self, "선택 필요", "작업을 시작할 행을 선택해주세요.")
-            self._is_context_menu_work = False  # 실패 시 플래그 리셋
             return
 
-        row = selected_items[0].row() # tablewidget 에서 선택된 행 중 가장 첫 번째 행에 대해서 시작하도록
-        rn_item = table.item(row, 1)  # RN은 이제 1번 컬럼
+        row = selected_items[0].row()
+        
+        self._is_context_menu_work = True
+        self._start_work_by_row(row)
+        self._is_context_menu_work = False
+
+    def _start_work_by_row(self, row):
+        """특정 행의 작업을 시작한다."""
+        table = self.complement_table_widget
+        rn_item = table.item(row, 1)  # RN은 1번 컬럼
 
         # AI 결과가 있는 경우 -> AI 결과 창 열기
         ai_item = table.item(row, 4)
@@ -545,7 +558,6 @@ class PdfLoadWidget(QWidget):
         row_data = rn_item.data(Qt.ItemDataRole.UserRole)
         if not row_data or not isinstance(row_data, dict):
             QMessageBox.warning(self, "파일 없음", "데이터를 불러올 수 없습니다.")
-            self._is_context_menu_work = False
             return
 
         worker = row_data.get('worker')
@@ -563,7 +575,6 @@ class PdfLoadWidget(QWidget):
 
         if not file_path:
             QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
-            self._is_context_menu_work = False
             return
 
         # 정규화된 파일 경로 -> 추후에 load_document 에서 사용
@@ -574,7 +585,6 @@ class PdfLoadWidget(QWidget):
                 "파일 없음",
                 f"경로를 찾을 수 없습니다.\n{resolved_path}"
             )
-            self._is_context_menu_work = False
             return
 
         metadata = self._extract_row_metadata(rn_item)
@@ -593,9 +603,6 @@ class PdfLoadWidget(QWidget):
 
         # 원본 파일 경로를 그대로 전달 (pdf_render.py에서 분할 파일 ex. RN123_1.pdf, RN123_2.pdf 등 감지 처리)
         self.work_started.emit([str(resolved_path)], metadata)
-        
-        # 작업 시작 후 플래그 리셋
-        self._is_context_menu_work = False
     
     @staticmethod
     def _normalize_file_path(raw_path):
