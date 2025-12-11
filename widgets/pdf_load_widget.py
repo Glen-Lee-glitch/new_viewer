@@ -29,7 +29,8 @@ from core.sql_manager import (
     fetch_today_subsidy_applications_by_worker,
     fetch_today_unfinished_subsidy_applications,
     get_email_by_thread_id,
-    check_gemini_flags
+    check_gemini_flags,
+    update_give_works_worker
 )
 from widgets.email_view_dialog import EmailViewDialog
 from widgets.detail_form_dialog import DetailFormDialog
@@ -160,6 +161,20 @@ class PdfLoadWidget(QWidget):
             if rn_item:
                 rn = rn_item.text().strip()
                 print(f"[지급 시작] RN: {rn}")
+                
+                # 현재 작업자 이름으로 give_works 테이블 업데이트
+                if self._worker_name:
+                    success = update_give_works_worker(rn, self._worker_name)
+                    if success:
+                        print(f"[지급 시작] 신청자 업데이트 완료: {self._worker_name}")
+                        # 테이블의 신청자 컬럼(1번)도 업데이트
+                        worker_item = table.item(row, 1)
+                        if worker_item:
+                            worker_item.setText(self._worker_name)
+                    else:
+                        print(f"[지급 시작] 신청자 업데이트 실패")
+                else:
+                    print(f"[지급 시작] 작업자 이름이 설정되지 않았습니다.")
                 
                 # 파일 경로 설정
                 search_dir = Path(r"C:\Users\HP\Desktop\Tesla\24q4\지급\지급서류\merged")
