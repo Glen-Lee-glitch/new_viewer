@@ -151,6 +151,16 @@ class PdfLoadWidget(QWidget):
             self._start_work_by_row(row)
             self._is_context_menu_work = False
     
+    def _handle_give_works_cell_clicked(self, row, column):
+        """지급 테이블 셀 클릭 시 처리"""
+        # 버튼 컬럼(5번) 클릭 시 RN 출력
+        if column == 5:
+            table = self.tableWidget
+            rn_item = table.item(row, 0)  # RN은 0번 컬럼
+            if rn_item:
+                rn = rn_item.text().strip()
+                print(f"[지급 시작] RN: {rn}")
+    
     def setup_give_works_table(self):
         """지급 테이블 위젯 초기 설정"""
         table = self.tableWidget
@@ -164,6 +174,9 @@ class PdfLoadWidget(QWidget):
         
         # 마지막 컬럼(5번)에 버튼 델리게이트 적용
         table.setItemDelegateForColumn(5, ButtonDelegate(table, "시작"))
+        
+        # 클릭 이벤트 연결
+        table.cellClicked.connect(self._handle_give_works_cell_clicked)
         
         self.populate_give_works_rows()
     
