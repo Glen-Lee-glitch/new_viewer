@@ -168,7 +168,10 @@ class PdfLoadWidget(QWidget):
                 pdf_files = list(search_dir.glob(f"*{rn}*.pdf"))
                 
                 if pdf_files:
-                    print(f"[지급 시작] 파일 존재: {pdf_files[0].name}")
+                    pdf_path = pdf_files[0]  # 첫 번째 파일 사용
+                    print(f"[지급 시작] 파일 존재: {pdf_path.name}")
+                    # PDF 파일을 열어서 편집 모드로 진입
+                    self.pdf_selected.emit([str(pdf_path)])
                 else:
                     print(f"[지급 시작] 파일 없음: RN {rn}에 해당하는 PDF 파일을 찾을 수 없습니다.")
     
