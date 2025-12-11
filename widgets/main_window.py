@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import pytz
 import pymupdf
+import traceback
 
 from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
@@ -657,10 +658,11 @@ class MainWindow(QMainWindow):
         self._is_current_file_processed = is_preprocessed
         
         if self._is_context_menu_work:
-            print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
+            # print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
+            pass
         
-        print(f"[디버그] _handle_work_started - 수신된 metadata: {metadata}")
-        print(f"[디버그] _handle_work_started - outlier 값: {metadata.get('outlier', 'N/A')}")
+        # print(f"[디버그] _handle_work_started - 수신된 metadata: {metadata}")
+        # print(f"[디버그] _handle_work_started - outlier 값: {metadata.get('outlier', 'N/A')}")
 
         # 메일 content 조회
         thread_id = metadata.get('recent_thread_id')
@@ -702,6 +704,7 @@ class MainWindow(QMainWindow):
             if outlier_value == 'O': # outlier 값이 'O'이면 이상치 체크 플래그 설정
                 self._pending_outlier_check = True
                 self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
+                # print(f"[디버그 main_window] _handle_work_started - 저장된 _pending_outlier_metadata: {self._pending_outlier_metadata}")
             else:
                 self._pending_outlier_check = False # outlier가 'O'가 아니면 플래그 리셋
                 self._pending_outlier_metadata = None
@@ -738,6 +741,7 @@ class MainWindow(QMainWindow):
         if outlier_value == 'O': # outlier 값이 'O'이면 이상치 체크 플래그 설정
             self._pending_outlier_check = True
             self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
+            # print(f"[디버그 main_window] _handle_work_started - 저장된 _pending_outlier_metadata (두 번째 블록): {self._pending_outlier_metadata}")
         else:
             self._pending_outlier_check = False # outlier가 'O'가 아니면 플래그 리셋
             self._pending_outlier_metadata = None
@@ -966,6 +970,7 @@ class MainWindow(QMainWindow):
         if self._pending_outlier_check:
             self._pending_outlier_check = False  # 플래그 리셋
             
+            # print(f"[디버그 main_window] _check_and_show_outlier_reminder - 호출 전 _pending_outlier_metadata: {self._pending_outlier_metadata}")
             # 이상치 종류 판단
             self._original_outlier_types = self._determine_outlier_type(self._pending_outlier_metadata)
             self._outlier_queue = self._original_outlier_types[:] # 처리할 큐 복사
@@ -1223,31 +1228,50 @@ class MainWindow(QMainWindow):
             
             # 초본 issue_date 이상치 체크 (31일 이상) - 이전에 sql_manager.py에서 계산된 값 활용
             issue_date = metadata.get('issue_date')
+            # print(f"[디버그 main_window] _determine_outlier_type - issue_date raw: {issue_date}, type: {type(issue_date)}")
             if issue_date and isinstance(issue_date, (str, datetime, date, pd.Timestamp)):
                 try:
                     from datetime import datetime, date, timedelta
                     import pytz
-                    
+
                     issue_date_obj = None
                     if isinstance(issue_date, str):
+                        # print(f"[디버그 main_window] issue_date (str) 파싱 시도: {issue_date}")
                         try:
-                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                            # ISO 8601 형식 처리 (예: "2025-04-28T15:00:00.000Z")
+                            issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
+                            # print(f"[디버그 main_window] ISO 8601 파싱 성공: {issue_date_obj}")
                         except ValueError:
-                            pass
+                            try:
+                                # 다른 문자열 형식 처리 (예: "2025-04-28 00:00:00")
+                                issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                                # print(f"[디버그 main_window] 일반 문자열 파싱 성공: {issue_date_obj}")
+                            except ValueError:
+                                pass # 파싱 실패 시 issue_date_obj는 None 유지
+                                # print(f"[디버그 main_window] 문자열 파싱 실패")
                     elif isinstance(issue_date, (datetime, date)):
                         issue_date_obj = issue_date if isinstance(issue_date, date) else issue_date.date()
+                        # print(f"[디버그 main_window] datetime/date 타입: {issue_date_obj}")
                     elif isinstance(issue_date, pd.Timestamp):
                         issue_date_obj = issue_date.date()
-                    
+                        # print(f"[디버그 main_window] pd.Timestamp 타입: {issue_date_obj}")
+
+                    # print(f"[디버그 main_window] 최종 issue_date_obj: {issue_date_obj}")
+
                     if issue_date_obj:
                         kst = pytz.timezone('Asia/Seoul')
                         today = datetime.now(kst).date()
-                        if (today - issue_date_obj).days >= 31:
+                        # print(f"[디버그 main_window] 오늘 날짜: {today}")
+                        days_diff = (today - issue_date_obj).days
+                        # print(f"[디버그 main_window] 날짜 차이 (일): {days_diff}")
+                        if days_diff >= 31:
                             if 'chobon_issue_date_outlier' not in outlier_types: outlier_types.append('chobon_issue_date_outlier')
+                            # print(f"[디버그 main_window] 'chobon_issue_date_outlier' 추가됨")
                 except Exception:
-                    pass
-        print(f"[디버그] _determine_outlier_type - region_val: {region_val}")
-        print(f"[디버그] _determine_outlier_type - address_1_val: {address_1_val}")
+                    traceback.print_exc()
+                    # print(f"[디버그 main_window] 초본 발행일 이상치 체크 중 예외 발생")
+        # print(f"[디버그] _determine_outlier_type - region_val: {region_val}")
+        # print(f"[디버그] _determine_outlier_type - address_1_val: {address_1_val}")
         print(f"[디버그] _determine_outlier_type - 최종 outlier_types: {outlier_types}")
         return outlier_types
     

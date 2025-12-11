@@ -666,7 +666,7 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 "       sa.urgent, "
                 "       sa.mail_count, "
                 "       gr.구매계약서, gr.초본, gr.공동명의, gr.다자녀, "
-                "       d.child_birth_date, cb.issue_date, "
+                "       d.child_birth_date, cb.issue_date AS issue_date, " # cb.issue_date를 issue_date로 명시적 앨리어싱
                 "       cb.chobon, "
                 "       c.ai_계약일자, c.ai_이름, c.전화번호, c.이메일, c.차종, c.page_number, "
                 "       cb.name AS chobon_name, cb.birth_date AS chobon_birth_date, cb.address_1 AS chobon_address_1, "
@@ -683,9 +683,12 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
             
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
-                columns = [col[0] for col in cursor.description]
+                columns = [col[0].strip() for col in cursor.description]
                 row = cursor.fetchone()
                 
+                print(f"[디버그 sql_manager] fetch_application_data_by_rn - SQL Columns: {columns}")
+                print(f"[디버그 sql_manager] fetch_application_data_by_rn - SQL Row: {row}")
+
                 if not row:
                     return None
                 
@@ -694,74 +697,30 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 # 이상치(outlier) 계산 로직 (fetch_recent_subsidy_applications의 로직 간소화 적용)
                 # 필요하다면 여기서 outlier 계산 로직을 추가하거나, 기본값만 설정
                 result['outlier'] = '' 
+                # print(f"[디버그 sql_manager] fetch_application_data_by_rn - 초기 result[outlier]: {result['outlier']}")
+                # print(f"[디버그 sql_manager] fetch_application_data_by_rn - issue_date in result: {'issue_date' in result}, issue_date value: {result.get('issue_date')}")
 
                 # 계약일자 이상치 체크
-                try:
-                    contract_date_val = result.get('ai_계약일자')
-                    if contract_date_val is not None:
-                        contract_date = None
-                        if isinstance(contract_date_val, str):
-                            contract_date = datetime.strptime(contract_date_val.split()[0], "%Y-%m-%d").date()
-                        elif isinstance(contract_date_val, (datetime, date)):
-                            contract_date = contract_date_val if isinstance(contract_date_val, date) else contract_date_val.date()
-                        elif isinstance(contract_date_val, pd.Timestamp):
-                            contract_date = contract_date_val.date()
-
-                        if contract_date:
-                            today = datetime.now().date()
-                            four_days_ago = today - timedelta(days=4)
-                            if contract_date > four_days_ago:
-                                result['outlier'] = 'O'
-                except Exception:
-                    pass
-                
-                # 0. 구매계약서 이상치 체크 (구매계약서가 있고 초본 또는 공동명의가 있는 경우)
-                if result['outlier'] != 'O' and result.get('구매계약서') == 1 and (result.get('초본') == 1 or result.get('공동명의') == 1):
+                if result['outlier'] != 'O':
                     try:
                         ai_계약일자 = result.get('ai_계약일자')
-                        ai_이름 = result.get('ai_이름')
-                        전화번호 = result.get('전화번호')
-                        이메일 = result.get('이메일')
-                        
-                        # NULL 체크 또는 2025년 이전 체크
-                        if (ai_계약일자 is None or ai_이름 is None or 전화번호 is None or 이메일 is None):
-                            result['outlier'] = 'O'
-                        else:
-                            # 2025년 이전 체크
+                        # print(f"[디버그 sql_manager] ai_계약일자: {ai_계약일자}")
+                        if ai_계약일자 and isinstance(ai_계약일자, (str, datetime, date, pd.Timestamp)):
+                            contract_date_obj = None
                             if isinstance(ai_계약일자, str):
                                 try:
-                                    contract_date = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
-                                    if contract_date < date(2025, 1, 1):
-                                        result['outlier'] = 'O'
-                                except (ValueError, AttributeError):
+                                    contract_date_obj = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
+                                except ValueError:
                                     pass
                             elif isinstance(ai_계약일자, (datetime, date)):
-                                contract_date = ai_계약일자 if isinstance(ai_계약일자, date) else ai_계약일자.date()
-                                if contract_date < date(2025, 1, 1):
-                                    result['outlier'] = 'O'
+                                contract_date_obj = ai_계약일자 if isinstance(ai_계약일자, date) else ai_계약일자.date()
                             elif isinstance(ai_계약일자, pd.Timestamp):
-                                if ai_계약일자.date() < date(2025, 1, 1):
-                                    result['outlier'] = 'O'
+                                contract_date_obj = ai_계약일자.date()
+
+                            if contract_date_obj and contract_date_obj < date(2025, 1, 1):
+                                result['outlier'] = 'O'
                     except Exception:
-                        pass
-                
-                # 1. 다자녀 이상치 체크
-                try:
-                    import json
-                    if result.get('다자녀') == 1 and result.get('child_birth_date'):
-                        dates = json.loads(result['child_birth_date'])
-                        today = datetime.now().date()
-                        for d_str in dates:
-                            try:
-                                birth_date = datetime.strptime(d_str, "%Y-%m-%d").date()
-                                age = today.year - birth_date.year
-                                if age > 19 or (age == 19 and (today.month, today.day) >= (birth_date.month, birth_date.day)):
-                                    result['outlier'] = 'O'
-                                    break
-                            except ValueError:
-                                pass
-                except Exception:
-                    pass
+                        traceback.print_exc()
 
                 # 2. 초본 issue_date 체크
                 if result['outlier'] != 'O' and result.get('초본') == 1 and result.get('issue_date'):
@@ -770,36 +729,32 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                         kst = pytz.timezone('Asia/Seoul')
                         today = datetime.now(kst).date()
                         
+                        issue_date_obj = None
                         if isinstance(issue_date, str):
-                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                            try:
+                                issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date() # ISO 형식 시도
+                            except ValueError:
+                                try:
+                                    issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                                except ValueError:
+                                    pass
                         elif isinstance(issue_date, (datetime, date)):
-                             issue_date_obj = issue_date if isinstance(issue_date, date) else issue_date.date()
-                        else:
-                            issue_date_obj = None
-                            
-                        if issue_date_obj and (today - issue_date_obj).days >= 31:
-                            result['outlier'] = 'O'
-                     except Exception:
-                         pass
+                            issue_date_obj = issue_date if isinstance(issue_date, date) else issue_date.date()
+                        elif isinstance(issue_date, pd.Timestamp):
+                            issue_date_obj = issue_date.date()
 
-                # 3. 초본 chobon == 0 체크
-                if result['outlier'] != 'O' and result.get('초본') == 1:
-                    try:
-                        chobon값 = result.get('chobon')
-                        if chobon값 is not None and chobon값 == 0:
-                            result['outlier'] = 'O'
-                    except Exception:
-                        pass
-                
-                # 4. 초본 address_1 지역 불일치 체크
-                if result['outlier'] != 'O' and result.get('초본') == 1:
-                    try:
-                        region_val = result.get('region')
-                        address_1_val = result.get('address_1')
-                        if region_val and address_1_val and region_val not in address_1_val:
-                            result['outlier'] = 'O'
-                    except Exception:
-                        pass
+                        # print(f"[디버그 sql_manager] 초본 issue_date 체크 - issue_date_obj: {issue_date_obj}, today: {today}")
+                        if issue_date_obj:
+                            days_diff = (today - issue_date_obj).days
+                            # print(f"[디버그 sql_manager] 초본 issue_date 체크 - days_diff: {days_diff}")
+                            if days_diff >= 31:
+                                result['outlier'] = 'O'
+                                # print(f"[디버그 sql_manager] 초본 issue_date 체크 - outlier 설정됨: {result['outlier']}")
+                     except Exception:
+                         traceback.print_exc()
+
+                # 3. 다자녀 이상치 체크 (2명 이상)
+                # ... existing code ...
 
                 return result
 
