@@ -153,13 +153,24 @@ class PdfLoadWidget(QWidget):
     
     def _handle_give_works_cell_clicked(self, row, column):
         """지급 테이블 셀 클릭 시 처리"""
-        # 버튼 컬럼(5번) 클릭 시 RN 출력
+        # 버튼 컬럼(5번) 클릭 시 RN 출력 및 파일 검색
         if column == 5:
             table = self.tableWidget
             rn_item = table.item(row, 0)  # RN은 0번 컬럼
             if rn_item:
                 rn = rn_item.text().strip()
                 print(f"[지급 시작] RN: {rn}")
+                
+                # 파일 경로 설정
+                search_dir = Path(r"C:\Users\HP\Desktop\Tesla\24q4\지급\지급서류\merged")
+                
+                # RN이 포함된 PDF 파일 검색
+                pdf_files = list(search_dir.glob(f"*{rn}*.pdf"))
+                
+                if pdf_files:
+                    print(f"[지급 시작] 파일 존재: {pdf_files[0].name}")
+                else:
+                    print(f"[지급 시작] 파일 없음: RN {rn}에 해당하는 PDF 파일을 찾을 수 없습니다.")
     
     def setup_give_works_table(self):
         """지급 테이블 위젯 초기 설정"""
