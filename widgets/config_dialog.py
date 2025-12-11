@@ -36,11 +36,19 @@ class ConfigDialog(QDialog):
         
         # 지급신청 로드 체크박스는 항상 체크된 상태로 시작 (설정 저장 안 함)
         self.checkBox_payment_request_load.setChecked(True)
+        
+        # AI 결과 자동 띄우기 체크박스 설정 로드 (기본값: True)
+        auto_show_ai = self._settings.value("general/auto_show_ai_results", True, type=bool)
+        self.checkBox_auto_show_ai_results.setChecked(auto_show_ai)
     
     def _save_settings(self):
         """UI에 설정된 값을 저장합니다."""
         self._settings.setValue("general/refresh_interval", self.spinBox_refresh_time.value())
         # 지급신청 로드 체크박스는 저장하지 않음 (프로그램 시작 시 항상 체크된 상태)
+        
+        # AI 결과 자동 띄우기 설정 저장
+        self._settings.setValue("general/auto_show_ai_results", self.checkBox_auto_show_ai_results.isChecked())
+        
         self.accept()
     
     @property
@@ -52,4 +60,9 @@ class ConfigDialog(QDialog):
     def payment_request_load_enabled(self):
         """지급신청 로드 체크박스 상태를 반환합니다."""
         return self.checkBox_payment_request_load.isChecked()
+    
+    @property
+    def auto_show_ai_results(self):
+        """AI 결과 자동 띄우기 체크박스 상태를 반환합니다."""
+        return self.checkBox_auto_show_ai_results.isChecked()
 

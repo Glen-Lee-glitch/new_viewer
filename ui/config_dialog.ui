@@ -61,6 +61,16 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_auto_show_ai_results">
+         <property name="text">
+          <string>AI 결과 자동 띄우기</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tab_2">

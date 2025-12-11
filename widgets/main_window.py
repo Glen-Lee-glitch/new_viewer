@@ -285,7 +285,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
         self._pdf_view_widget.toolbar.email_requested.connect(self._open_special_note_dialog)
         self._pdf_view_widget.page_delete_requested.connect(self._handle_page_delete_request)
-        self._pdf_load_widget.ai_review_requested.connect(self._show_gemini_results_dialog)
+        self._pdf_load_widget.ai_review_requested.connect(self._handle_ai_review_requested)
         # 데이터 새로고침 시 시간 업데이트 및 알람 위젯 갱신
         self._pdf_load_widget.data_refreshed.connect(self._on_data_refreshed)
         
@@ -511,6 +511,14 @@ class MainWindow(QMainWindow):
         worker_progress_dialog = WorkerProgressDialog(self)
         worker_progress_dialog.exec()
         
+    def _handle_ai_review_requested(self, rn: str):
+        """AI 검토 요청을 처리한다. 설정에 따라 자동으로 열지 말지 결정한다."""
+        # 설정 확인: AI 결과 자동 띄우기가 체크되어 있는지 확인
+        auto_show_ai = self._config_dialog.settings.value("general/auto_show_ai_results", True, type=bool)
+        
+        if auto_show_ai:
+            self._show_gemini_results_dialog(rn)
+    
     def _show_gemini_results_dialog(self, rn: str):
         """상세 정보 다이얼로그를 표시한다."""
         self._detail_form_dialog.load_data(rn)
