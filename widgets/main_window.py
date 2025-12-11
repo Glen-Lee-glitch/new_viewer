@@ -125,6 +125,15 @@ class MainWindow(QMainWindow):
     def _setup_ui_containers(self):
         """UI 컨테이너에 위젯들을 배치한다."""
 
+        # QSplitter 설정 및 중앙 영역 최소 너비 보장
+        if hasattr(self, 'ui_main_splitter'):
+            self.ui_main_splitter.setHandleWidth(1)
+            # 중앙 컨테이너 최소 너비 설정 (사용자 요청: tablewidget 너비 보장)
+            self.ui_content_container.setMinimumWidth(600)
+            # 좌우 패널도 너무 작아지지 않도록 최소 너비 설정
+            self.ui_thumbnail_container.setMinimumWidth(200)
+            self.ui_info_panel_container.setMinimumWidth(300)
+
         if hasattr(self, 'ui_main_layout'):
             self.ui_main_layout.setSpacing(0)
             self.ui_main_layout.setContentsMargins(0, 0, 0, 0)
@@ -906,19 +915,23 @@ class MainWindow(QMainWindow):
     # === UI 및 레이아웃 업데이트 ===
 
     def set_splitter_sizes(self, is_landscape: bool):
-        # 현재 UI는 QHBoxLayout 구조이므로 각 컨테이너의 고정 크기를 설정한다.
+        # QSplitter를 사용하여 영역 너비 설정
         try:
-            # 썸네일 컨테이너 고정 크기 설정
-            thumbnail_width = 220
-            self.ui_thumbnail_container.setFixedWidth(thumbnail_width)
-            
-            # 정보 패널 컨테이너 고정 크기 설정
-            info_width = 450 if is_landscape else 450
-            self.ui_info_panel_container.setFixedWidth(info_width)
-            
-            # 중앙 컨테이너는 나머지 공간을 차지하도록 설정 (기본 확장 정책 유지)
-            self.ui_content_container.setMinimumWidth(440)
-            
+            if hasattr(self, 'ui_main_splitter'):
+                # 썸네일(왼쪽), 콘텐츠(중앙), 정보패널(오른쪽)
+                left_width = 220
+                right_width = 450
+                
+                # 현재 스플리터의 전체 너비
+                total_width = self.ui_main_splitter.width()
+                if total_width <= 0:
+                    total_width = 1350 # 기본 예상 너비
+                
+                center_width = max(600, total_width - left_width - right_width)
+                
+                # 스플리터 크기 설정
+                self.ui_main_splitter.setSizes([left_width, center_width, right_width])
+                
         except Exception:
             # 안전 장치: 실패해도 크래시 방지
             pass
@@ -1252,6 +1265,9 @@ class MainWindow(QMainWindow):
                 client_height = available_geometry.height() - title_bar_height
                 
                 self.setGeometry(x, y, target_width, client_height)
+            
+            # 초기 스플리터 크기 설정 (화면에 표시된 후 정확한 너비 기반으로 설정)
+            QTimer.singleShot(0, lambda: self.set_splitter_sizes(False))
             
             self._initial_resize_done = True
         
