@@ -1,10 +1,11 @@
 import sys
 import os
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pytz
 import pymupdf
 import traceback
+import pandas as pd
 
 from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
@@ -1099,7 +1100,6 @@ class MainWindow(QMainWindow):
             outlier_types.append('contract_missing')
         
         # 초본이 0이고 구매계약서가 1인 경우 (초본 없음은 이미 chobon_missing으로 처리됨)
-        # 하지만 명시적으로 체크할 수도 있음
         
         # 다자녀 이상치 체크
         다자녀값 = metadata.get('다자녀', 0)
@@ -1108,7 +1108,6 @@ class MainWindow(QMainWindow):
             if child_birth_date_str:
                 try:
                     import json
-                    from datetime import datetime
                     
                     dates = json.loads(child_birth_date_str) if isinstance(child_birth_date_str, str) else child_birth_date_str
                     # 리스트가 아니면 빈 리스트 처리
@@ -1161,7 +1160,6 @@ class MainWindow(QMainWindow):
             
             # 계약일자 > 오늘-4일 체크
             try:
-                from datetime import datetime, date, timedelta
                 import pandas as pd
                 
                 contract_date = None
@@ -1185,7 +1183,6 @@ class MainWindow(QMainWindow):
             
             # 2025년 이전 체크
             try:
-                from datetime import datetime, date
                 import pandas as pd
                 
                 if isinstance(ai_계약일자, str):
@@ -1231,7 +1228,6 @@ class MainWindow(QMainWindow):
             # print(f"[디버그 main_window] _determine_outlier_type - issue_date raw: {issue_date}, type: {type(issue_date)}")
             if issue_date and isinstance(issue_date, (str, datetime, date, pd.Timestamp)):
                 try:
-                    from datetime import datetime, date, timedelta
                     import pytz
 
                     issue_date_obj = None
