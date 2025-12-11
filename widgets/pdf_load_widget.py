@@ -213,13 +213,17 @@ class PdfLoadWidget(QWidget):
                 
                 # 메모 다이얼로그 열기
                 dialog = GiveMemoDialog(parent=self)
+                # RN 설정
+                dialog.set_rn(rn)
                 # RN 라벨에 RN 번호 설정
                 if hasattr(dialog, 'rn_label'):
                     dialog.rn_label.setText(rn)
                 # textEdit에 전체 메모 표시
-                if hasattr(dialog, 'textEdit'):
-                    dialog.textEdit.setPlainText(memo_full)
+                dialog.set_memo(memo_full)
                 dialog.exec()
+                
+                # 저장 후 테이블 새로고침
+                self.populate_give_works_rows()
     
     def setup_give_works_table(self):
         """지급 테이블 위젯 초기 설정"""

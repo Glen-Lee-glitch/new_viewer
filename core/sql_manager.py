@@ -1761,6 +1761,39 @@ def update_give_works_worker(rn: str, worker: str) -> bool:
         traceback.print_exc()
         return False
 
+def update_give_works_memo(rn: str, memo: str) -> bool:
+    """
+    give_works 테이블의 메모 필드를 업데이트한다.
+    
+    Args:
+        rn: RN 번호
+        memo: 메모 내용
+        
+    Returns:
+        업데이트 성공 여부
+    """
+    if not rn:
+        raise ValueError("rn must be provided")
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            connection.begin()
+            try:
+                with connection.cursor() as cursor:
+                    update_query = (
+                        "UPDATE give_works SET 메모 = %s "
+                        "WHERE RN = %s"
+                    )
+                    cursor.execute(update_query, (memo, rn))
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def insert_delivery_day_gap(region: str, day_gap: int) -> bool:
     """
     '출고예정일' 테이블에 새로운 지역 데이터를 추가한다.
