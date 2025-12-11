@@ -1207,9 +1207,9 @@ class MainWindow(QMainWindow):
         
         # 초본 이상치 체크
         if 초본:
-            chobon_name = metadata.get('chobon_name')
-            chobon_birth_date = metadata.get('chobon_birth_date')
-            chobon_address_1 = metadata.get('chobon_address_1')
+            chobon_name = metadata.get('name') # 'name'으로 수정
+            chobon_birth_date = metadata.get('birth_date') # 'birth_date'로 수정
+            chobon_address_1 = metadata.get('address_1') # 'address_1'으로 수정
             chobon = metadata.get('chobon', 1)  # 기본값은 1 (정상)
             
             # chobon == 0이면 "초본 없음"으로 처리

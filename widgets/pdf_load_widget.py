@@ -364,13 +364,15 @@ class PdfLoadWidget(QWidget):
                 '전화번호': row.get('전화번호'),
                 '이메일': row.get('이메일'),
                 '차종': row.get('차종'),  # 차종 필드 추가
-                'chobon_name': row.get('chobon_name'),  # 초본 필드 추가
-                'chobon_birth_date': row.get('chobon_birth_date'),
-                'chobon_address_1': row.get('chobon_address_1'),
+                'chobon_name': row.get('name'),  # 'name' 컬럼 사용
+                'chobon_birth_date': row.get('birth_date'), # 'birth_date' 컬럼 사용
+                'chobon_address_1': row.get('address_1'), # 'address_1' 컬럼 사용
                 'chobon': row.get('chobon', 0),  # chobon 칼럼 추가
                 'is_법인': row.get('is_법인', 0),  # is_법인 칼럼 추가
                 'page_number': row.get('page_number'),  # page_number 추가
-                'issue_date': row.get('issue_date') # issue_date 추가
+                'issue_date': row.get('issue_date'), # issue_date 추가
+                'birth_date': row.get('birth_date', ''), # birth_date 추가
+                'address_1': row.get('address_1', '') # address_1 추가
             }
 
             # 'AI' 칼럼 값 계산
@@ -873,9 +875,9 @@ class PdfLoadWidget(QWidget):
             '전화번호': data.get('전화번호'),
             '이메일': data.get('이메일'),
             '차종': data.get('차종'),  # 차종 필드 추가
-            'chobon_name': data.get('chobon_name'),
-            'chobon_birth_date': data.get('chobon_birth_date'),
-            'chobon_address_1': data.get('chobon_address_1'),
+            'chobon_name': data.get('name'),
+            'chobon_birth_date': data.get('birth_date'),
+            'chobon_address_1': data.get('address_1'),
             'chobon': data.get('chobon', 0),
             'special_note': data.get('special_note', ''),
             'recent_thread_id': data.get('recent_thread_id', ''),
@@ -887,7 +889,9 @@ class PdfLoadWidget(QWidget):
             'is_법인': data.get('is_법인', 0),
             'is_context_menu_work': True, # 컨텍스트 메뉴와 동일하게 동작하도록 True로 설정
             'page_number': data.get('page_number'), # page_number 추가
-            'issue_date': data.get('issue_date') # issue_date 추가
+            'issue_date': data.get('issue_date'), # issue_date 추가
+            'birth_date': data.get('birth_date', ''), # birth_date 추가
+            'address_1': data.get('address_1', '') # address_1 추가
         }
         
         # 작업 시작 시그널 발생
@@ -979,16 +983,18 @@ class PdfLoadWidget(QWidget):
             '전화번호': data.get('전화번호'),
             '이메일': data.get('이메일'),
             '차종': data.get('차종'),  # 차종 필드 추가
-            'chobon_name': data.get('chobon_name'),  # 초본 필드 추가
-            'chobon_birth_date': data.get('chobon_birth_date'),
-            'chobon_address_1': data.get('chobon_address_1'),
+            'chobon_name': data.get('name'),  # 'name' 컬럼 사용
+            'chobon_birth_date': data.get('birth_date'), # 'birth_date' 컬럼 사용
+            'chobon_address_1': data.get('address_1'), # 'address_1' 컬럼 사용
             'chobon': data.get('chobon', 0),  # chobon 칼럼 추가
             'is_법인': data.get('is_법인', 0),  # is_법인 칼럼 추가
             'is_context_menu_work': False,  # 기본값은 False, 실제 값은 start_selected_work에서 설정
             'child_birth_date': data.get('child_birth_date', ''), # 다자녀 자녀 생년월일 목록 추가
             '다자녀': data.get('다자녀', 0), # 다자녀 플래그 추가
             'page_number': data.get('page_number'), # page_number 추가
-            'issue_date': data.get('issue_date') # issue_date 추가
+            'issue_date': data.get('issue_date'), # issue_date 추가
+            'birth_date': data.get('birth_date', ''), # birth_date 추가
+            'address_1': data.get('address_1', '') # address_1 추가
         }
 
     def _handle_cell_double_clicked(self, row, column):
