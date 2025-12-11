@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QApplication, # QApplication import 추가
     QStyle,
     QStyleOptionButton,
+    QAbstractItemView,
 )
 
 from core.sql_manager import (
@@ -204,6 +205,9 @@ class PdfLoadWidget(QWidget):
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        # 셀 편집 비활성화
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         
         # 마지막 컬럼(5번)에 버튼 델리게이트 적용
         table.setItemDelegateForColumn(5, ButtonDelegate(table, "시작"))
