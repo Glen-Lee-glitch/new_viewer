@@ -10,10 +10,11 @@ _active_toasts = []  # 토스트 알림 목록
 class Toast(QWidget):
     """화면 중앙 상단에 표시되는 토스트 알림 위젯"""
     
-    def __init__(self, title: str, message: str, parent=None):
+    def __init__(self, title: str, message: str, parent=None, recent_received_date=None):
         super().__init__(parent)
         self._opacity = 1.0
         self._duration = 7000  # 4초 후 자동으로 사라짐
+        self._recent_received_date = recent_received_date  # recent_received_date 저장
         
         # 프레임리스, 항상 위에 표시
         self.setWindowFlags(
@@ -222,18 +223,46 @@ def show_alert(title: str, message: str, parent=None):
     alert_box.show()
 
 
-def show_toast(title: str, message: str, parent=None):
+def show_toast(title: str, message: str, parent=None, recent_received_date=None):
     """
     화면 중앙 상단에 토스트 알림을 표시한다.
+    최대 3개까지만 표시하며, recent_received_date가 더 최근인 것부터 우선적으로 표시한다.
     
     Args:
         title: 알림 제목
         message: 알림 메시지
         parent: 부모 위젯 (사용하지 않지만 호환성을 위해 유지)
+        recent_received_date: 최근 접수 시간 (datetime 객체, 정렬 기준으로 사용)
     """
     global _active_toasts
     
-    toast = Toast(title, message, parent)
+    # 최대 3개 제한: 이미 3개가 있으면 가장 오래된 것 제거
+    if len(_active_toasts) >= 3:
+        # recent_received_date 기준으로 정렬 (None인 경우 가장 오래된 것으로 간주)
+        visible_toasts = [t for t in _active_toasts if t.isVisible()]
+        
+        if len(visible_toasts) >= 3:
+            # recent_received_date가 None이거나 가장 오래된 토스트 찾기
+            oldest_toast = None
+            oldest_date = None
+            
+            for t in visible_toasts:
+                toast_date = t._recent_received_date
+                if toast_date is None:
+                    # None인 경우 가장 오래된 것으로 간주하고 제거
+                    oldest_toast = t
+                    break
+                elif oldest_date is None or toast_date < oldest_date:
+                    oldest_date = toast_date
+                    oldest_toast = t
+            
+            # 가장 오래된 토스트 제거
+            if oldest_toast:
+                oldest_toast.close()
+                if oldest_toast in _active_toasts:
+                    _active_toasts.remove(oldest_toast)
+    
+    toast = Toast(title, message, parent, recent_received_date)
     
     # 닫힐 때 목록에서 제거
     def on_closed():

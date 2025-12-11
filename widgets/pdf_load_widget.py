@@ -494,7 +494,7 @@ class PdfLoadWidget(QWidget):
                                     if alert_state == 0:
                                         # 상태 0: 첫 알림
                                         print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
-                                        show_toast("미배정 알림", alert_message, self)
+                                        show_toast("미배정 알림", alert_message, self, received_time)
                                         self._alert_tracker[rn_val] = 1
                                     
                                     elif alert_state == 1:
@@ -504,7 +504,7 @@ class PdfLoadWidget(QWidget):
                                     elif alert_state == 2:
                                         # 상태 2: 알림 후 두 번째 새로고침, 다시 알림
                                         print(f"[알림] 미할당 지속: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
-                                        show_toast("미배정 지속 알림", alert_message, self)
+                                        show_toast("미배정 지속 알림", alert_message, self, received_time)
                                         self._alert_tracker[rn_val] = 1 # 다시 다음 주기는 건너뛰도록 상태 1로 복귀
                 else:
                     # 작업자가 할당된 경우, 추적 목록에서 제거하여 알림 로직 초기화
