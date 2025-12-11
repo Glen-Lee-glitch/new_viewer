@@ -181,7 +181,7 @@
               <item>
                <widget class="QCheckBox" name="ai_checkbox">
                 <property name="text">
-                 <string>AI = O</string>
+                 <string>AI</string>
                 </property>
                 <property name="checked">
                  <bool>false</bool>
