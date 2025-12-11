@@ -29,6 +29,9 @@ class GiveMemoDialog(QDialog):
             self.pushButton_3.clicked.connect(self._save_memo)
         if hasattr(self, 'pushButton'):  # 닫기 버튼
             self.pushButton.clicked.connect(self.close)
+        
+        # 초기 버튼 상태 설정 (읽기 전용 상태)
+        self._update_button_states(read_only=True)
     
     def _update_text_edit_style(self, read_only: bool):
         """textEdit의 스타일을 읽기 전용/편집 가능 상태에 따라 업데이트"""
@@ -63,6 +66,21 @@ class GiveMemoDialog(QDialog):
                 }
             """)
     
+    def _update_button_states(self, read_only: bool):
+        """버튼 상태를 읽기 전용/편집 가능 상태에 따라 업데이트"""
+        if read_only:
+            # 읽기 전용 상태: 메모 수정 버튼 활성화, 메모 저장 버튼 비활성화
+            if hasattr(self, 'pushButton_2'):  # 메모 수정 버튼
+                self.pushButton_2.setEnabled(True)
+            if hasattr(self, 'pushButton_3'):  # 메모 저장 버튼
+                self.pushButton_3.setEnabled(False)
+        else:
+            # 편집 가능 상태: 메모 수정 버튼 비활성화, 메모 저장 버튼 활성화
+            if hasattr(self, 'pushButton_2'):  # 메모 수정 버튼
+                self.pushButton_2.setEnabled(False)
+            if hasattr(self, 'pushButton_3'):  # 메모 저장 버튼
+                self.pushButton_3.setEnabled(True)
+    
     def set_rn(self, rn: str):
         """RN 번호를 설정한다."""
         self._rn = rn
@@ -78,6 +96,7 @@ class GiveMemoDialog(QDialog):
             self.textEdit.setReadOnly(False)
             self._is_editable = True
             self._update_text_edit_style(read_only=False)
+            self._update_button_states(read_only=False)
     
     def _save_memo(self):
         """메모를 저장하고 읽기 전용 모드로 복귀"""
@@ -98,6 +117,7 @@ class GiveMemoDialog(QDialog):
             self.textEdit.setReadOnly(True)
             self._is_editable = False
             self._update_text_edit_style(read_only=True)
+            self._update_button_states(read_only=True)
             QMessageBox.information(self, "저장 완료", "메모가 성공적으로 저장되었습니다.")
         else:
             QMessageBox.warning(self, "저장 실패", "메모 저장 중 오류가 발생했습니다.")
