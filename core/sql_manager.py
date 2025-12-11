@@ -1814,15 +1814,21 @@ def update_give_works_on_save(rn: str, file_path: str, application_date: str) ->
             connection.begin()
             try:
                 with connection.cursor() as cursor:
+                    print(f"Executing query: UPDATE give_works SET 파일명='{file_path}', 지급_신청일='{application_date}', 작업상태='완료' WHERE RN='{rn}'")
                     update_query = (
                         "UPDATE give_works "
-                        "SET 파일명 = %s, `지급 신청일` = %s, 작업상태 = '완료' "
+                        "SET 파일명 = %s, 지급_신청일 = %s, 작업상태 = '완료' "
                         "WHERE RN = %s"
                     )
                     cursor.execute(update_query, (file_path, application_date, rn))
                 connection.commit()
+                
+                if cursor.rowcount == 0:
+                    print(f"[update_give_works_on_save] Warning: No rows updated for RN {rn}")
+                    
                 return True
-            except Exception:
+            except Exception as e:
+                print(f"[update_give_works_on_save] DB Error: {e}")
                 connection.rollback()
                 raise
     except Exception:

@@ -722,6 +722,8 @@ class MainWindow(QMainWindow):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
         if self.renderer:
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
+            print(f"[_save_document 호출] is_give_works={self._is_give_works_started}, rn={self._give_works_rn}")
+            
             # 저장 완료 후 자동으로 메인화면으로 돌아가도록 플래그 설정
             self._auto_return_to_main_after_save = True
             try:

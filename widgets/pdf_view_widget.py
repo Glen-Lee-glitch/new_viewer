@@ -578,6 +578,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
 
     def save_pdf(self, page_order: list[int] | None = None, worker_name: str = "", is_give_works: bool = False, rn: str = ""):
         """PDF 저장 프로세스를 시작한다."""
+        print(f"[save_pdf 호출] is_give_works={is_give_works}, rn={rn}")
         try:
             if not self.renderer or not self.renderer.get_pdf_bytes():
                 QMessageBox.warning(self, "저장 오류", "저장할 PDF 파일이 없습니다.")
@@ -673,6 +674,9 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             QMessageBox.information(self, "저장 완료", f"'{output_path}'\n\n파일이 성공적으로 저장되었습니다.")
             
             # 지급 테이블 작업인 경우 give_works 테이블 업데이트
+            if hasattr(self, '_saving_is_give_works'):
+                print(f"[_on_save_finished] _saving_is_give_works={self._saving_is_give_works}")
+            
             if hasattr(self, '_saving_is_give_works') and self._saving_is_give_works:
                 rn = getattr(self, '_saving_rn', '')
                 if rn:
@@ -684,8 +688,10 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                     
                     if db_success:
                         print(f"[지급 테이블] RN {rn}의 파일명, 지급 신청일({today_str}), 작업상태 업데이트 완료")
+                        QMessageBox.information(self, "DB 업데이트", "지급 데이터(파일명, 신청일, 상태)가 업데이트되었습니다.")
                     else:
                         print(f"[지급 테이블] RN {rn}의 DB 업데이트 실패")
+                        QMessageBox.warning(self, "DB 업데이트 실패", "지급 데이터 업데이트에 실패했습니다.\n로그를 확인해주세요.")
                 
                 # 임시 속성 초기화
                 self._saving_is_give_works = False
