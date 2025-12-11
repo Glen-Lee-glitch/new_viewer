@@ -163,7 +163,7 @@ class ThumbnailViewWidget(QWidget):
         if hasattr(self, 'thumbnail_list_widget'):
             self.thumbnail_list_widget.itemClicked.connect(self.on_thumbnail_clicked)
     
-    def set_renderer(self, renderer: PdfRender | None, page_order: list[int] | None = None):
+    def set_renderer(self, renderer: PdfRender | None, page_order: list[int] | None = None, rotations: dict | None = None):
         """PDF 렌더러를 설정하고 썸네일을 생성한다. page_order가 있으면 그 순서대로 생성한다."""
         self.renderer = renderer
         self.thumbnail_list_widget.clear()
@@ -178,8 +178,11 @@ class ThumbnailViewWidget(QWidget):
         # page_order 순서대로 썸네일 생성
         for visual_index, actual_page_num in enumerate(page_order):
             try:
+                # 회전 각도 가져오기
+                user_rotation = rotations.get(actual_page_num, 0) if rotations else 0
+                
                 # 실제 페이지 번호로 썸네일 이미지 생성
-                icon = self.renderer.create_thumbnail(actual_page_num, max_width=120)
+                icon = self.renderer.create_thumbnail(actual_page_num, max_width=120, user_rotation=user_rotation)
                 
                 # 텍스트는 '보이는 순서' (1부터 시작)
                 item = QListWidgetItem(icon, f"{visual_index + 1}")
@@ -190,6 +193,23 @@ class ThumbnailViewWidget(QWidget):
                 self.thumbnail_list_widget.addItem(item)
             except (IndexError, RuntimeError) as e:
                 print(f"썸네일 생성 오류 (실제 페이지 {actual_page_num}): {e}")
+
+    def update_page_rotation(self, page_num: int, rotation: int):
+        """특정 페이지의 회전 상태를 업데이트한다."""
+        if not self.renderer:
+            return
+            
+        for i in range(self.thumbnail_list_widget.count()):
+            item = self.thumbnail_list_widget.item(i)
+            actual_page_num = item.data(Qt.ItemDataRole.UserRole)
+            
+            if actual_page_num == page_num:
+                try:
+                    icon = self.renderer.create_thumbnail(page_num, max_width=120, user_rotation=rotation)
+                    item.setIcon(icon)
+                except Exception as e:
+                    print(f"썸네일 회전 업데이트 오류 (페이지 {page_num}): {e}")
+                break
 
     def on_thumbnail_clicked(self, item):
         """썸네일 클릭 시 호출"""

@@ -343,7 +343,7 @@ class PdfRender:
         # 새 데이터로 교체되었으므로, doc 객체도 다시 로드해야 함
         self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
 
-    def create_thumbnail(self, page_num: int, max_width: int = 90) -> QIcon:
+    def create_thumbnail(self, page_num: int, max_width: int = 90, user_rotation: int = 0) -> QIcon:
         """선명한 썸네일(QIcon)을 생성한다.
 
         전략:
@@ -353,6 +353,7 @@ class PdfRender:
         Args:
             page_num: 0-based 페이지 인덱스
             max_width: 썸네일 최대 너비(px)
+            user_rotation: 사용자 지정 회전 각도 (0, 90, 180, 270)
         Returns:
             QIcon: 아이콘으로 반환(리스트/트리 뷰에 바로 사용 가능)
         """
@@ -376,6 +377,11 @@ class PdfRender:
         image_format = QImage.Format.Format_RGB888 if not pix.alpha else QImage.Format.Format_RGBA8888
         qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, image_format).copy()
         qpix = QPixmap.fromImage(qimage)
+
+        # 사용자 회전 적용
+        if user_rotation != 0:
+            transform = QTransform().rotate(user_rotation)
+            qpix = qpix.transformed(transform, Qt.TransformationMode.SmoothTransformation)
 
         if qpix.width() > max_width:
             qpix = qpix.scaled(

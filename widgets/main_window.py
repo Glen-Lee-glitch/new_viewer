@@ -291,6 +291,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.pdf_loaded.connect(self._info_panel.update_file_info)
         self._pdf_view_widget.page_info_updated.connect(self._info_panel.update_page_info)
         self._info_panel.text_stamp_requested.connect(self._pdf_view_widget.activate_text_stamp_mode)
+        self._pdf_view_widget.page_rotation_changed.connect(self._thumbnail_viewer.update_page_rotation)
 
         # 페이지 네비게이션 버튼 클릭 시그널 연결
         self.ui_push_button_prev.clicked.connect(lambda: self.change_page(-1))
@@ -565,7 +566,8 @@ class MainWindow(QMainWindow):
         # 첫 번째 파일 이름을 기준으로 창 제목 설정
         self.setWindowTitle(f"PDF Viewer - {Path(pdf_paths[0]).name}")
         
-        self._thumbnail_viewer.set_renderer(self.renderer, self._page_order) # 썸네일 생성
+        # 썸네일 생성 시 회전 정보 전달
+        self._thumbnail_viewer.set_renderer(self.renderer, self._page_order, rotations=self._pdf_view_widget.get_page_rotations()) 
         self._pdf_view_widget.set_renderer(self.renderer) # PDF 뷰어 사전 작업(준비 작업, 밑에서 펼침)
 
         # PDF 편집 모드를 위한 필요한 영역 활성화/필요 없는 영역 숨기기
@@ -909,7 +911,7 @@ class MainWindow(QMainWindow):
                     self._page_order[i] -= 1
         
         # 6. 썸네일 뷰 갱신
-        self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
+        self._thumbnail_viewer.set_renderer(self.renderer, self._page_order, rotations=self._pdf_view_widget.get_page_rotations())
 
         # 7. 뷰어 및 네비게이션 갱신
         new_total_pages = len(self._page_order)
@@ -1605,7 +1607,7 @@ class MainWindow(QMainWindow):
                 self.renderer.replace_page(actual_page_num, original_pdf_bytes, actual_page_num)
             
             # 교체 완료 후 썸네일 및 뷰어 갱신
-            self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
+            self._thumbnail_viewer.set_renderer(self.renderer, self._page_order, rotations=self._pdf_view_widget.get_page_rotations())
             self._pdf_view_widget.set_renderer(self.renderer, clear_overlay=False)
             
             # 현재 페이지가 교체된 페이지 중 하나라면 화면 갱신
@@ -1667,7 +1669,7 @@ class MainWindow(QMainWindow):
             self._page_order.extend(range(old_page_count, self.renderer.get_page_count()))
             
             # 썸네일 뷰 갱신
-            self._thumbnail_viewer.set_renderer(self.renderer, self._page_order)
+            self._thumbnail_viewer.set_renderer(self.renderer, self._page_order, rotations=self._pdf_view_widget.get_page_rotations())
             
             # PDF 뷰어 갱신 (렌더러 재설정 및 화면 갱신, 오버레이 보존)
             self._pdf_view_widget.set_renderer(self.renderer, clear_overlay=False)

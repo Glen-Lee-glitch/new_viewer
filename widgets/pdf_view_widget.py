@@ -24,6 +24,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     """PDF 뷰어 위젯"""
     page_change_requested = pyqtSignal(int)
     page_aspect_ratio_changed = pyqtSignal(bool)  # is_landscape: 가로가 긴 페이지 여부
+    page_rotation_changed = pyqtSignal(int, int) # page_num, rotation
     save_completed = pyqtSignal()  # 저장 완료 후 화면 전환을 위한 신호
     page_delete_requested = pyqtSignal(object, dict) # '보이는' 페이지 번호(단일 int 또는 리스트)와 삭제 정보로 삭제를 요청하는 신호
 
@@ -959,6 +960,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         elif action == 'rotate_page':
             old_rotation = data
             self.page_rotations[page_num] = old_rotation
+            self.page_rotation_changed.emit(page_num, old_rotation)
             # 캐시 제거해서 새로 렌더링하도록 함
             if page_num in self.page_cache:
                 del self.page_cache[page_num]
@@ -1039,6 +1041,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         current_user_rotation = self.page_rotations.get(self.current_page, 0)
         new_user_rotation = (current_user_rotation + 90) % 360
         self.page_rotations[self.current_page] = new_user_rotation
+        self.page_rotation_changed.emit(self.current_page, new_user_rotation)
         
         # 2. 캐시 제거
         if self.current_page in self.page_cache:
@@ -1078,6 +1081,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         current_user_rotation = self.page_rotations.get(self.current_page, 0)
         new_user_rotation = (current_user_rotation + 90) % 360
         self.page_rotations[self.current_page] = new_user_rotation
+        self.page_rotation_changed.emit(self.current_page, new_user_rotation)
 
         # 되돌리기를 위해 이전 회전 값 저장
         self._history_stack.append(('rotate_page', self.current_page, current_user_rotation))
