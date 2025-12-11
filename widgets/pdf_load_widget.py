@@ -162,13 +162,17 @@ class PdfLoadWidget(QWidget):
                 rn = rn_item.text().strip()
                 print(f"[지급 시작] RN: {rn}")
                 
-                # 현재 작업자 이름으로 give_works 테이블 업데이트
-                if self._worker_name:
+                # 현재 작업자 이름으로 give_works 테이블 업데이트 (신청자가 비어있을 때만)
+                worker_item = table.item(row, 1)  # 신청자 컬럼(1번)
+                existing_worker = worker_item.text().strip() if worker_item else ""
+                
+                if existing_worker:
+                    print(f"[지급 시작] 신청자 업데이트 건너뜀: 이미 '{existing_worker}'로 할당됨")
+                elif self._worker_name:
                     success = update_give_works_worker(rn, self._worker_name)
                     if success:
                         print(f"[지급 시작] 신청자 업데이트 완료: {self._worker_name}")
                         # 테이블의 신청자 컬럼(1번)도 업데이트
-                        worker_item = table.item(row, 1)
                         if worker_item:
                             worker_item.setText(self._worker_name)
                     else:
