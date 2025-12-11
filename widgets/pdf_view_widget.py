@@ -755,8 +755,11 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         if renderer is not None and clear_overlay:
             self._overlay_items.clear()
             self._history_stack.clear()
+            self.page_rotations.clear()  # 회전 정보도 초기화
+        elif renderer is None:
+            # renderer가 None일 때도 회전 정보 초기화 (메인 화면으로 돌아갈 때)
+            self.page_rotations.clear()
         
-        # self.page_rotations = {} # 새 파일 로드 시 회전 정보 초기화 -> 보존
         # _current_rn은 보존 (set_renderer()에서 초기화하지 않음)
         
         # 메일 오버레이 숨김
