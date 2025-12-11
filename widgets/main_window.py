@@ -127,7 +127,21 @@ class MainWindow(QMainWindow):
 
         # QSplitter 설정 및 중앙 영역 최소 너비 보장
         if hasattr(self, 'ui_main_splitter'):
-            self.ui_main_splitter.setHandleWidth(1)
+            self.ui_main_splitter.setHandleWidth(6)
+            
+            # 스타일시트로 핸들에 '가는 선 두 줄' 시각적 효과 적용
+            self.ui_main_splitter.setStyleSheet("""
+                QSplitter::handle {
+                    background-color: transparent;
+                }
+                QSplitter::handle:horizontal {
+                    width: 6px;
+                    margin: 10px 1px; /* 상하 여백 10px, 좌우 여백 1px */
+                    border-left: 1px solid #555555;  /* 왼쪽 선 */
+                    border-right: 1px solid #555555; /* 오른쪽 선 */
+                }
+            """)
+            
             # 중앙 컨테이너 최소 너비 설정 (사용자 요청: tablewidget 너비 보장)
             self.ui_content_container.setMinimumWidth(600)
             # 좌우 패널도 너무 작아지지 않도록 최소 너비 설정
