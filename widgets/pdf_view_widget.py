@@ -576,7 +576,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         """현재 작업 중인 RN 번호를 설정한다."""
         self._current_rn = rn or ""
 
-    def save_pdf(self, page_order: list[int] | None = None, worker_name: str = ""):
+    def save_pdf(self, page_order: list[int] | None = None, worker_name: str = "", is_give_works: bool = False, rn: str = ""):
         """PDF 저장 프로세스를 시작한다."""
         try:
             if not self.renderer or not self.renderer.get_pdf_bytes():
@@ -587,11 +587,21 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             if page_order is None:
                 page_order = list(range(self.renderer.get_page_count()))
 
+            # 상태 저장 (저장 완료 후 처리를 위해)
+            self._saving_is_give_works = is_give_works
+            self._saving_rn = rn
+
             # 자동 경로 생성
             from datetime import datetime
             from pathlib import Path as PathLib
             
-            base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\finished'
+            if is_give_works:
+                # 지급 테이블 시작인 경우
+                base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\지급_finished'
+            else:
+                # 일반 작업인 경우
+                base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\finished'
+            
             today = datetime.now().strftime('%Y-%m-%d')
             
             # 작업자 이름이 없으면 "미지정" 폴더 사용
@@ -601,18 +611,23 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             save_dir = PathLib(base_dir) / worker_folder / today
             save_dir.mkdir(parents=True, exist_ok=True)
             
-            # 원본 파일명 가져오기
-            default_path = self.get_current_pdf_path() or "untitled.pdf"
-            original_filename = PathLib(default_path).name
+            # 파일명 결정
+            if is_give_works and rn:
+                # 지급 테이블: {RN}.pdf
+                filename = f"{rn}.pdf"
+            else:
+                # 일반 작업: 원본 파일명
+                default_path = self.get_current_pdf_path() or "untitled.pdf"
+                filename = PathLib(default_path).name
             
             # 최종 저장 경로
-            output_path = str(save_dir / original_filename)
+            output_path = str(save_dir / filename)
             
             # 파일이 이미 존재하는 경우 타임스탬프 추가
             if PathLib(output_path).exists():
                 timestamp = datetime.now().strftime('%H%M%S')
-                stem = PathLib(original_filename).stem
-                suffix = PathLib(original_filename).suffix
+                stem = PathLib(filename).stem
+                suffix = PathLib(filename).suffix
                 output_path = str(save_dir / f"{stem}_{timestamp}{suffix}")
             
             # 저장 확인 다이얼로그
@@ -657,8 +672,27 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         if success:
             QMessageBox.information(self, "저장 완료", f"'{output_path}'\n\n파일이 성공적으로 저장되었습니다.")
             
-            # RN이 있으면 DB에 저장 경로 업데이트
-            if self._current_rn:
+            # 지급 테이블 작업인 경우 give_works 테이블 업데이트
+            if hasattr(self, '_saving_is_give_works') and self._saving_is_give_works:
+                rn = getattr(self, '_saving_rn', '')
+                if rn:
+                    from core.sql_manager import update_give_works_on_save
+                    from datetime import datetime
+                    
+                    today_str = datetime.now().strftime('%m/%d')
+                    db_success = update_give_works_on_save(rn, output_path, today_str)
+                    
+                    if db_success:
+                        print(f"[지급 테이블] RN {rn}의 파일명, 지급 신청일({today_str}), 작업상태 업데이트 완료")
+                    else:
+                        print(f"[지급 테이블] RN {rn}의 DB 업데이트 실패")
+                
+                # 임시 속성 초기화
+                self._saving_is_give_works = False
+                self._saving_rn = ""
+            
+            # RN이 있으면 DB에 저장 경로 업데이트 (일반 작업)
+            elif self._current_rn:
                 from core.sql_manager import update_finished_file_path
                 db_success = update_finished_file_path(self._current_rn, output_path)
                 if db_success:

@@ -1794,6 +1794,41 @@ def update_give_works_memo(rn: str, memo: str) -> bool:
         traceback.print_exc()
         return False
 
+def update_give_works_on_save(rn: str, file_path: str, application_date: str) -> bool:
+    """
+    give_works 테이블의 파일명, 지급 신청일, 작업상태를 업데이트한다.
+    
+    Args:
+        rn: RN 번호
+        file_path: 저장된 PDF 파일 경로 (네트워크 경로)
+        application_date: 지급 신청일 (MM/DD 형식)
+        
+    Returns:
+        업데이트 성공 여부
+    """
+    if not rn:
+        raise ValueError("rn must be provided")
+    
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            connection.begin()
+            try:
+                with connection.cursor() as cursor:
+                    update_query = (
+                        "UPDATE give_works "
+                        "SET 파일명 = %s, `지급 신청일` = %s, 작업상태 = '완료' "
+                        "WHERE RN = %s"
+                    )
+                    cursor.execute(update_query, (file_path, application_date, rn))
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def insert_delivery_day_gap(region: str, day_gap: int) -> bool:
     """
     '출고예정일' 테이블에 새로운 지역 데이터를 추가한다.

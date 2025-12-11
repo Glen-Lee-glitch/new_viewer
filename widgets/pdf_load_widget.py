@@ -85,7 +85,7 @@ class ButtonDelegate(QStyledItemDelegate):
 
 class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
-    pdf_selected = pyqtSignal(list)  # 여러 파일 경로(리스트)를 전달하도록 변경
+    pdf_selected = pyqtSignal(list, dict)  # 여러 파일 경로(리스트)와 메타데이터(딕셔너리) 전달
     work_started = pyqtSignal(list, dict)
     ai_review_requested = pyqtSignal(str) # AI 검토 요청 시그널
     data_refreshed = pyqtSignal()  # 데이터 새로고침 완료 시그널
@@ -191,8 +191,8 @@ class PdfLoadWidget(QWidget):
                 if pdf_files:
                     pdf_path = pdf_files[0]  # 첫 번째 파일 사용
                     print(f"[지급 시작] 파일 존재: {pdf_path.name}")
-                    # PDF 파일을 열어서 편집 모드로 진입
-                    self.pdf_selected.emit([str(pdf_path)])
+                    # PDF 파일을 열어서 편집 모드로 진입 (지급 테이블 시작 플래그 및 RN 전달)
+                    self.pdf_selected.emit([str(pdf_path)], {'is_give_works': True, 'rn': rn})
                 else:
                     print(f"[지급 시작] 파일 없음: RN {rn}에 해당하는 PDF 파일을 찾을 수 없습니다.")
     
@@ -911,7 +911,7 @@ class PdfLoadWidget(QWidget):
         )
         
         if paths:
-            self.pdf_selected.emit(paths)
+            self.pdf_selected.emit(paths, {})
     
     def refresh_data(self, force_refresh_give_works: bool = False):
         """sql 데이터 새로고침

@@ -54,6 +54,8 @@ class MainWindow(QMainWindow):
         self._worker_name = ""  # 작업자 이름 저장용 (위젯 생성 전에 초기화)
         self._original_filepath: str | None = None # 현재 로드된 PDF의 원본 파일 경로
         self._is_current_file_processed: bool = False # 현재 파일이 전처리된 파일인지 여부
+        self._is_give_works_started: bool = False  # 지급 테이블에서 시작 여부
+        self._give_works_rn: str = ""  # 지급 테이블 시작 시 RN 번호
         
         # --- 위젯 인스턴스 생성 ---
         self._thumbnail_viewer = ThumbnailViewWidget()
@@ -593,12 +595,25 @@ class MainWindow(QMainWindow):
         # AI 결과 보기 액션 활성화/비활성화
         self._update_ai_results_action_state(rn)
 
-    def _handle_pdf_selected(self, pdf_paths: list):
+    def _handle_pdf_selected(self, pdf_paths: list, metadata: dict = None):
+        if metadata is None:
+            metadata = {}
+            
         self._pending_basic_info = None
         self._current_rn = ""  # 로컬 파일 열기 시 RN 초기화
         self._is_context_menu_work = False  # 로컬 파일 열기 시 컨텍스트 메뉴 작업 플래그 리셋
         self._pending_outlier_check = False  # 로컬 파일 열기 시 이상치 체크 플래그 리셋
         self._pending_outlier_metadata = None  # 이상치 메타데이터 리셋
+        
+        # 지급 테이블 시작 여부 확인
+        self._is_give_works_started = metadata.get('is_give_works', False)
+        self._give_works_rn = metadata.get('rn', "") if self._is_give_works_started else ""
+        
+        if self._is_give_works_started:
+            print(f"[지급 테이블 작업 시작] RN: {self._give_works_rn}")
+            # RN이 있으면 현재 RN 설정 (저장 시 사용 등)
+            self._current_rn = self._give_works_rn
+        
         self._info_panel.update_basic_info("", "", "", "")
         # 로컬 파일 열기 시 '원본 불러오기' 및 '추가서류' 액션 비활성화
         if hasattr(self, 'load_original_action'):
@@ -710,7 +725,12 @@ class MainWindow(QMainWindow):
             # 저장 완료 후 자동으로 메인화면으로 돌아가도록 플래그 설정
             self._auto_return_to_main_after_save = True
             try:
-                self._pdf_view_widget.save_pdf(page_order=self._page_order, worker_name=self._worker_name)
+                self._pdf_view_widget.save_pdf(
+                    page_order=self._page_order, 
+                    worker_name=self._worker_name,
+                    is_give_works=self._is_give_works_started,
+                    rn=self._give_works_rn
+                )
             except Exception as e:
                 # 저장 호출 중 예외 발생 시 안전장치
                 print(f"[저장 호출 중 예외] {e}")
@@ -723,6 +743,13 @@ class MainWindow(QMainWindow):
         
     def _handle_save_completed(self):
         """PDF 저장이 완료되었을 때 호출된다."""
+        
+        # 지급 테이블 작업이었다면 플래그 리셋
+        if self._is_give_works_started:
+            self._is_give_works_started = False
+            self._give_works_rn = ""
+            print("[지급 테이블 작업 플래그] 저장 완료 후 초기화됨")
+            
         if hasattr(self, '_auto_return_to_main_after_save') and self._auto_return_to_main_after_save:
             self._auto_return_to_main_after_save = False
             
