@@ -45,11 +45,26 @@ class NecessaryWidget(QWidget):
             clipboard = QApplication.clipboard()
             clipboard.setText(folder_path_str)
             
-            QMessageBox.information(
-                self,
-                "복사 완료",
-                f"폴더 경로가 클립보드에 복사되었습니다:\n\n{folder_path_str}"
+            # 버튼의 원래 스타일시트 저장
+            original_style = self.pushButton_copy_folder.styleSheet()
+            
+            # 하이라이트 스타일 적용
+            highlight_style = """
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    font-weight: bold;
+                }
+            """
+            self.pushButton_copy_folder.setStyleSheet(highlight_style)
+            
+            # 3초 후 원래 스타일로 복원
+            self._style_timer = QTimer(self)
+            self._style_timer.setSingleShot(True)
+            self._style_timer.timeout.connect(
+                lambda: self.pushButton_copy_folder.setStyleSheet(original_style)
             )
+            self._style_timer.start(3000)
             
         except Exception as e:
             QMessageBox.critical(
