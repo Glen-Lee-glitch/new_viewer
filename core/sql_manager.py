@@ -253,6 +253,21 @@ def fetch_recent_subsidy_applications():
             except (ValueError, TypeError, AttributeError, KeyError):
                 return False
 
+        def is_chobon_address_outlier(row) -> bool:
+            """초본 address_1에 region 문자열이 포함되어 있지 않으면 True 반환"""
+            try:
+                초본값 = row.get('초본')
+                region = row.get('region')
+                address_1 = row.get('address_1')
+
+                # 초본 서류가 있고, region과 address_1이 유효한 경우에만 체크
+                if pd.notna(초본값) and 초본값 == 1 and region and address_1:
+                    # region이 address_1에 포함되어 있지 않으면 이상치
+                    return region not in address_1
+                return False
+            except (ValueError, TypeError, KeyError, AttributeError):
+                return False
+
         def update_outlier(row):
             """outlier 값을 업데이트하는 함수"""
             # 기존 outlier 값 확인
@@ -289,6 +304,10 @@ def fetch_recent_subsidy_applications():
                     return 'O'
             except (ValueError, TypeError, KeyError):
                 pass
+            
+            # 초본 address_1 지역 불일치 이상치 체크
+            if is_chobon_address_outlier(row):
+                return 'O'
             
             # 이상치가 아니면 기존 값 반환 (문자열로 변환)
             return current_outlier_str if current_outlier_str else ''
@@ -420,6 +439,21 @@ def fetch_today_subsidy_applications_by_worker(worker_name: str):
             except (ValueError, TypeError, AttributeError, KeyError):
                 return False
 
+        def is_chobon_address_outlier(row) -> bool:
+            """초본 address_1에 region 문자열이 포함되어 있지 않으면 True 반환"""
+            try:
+                초본값 = row.get('초본')
+                region = row.get('region')
+                address_1 = row.get('address_1')
+
+                # 초본 서류가 있고, region과 address_1이 유효한 경우에만 체크
+                if pd.notna(초본값) and 초본값 == 1 and region and address_1:
+                    # region이 address_1에 포함되어 있지 않으면 이상치
+                    return region not in address_1
+                return False
+            except (ValueError, TypeError, KeyError, AttributeError):
+                return False
+
         def update_outlier(row):
             current_outlier = row['outlier']
             if pd.isna(current_outlier):
@@ -439,6 +473,10 @@ def fetch_today_subsidy_applications_by_worker(worker_name: str):
                     return 'O'
             except (ValueError, TypeError, KeyError):
                 pass
+            
+            # 초본 address_1 지역 불일치 이상치 체크
+            if is_chobon_address_outlier(row):
+                return 'O'
             return current_outlier_str if current_outlier_str else ''
         
         df['outlier'] = df.apply(update_outlier, axis=1)
@@ -562,6 +600,21 @@ def fetch_today_unfinished_subsidy_applications():
             except (ValueError, TypeError, AttributeError, KeyError):
                 return False
 
+        def is_chobon_address_outlier(row) -> bool:
+            """초본 address_1에 region 문자열이 포함되어 있지 않으면 True 반환"""
+            try:
+                초본값 = row.get('초본')
+                region = row.get('region')
+                address_1 = row.get('address_1')
+
+                # 초본 서류가 있고, region과 address_1이 유효한 경우에만 체크
+                if pd.notna(초본값) and 초본값 == 1 and region and address_1:
+                    # region이 address_1에 포함되어 있지 않으면 이상치
+                    return region not in address_1
+                return False
+            except (ValueError, TypeError, KeyError, AttributeError):
+                return False
+
         def update_outlier(row):
             current_outlier = row['outlier']
             if pd.isna(current_outlier):
@@ -581,6 +634,10 @@ def fetch_today_unfinished_subsidy_applications():
                     return 'O'
             except (ValueError, TypeError, KeyError):
                 pass
+
+            # 초본 address_1 지역 불일치 이상치 체크
+            if is_chobon_address_outlier(row):
+                return 'O'
             return current_outlier_str if current_outlier_str else ''
         
         df['outlier'] = df.apply(update_outlier, axis=1)
@@ -730,6 +787,16 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                     try:
                         chobon값 = result.get('chobon')
                         if chobon값 is not None and chobon값 == 0:
+                            result['outlier'] = 'O'
+                    except Exception:
+                        pass
+                
+                # 4. 초본 address_1 지역 불일치 체크
+                if result['outlier'] != 'O' and result.get('초본') == 1:
+                    try:
+                        region_val = result.get('region')
+                        address_1_val = result.get('address_1')
+                        if region_val and address_1_val and region_val not in address_1_val:
                             result['outlier'] = 'O'
                     except Exception:
                         pass

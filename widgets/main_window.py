@@ -659,6 +659,9 @@ class MainWindow(QMainWindow):
         if self._is_context_menu_work:
             print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
         
+        print(f"[디버그] _handle_work_started - 수신된 metadata: {metadata}")
+        print(f"[디버그] _handle_work_started - outlier 값: {metadata.get('outlier', 'N/A')}")
+
         # 메일 content 조회
         thread_id = metadata.get('recent_thread_id')
         mail_content = ""
@@ -696,9 +699,12 @@ class MainWindow(QMainWindow):
             
             # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
             outlier_value = metadata.get('outlier', '')
-            self._pending_outlier_check = (self._is_context_menu_work and outlier_value == 'O')
-            if self._pending_outlier_check:
+            if outlier_value == 'O': # outlier 값이 'O'이면 이상치 체크 플래그 설정
+                self._pending_outlier_check = True
                 self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
+            else:
+                self._pending_outlier_check = False # outlier가 'O'가 아니면 플래그 리셋
+                self._pending_outlier_metadata = None
             
             self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
             
@@ -729,9 +735,12 @@ class MainWindow(QMainWindow):
         
         # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
         outlier_value = metadata.get('outlier', '')
-        self._pending_outlier_check = (self._is_context_menu_work and outlier_value == 'O')
-        if self._pending_outlier_check:
+        if outlier_value == 'O': # outlier 값이 'O'이면 이상치 체크 플래그 설정
+            self._pending_outlier_check = True
             self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
+        else:
+            self._pending_outlier_check = False # outlier가 'O'가 아니면 플래그 리셋
+            self._pending_outlier_metadata = None
         
         self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
         
@@ -1028,6 +1037,30 @@ class MainWindow(QMainWindow):
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
 
+        elif outlier_type == 'chobon_data_missing':
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("초본 데이터 누락")
+            msg_box.setText("초본 필수 데이터가 누락되었습니다!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+
+        elif outlier_type == 'chobon_address_mismatch':
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("초본 주소 불일치")
+            msg_box.setText("초본 주소와 지역이 일치하지 않습니다!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+
+        elif outlier_type == 'chobon_issue_date_outlier':
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("초본 발행일 이상")
+            msg_box.setText("초본 발행일이 31일 이상 경과했습니다!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+
         elif outlier_type == 'chobon_missing':
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
@@ -1178,9 +1211,44 @@ class MainWindow(QMainWindow):
             if chobon == 0:
                 outlier_types.append('chobon_missing')
             
+            # 초본 기본 정보 누락 (name, birth_date, address_1) 이상치 체크
             if chobon_name is None or chobon_birth_date is None or chobon_address_1 is None:
-                outlier_types.append('chobon')
-        
+                if 'chobon_data_missing' not in outlier_types: outlier_types.append('chobon_data_missing')
+            
+            # 초본 address_1 지역 불일치 체크
+            region_val = metadata.get('region')
+            address_1_val = metadata.get('chobon_address_1') # 여기를 수정
+            if region_val and address_1_val and region_val not in address_1_val:
+                if 'chobon_address_mismatch' not in outlier_types: outlier_types.append('chobon_address_mismatch')
+            
+            # 초본 issue_date 이상치 체크 (31일 이상) - 이전에 sql_manager.py에서 계산된 값 활용
+            issue_date = metadata.get('issue_date')
+            if issue_date and isinstance(issue_date, (str, datetime, date, pd.Timestamp)):
+                try:
+                    from datetime import datetime, date, timedelta
+                    import pytz
+                    
+                    issue_date_obj = None
+                    if isinstance(issue_date, str):
+                        try:
+                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
+                        except ValueError:
+                            pass
+                    elif isinstance(issue_date, (datetime, date)):
+                        issue_date_obj = issue_date if isinstance(issue_date, date) else issue_date.date()
+                    elif isinstance(issue_date, pd.Timestamp):
+                        issue_date_obj = issue_date.date()
+                    
+                    if issue_date_obj:
+                        kst = pytz.timezone('Asia/Seoul')
+                        today = datetime.now(kst).date()
+                        if (today - issue_date_obj).days >= 31:
+                            if 'chobon_issue_date_outlier' not in outlier_types: outlier_types.append('chobon_issue_date_outlier')
+                except Exception:
+                    pass
+        print(f"[디버그] _determine_outlier_type - region_val: {region_val}")
+        print(f"[디버그] _determine_outlier_type - address_1_val: {address_1_val}")
+        print(f"[디버그] _determine_outlier_type - 최종 outlier_types: {outlier_types}")
         return outlier_types
     
     def _on_data_refreshed(self):
