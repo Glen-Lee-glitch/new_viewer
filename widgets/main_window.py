@@ -277,7 +277,7 @@ class MainWindow(QMainWindow):
         self._thumbnail_viewer.undo_requested.connect(self._handle_undo_request)
         self._thumbnail_viewer.page_delete_requested.connect(self._handle_page_delete_request)
         self._thumbnail_viewer.page_replace_with_original_requested.connect(self._handle_page_replace_with_original)
-        self._pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
+        # self._pdf_view_widget.page_aspect_ratio_changed.connect(self.set_splitter_sizes)
         self._pdf_view_widget.save_completed.connect(self._handle_save_completed) # 저장 완료 시그널 연결
         self._pdf_view_widget.toolbar.save_pdf_requested.connect(self._save_document)
         self._pdf_view_widget.toolbar.setting_requested.connect(self._open_settings_dialog)
