@@ -1058,13 +1058,13 @@ class MainWindow(QMainWindow):
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
 
-        elif outlier_type == 'chobon_issue_date_outlier':
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("초본 발행일 이상")
-            msg_box.setText("초본 발행일이 31일 이상 경과했습니다!")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
+        # elif outlier_type == 'chobon_issue_date_outlier':
+        #     msg_box = QMessageBox(self)
+        #     msg_box.setIcon(QMessageBox.Icon.Warning)
+        #     msg_box.setWindowTitle("초본 발행일 이상")
+        #     msg_box.setText("초본 발행일이 31일 이상 경과했습니다!")
+        #     msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        #     msg_box.exec()
 
         elif outlier_type == 'chobon_missing':
             msg_box = QMessageBox(self)

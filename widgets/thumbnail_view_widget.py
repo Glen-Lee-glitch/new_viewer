@@ -233,6 +233,10 @@ class ThumbnailViewWidget(QWidget):
         new_order = []
         for i in range(self.thumbnail_list_widget.count()):
             item = self.thumbnail_list_widget.item(i)
+            
+            # 아이템의 순서가 바뀌었으므로, 현재 위치(i)에 맞춰 번호를 다시 1부터 매깁니다.
+            item.setText(str(i + 1))
+            
             actual_page_num = item.data(Qt.ItemDataRole.UserRole)
             new_order.append(actual_page_num)
         
