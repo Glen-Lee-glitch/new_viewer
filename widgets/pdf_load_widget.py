@@ -202,13 +202,23 @@ class PdfLoadWidget(QWidget):
         if column == 4:
             table = self.tableWidget
             rn_item = table.item(row, 0)  # RN은 0번 컬럼
+            memo_item = table.item(row, 4)  # 메모 컬럼(4번)
+            
             if rn_item:
                 rn = rn_item.text().strip()
+                # 전체 메모 가져오기 (UserRole에 저장된 전체 텍스트)
+                memo_full = ""
+                if memo_item:
+                    memo_full = memo_item.data(Qt.ItemDataRole.UserRole) or memo_item.text()
+                
                 # 메모 다이얼로그 열기
                 dialog = GiveMemoDialog(parent=self)
                 # RN 라벨에 RN 번호 설정
                 if hasattr(dialog, 'rn_label'):
                     dialog.rn_label.setText(rn)
+                # textEdit에 전체 메모 표시
+                if hasattr(dialog, 'textEdit'):
+                    dialog.textEdit.setPlainText(memo_full)
                 dialog.exec()
     
     def setup_give_works_table(self):
@@ -281,8 +291,11 @@ class PdfLoadWidget(QWidget):
             status_item = QTableWidgetItem("")
             table.setItem(row_index, 3, status_item)
             
-            # 메모 컬럼 (4번) - 빈 값으로 설정
-            memo_item = QTableWidgetItem("")
+            # 메모 컬럼 (4번) - 6자리까지만 표시, 전체 메모는 UserRole에 저장
+            memo_full = self._sanitize_text(row.get('메모', ''))
+            memo_display = memo_full[:6] if len(memo_full) > 6 else memo_full
+            memo_item = QTableWidgetItem(memo_display)
+            memo_item.setData(Qt.ItemDataRole.UserRole, memo_full)  # 전체 메모 저장
             table.setItem(row_index, 4, memo_item)
 
             # 버튼 컬럼 (5번) - 델리게이트가 그려줌
