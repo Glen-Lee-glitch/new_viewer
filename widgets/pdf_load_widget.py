@@ -37,6 +37,7 @@ from widgets.email_view_dialog import EmailViewDialog
 from widgets.detail_form_dialog import DetailFormDialog
 from widgets.alert_dialog import show_alert, show_toast
 from widgets.subsidy_history_dialog import SubsidyHistoryDialog
+from widgets.give_memo_dialog import GiveMemoDialog
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -195,6 +196,21 @@ class PdfLoadWidget(QWidget):
                 else:
                     print(f"[지급 시작] 파일 없음: RN {rn}에 해당하는 PDF 파일을 찾을 수 없습니다.")
     
+    def _handle_give_works_cell_double_clicked(self, row, column):
+        """지급 테이블 셀 더블 클릭 시 처리"""
+        # 메모 컬럼(4번) 더블 클릭 시 메모 다이얼로그 열기
+        if column == 4:
+            table = self.tableWidget
+            rn_item = table.item(row, 0)  # RN은 0번 컬럼
+            if rn_item:
+                rn = rn_item.text().strip()
+                # 메모 다이얼로그 열기
+                dialog = GiveMemoDialog(parent=self)
+                # RN 라벨에 RN 번호 설정
+                if hasattr(dialog, 'rn_label'):
+                    dialog.rn_label.setText(rn)
+                dialog.exec()
+    
     def setup_give_works_table(self):
         """지급 테이블 위젯 초기 설정"""
         table = self.tableWidget
@@ -214,6 +230,8 @@ class PdfLoadWidget(QWidget):
         
         # 클릭 이벤트 연결
         table.cellClicked.connect(self._handle_give_works_cell_clicked)
+        # 더블 클릭 이벤트 연결
+        table.cellDoubleClicked.connect(self._handle_give_works_cell_double_clicked)
         
         self.populate_give_works_rows()
     
