@@ -22,4 +22,8 @@ class HelpDialog(QDialog):
         self.listWidget.addItem("임시1")
         self.listWidget.addItem("임시2")
         self.listWidget.addItem("임시3")
+        
+        # Splitter 비율 설정 (col1:col2 = 2:8)
+        self.splitter.setStretchFactor(0, 2)
+        self.splitter.setStretchFactor(1, 8)
 
