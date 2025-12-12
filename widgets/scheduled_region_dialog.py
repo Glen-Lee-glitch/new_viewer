@@ -32,13 +32,13 @@ class ScheduledRegionDialog(QDialog):
         # Table Widget
         self.table = QTableWidget()
         self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["지역", "출고예정일", "최근 업데이트"])
+        self.table.setHorizontalHeaderLabels(["지역", "오픈일", "최근 업데이트"])
         
         # Header Settings
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(1, 150)
+        self.table.setColumnWidth(1, 230)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(2, 180)
         
