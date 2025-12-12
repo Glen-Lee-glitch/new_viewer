@@ -1959,12 +1959,19 @@ def fetch_duplicate_mail_rns(worker_name: str) -> list[str]:
                 """
                 args = ()
             else:
+                # 일반 작업자는 duplicated_rn 테이블의 가장 최근 original_worker가 본인인 경우만 조회
                 query = """
-                    SELECT RN 
-                    FROM subsidy_applications 
-                    WHERE worker = %s 
-                    AND status = '중복메일'
-                    ORDER BY RN ASC
+                    SELECT S.RN 
+                    FROM subsidy_applications S
+                    WHERE S.status = '중복메일'
+                    AND (
+                        SELECT D.original_worker
+                        FROM duplicated_rn D
+                        WHERE D.RN = S.RN
+                        ORDER BY D.received_date DESC
+                        LIMIT 1
+                    ) = %s
+                    ORDER BY S.RN ASC
                 """
                 args = (worker_name,)
 
