@@ -305,7 +305,7 @@ class AlarmWidget(QWidget):
         if not rn:
             return
             
-        from core.sql_manager import get_recent_thread_id_by_rn, get_email_by_thread_id
+        from core.sql_manager import get_recent_thread_id_by_rn, get_email_by_thread_id, get_original_worker_by_rn
         from widgets.email_view_dialog import EmailViewDialog
         from PyQt6.QtWidgets import QMessageBox
         
@@ -321,12 +321,15 @@ class AlarmWidget(QWidget):
             if not email_data:
                 QMessageBox.warning(self, "알림", "메일 내용을 불러올 수 없습니다.")
                 return
+            
+            # 3. 기존 작업자 정보 조회
+            original_worker = get_original_worker_by_rn(rn)
                 
-            # 3. 다이얼로그 표시
+            # 4. 다이얼로그 표시
             title = email_data.get('title', '제목 없음')
             content = email_data.get('content', '내용 없음')
             
-            dialog = EmailViewDialog(title=title, content=content, parent=self)
+            dialog = EmailViewDialog(title=title, content=content, original_worker=original_worker, parent=self)
             dialog.exec()
             
         except Exception as e:

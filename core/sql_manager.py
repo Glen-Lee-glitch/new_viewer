@@ -1985,6 +1985,30 @@ def fetch_duplicate_mail_rns(worker_name: str) -> list[str]:
         traceback.print_exc()
         return []
 
+def get_original_worker_by_rn(rn: str) -> str | None:
+    """
+    duplicated_rn 테이블에서 해당 RN의 가장 최근 original_worker를 조회한다.
+    """
+    if not rn:
+        return None
+        
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT original_worker 
+                FROM duplicated_rn 
+                WHERE RN = %s 
+                ORDER BY received_date DESC 
+                LIMIT 1
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def fetch_after_apply_counts() -> tuple[int, int]:
     """
     after_apply 테이블에서 오늘과 내일의 신청 건수를 조회한다.
