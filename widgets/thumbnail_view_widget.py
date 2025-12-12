@@ -93,8 +93,9 @@ class ThumbnailViewWidget(QWidget):
         if not item:
             return  # 빈 공간을 클릭한 경우 메뉴 표시 안 함
         
-        # 클릭된 아이템을 선택 상태로 만들기
-        self.thumbnail_list_widget.setCurrentItem(item)
+        # 클릭된 아이템이 이미 선택된 상태라면 선택 변경을 하지 않음
+        if not item.isSelected():
+            self.thumbnail_list_widget.setCurrentItem(item)
         
         # 컨텍스트 메뉴 생성
         context_menu = QMenu(self)
