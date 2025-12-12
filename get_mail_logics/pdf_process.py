@@ -153,6 +153,67 @@ def extract_as_is():
     try:
         doc = pymupdf.open(input_pdf)
         
+        # [DEBUG START] 1페이지 객체 분석
+        print(f"\n{'='*50}")
+        print(f"[DEBUG] 11.pdf Page 1 심층 분석 시작")
+        try:
+            page1 = doc[0]
+            
+            # 1. Annotation (주석/서명) 확인
+            print(f"\n[1. Annotations (주석/서명)]")
+            annots = list(page1.annots())
+            if not annots:
+                print(" -> 발견된 Annotation 없음")
+            for i, annot in enumerate(annots):
+                # annot.type: [id, name] ex) [0, 'Text'], [15, 'Ink']
+                print(f"  #{i+1} Type: {annot.type[0]} ({annot.type[1]})")
+                print(f"      Rect: {annot.rect}")
+                print(f"      Info: {annot.info}")
+                # Line 타입인 경우 vertices 정보 출력
+                if annot.type[0] == 3:
+                    try:
+                        if hasattr(annot, "vertices"):
+                            vertices = annot.vertices
+                            print(f"      Vertices: {vertices}")
+                            print(f"      Vertices 타입: {type(vertices)}, 길이: {len(vertices) if vertices else 0}")
+                            if vertices and len(vertices) >= 2:
+                                print(f"      첫 번째 점: {vertices[0]}, 타입: {type(vertices[0])}")
+                                print(f"      두 번째 점: {vertices[1]}, 타입: {type(vertices[1])}")
+                                # Point 객체인 경우 좌표 출력
+                                if hasattr(vertices[0], 'x'):
+                                    print(f"      첫 번째 점 좌표: ({vertices[0].x}, {vertices[0].y})")
+                                    print(f"      두 번째 점 좌표: ({vertices[1].x}, {vertices[1].y})")
+                        else:
+                            print(f"      Vertices: 속성 없음")
+                    except Exception as e:
+                        print(f"      Vertices: 접근 불가 - {e}")
+
+            # 2. Images (이미지) 확인
+            print(f"\n[2. Images (이미지)]")
+            images = page1.get_images()
+            if not images:
+                print(" -> 발견된 Image 없음")
+            for i, img in enumerate(images):
+                xref = img[0]
+                try:
+                    bbox = page1.get_image_rects(xref)
+                    print(f"  #{i+1} Xref: {xref}, Loc: {bbox}")
+                except:
+                    print(f"  #{i+1} Xref: {xref} (위치 확인 불가)")
+
+            # 3. Drawings (벡터 그래픽 - 펜으로 쓴 것 같은 선들) 확인
+            print(f"\n[3. Drawings (벡터 그래픽)]")
+            drawings = page1.get_drawings()
+            print(f"  -> 총 {len(drawings)}개의 드로잉 패스 발견")
+            # 너무 많을 수 있으니 처음 5개만 샘플 출력
+            for i, d in enumerate(drawings[:5]):
+                print(f"  #{i+1} Type: {d['type']}, Rect: {d['rect']}")
+
+        except Exception as e:
+            print(f"[DEBUG] 분석 중 에러 발생: {e}")
+        print(f"{'='*50}\n")
+        # [DEBUG END]
+
         text_content = "출고예정일 12/09"
         font_size = 15
 
@@ -169,10 +230,14 @@ def extract_as_is():
             print(f"[INFO] 이미지 압축을 시작합니다... (병렬 처리)")
             
             # 1. 압축 대상 이미지 정보 수집 (순차)
-            tasks = []
-            task_info = [] # (page_num, xref, img_rect, original_size)
+            # xref별로 한 번만 압축하고, 각 위치 정보를 모두 저장
+            xref_to_image_data = {}  # xref -> (image_bytes, image_ext, original_size)
+            xref_to_locations = {}  # xref -> [(page_num, img_rect, page_rotation), ...]
             
             for page_num, page in enumerate(doc):
+                # 페이지 회전값 저장
+                page_rotation = page.rotation
+                
                 image_list = page.get_images()
                 if image_list:
                     for img in image_list:
@@ -180,29 +245,49 @@ def extract_as_is():
                             xref = img[0]
                             img_name = img[7]
                             
-                            # 위치 찾기
+                            # 위치 찾기 (회전값을 고려하여 정확한 좌표 사용)
                             img_rects = []
                             try:
+                                # 회전값을 0으로 설정하여 물리적 좌표 얻기
+                                page.set_rotation(0)
                                 img_rects = page.get_image_rects(xref)
+                                page.set_rotation(page_rotation)  # 원상복구
                             except:
                                 try:
+                                    page.set_rotation(0)
                                     img_rects = page.get_image_rects(img_name)
+                                    page.set_rotation(page_rotation)  # 원상복구
                                 except:
+                                    page.set_rotation(page_rotation)  # 실패 시에도 원상복구
                                     pass
                             
                             if not img_rects:
                                 continue
                             
-                            img_rect = img_rects[0]
-                            base_image = doc.extract_image(xref)
-                            image_bytes = base_image["image"]
-                            image_ext = base_image["ext"]
+                            # 이미지 데이터는 한 번만 추출 (같은 xref는 같은 이미지)
+                            if xref not in xref_to_image_data:
+                                base_image = doc.extract_image(xref)
+                                image_bytes = base_image["image"]
+                                image_ext = base_image["ext"]
+                                xref_to_image_data[xref] = (image_bytes, image_ext, len(image_bytes))
                             
-                            tasks.append((image_bytes, image_ext))
-                            task_info.append((page_num, xref, img_rect, len(image_bytes)))
+                            # 모든 위치 정보 저장
+                            if xref not in xref_to_locations:
+                                xref_to_locations[xref] = []
+                            
+                            # 각 위치를 모두 저장
+                            for img_rect in img_rects:
+                                xref_to_locations[xref].append((page_num, img_rect, page_rotation))
                             
                         except Exception:
                             continue
+            
+            # 압축 작업 준비
+            tasks = []
+            task_info = []
+            for xref, (image_bytes, image_ext, original_size) in xref_to_image_data.items():
+                tasks.append((image_bytes, image_ext))
+                task_info.append((xref, original_size))
 
             print(f"[INFO] 총 {len(tasks)}개의 이미지를 압축합니다.")
 
@@ -211,16 +296,48 @@ def extract_as_is():
                 results = list(executor.map(compress_single_image, tasks))
             
             # 3. 결과 적용 (순차)
-            for (page_num, xref, img_rect, original_size), compressed_image_bytes in zip(task_info, results):
+            # xref별로 압축된 이미지를 모든 위치에 재삽입
+            for (xref, original_size), compressed_image_bytes in zip(task_info, results):
                 if compressed_image_bytes:
                     compressed_size = len(compressed_image_bytes)
                     if compressed_size < original_size * 0.9:
-                        try:
-                            page = doc[page_num]
-                            page.delete_image(xref)
-                            page.insert_image(img_rect, stream=compressed_image_bytes)
-                        except Exception as e:
-                            print(f"[WARNING] 이미지 교체 실패: {e}")
+                        # 이 xref가 사용되는 모든 위치에 대해 처리
+                        if xref in xref_to_locations:
+                            locations = xref_to_locations[xref]
+                            
+                            # 첫 번째 위치에서 이미지 삭제 (한 번만 삭제하면 모든 위치에서 삭제됨)
+                            if locations:
+                                first_page_num, _, _ = locations[0]
+                                try:
+                                    page = doc[first_page_num]
+                                    current_rotation = page.rotation
+                                    page.set_rotation(0)
+                                    page.delete_image(xref)
+                                    page.set_rotation(current_rotation)
+                                except Exception as e:
+                                    print(f"[WARNING] 이미지 삭제 실패 (Page {first_page_num + 1}, Xref {xref}): {e}")
+                            
+                            # 모든 위치에 압축된 이미지 재삽입
+                            for page_num, img_rect, page_rotation in locations:
+                                try:
+                                    page = doc[page_num]
+                                    
+                                    # 현재 페이지 회전값 확인
+                                    current_rotation = page.rotation
+                                    
+                                    # 회전값을 0으로 설정하여 정확한 좌표로 이미지 삽입
+                                    page.set_rotation(0)
+                                    
+                                    # 이미지 재삽입 (img_rect는 이미 회전값 0 기준으로 저장됨)
+                                    page.insert_image(img_rect, stream=compressed_image_bytes)
+                                    
+                                    # 원본 회전값 복구
+                                    page.set_rotation(current_rotation)
+                                    
+                                except Exception as e:
+                                    print(f"[WARNING] 이미지 재삽입 실패 (Page {page_num + 1}, Xref {xref}): {e}")
+                                    import traceback
+                                    traceback.print_exc()
         else:
             print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 이하)")
             print(f"[INFO] 압축 없이 진행합니다...")
@@ -280,64 +397,93 @@ def extract_as_is():
                     y = (tgt_height - new_h) / 2
                     dest_rect = pymupdf.Rect(x, y, x + new_w, y + new_h)
                     
-                    # 내용 복사 (보정된 회전값 적용)
-                    new_page.show_pdf_page(dest_rect, doc, page.number, rotate=apply_rot)
-                    
-                    # 주석 보존 (원본 페이지의 주석을 새 페이지에 복사)
-                    try:
-                        annotations_list = list(page.annots())  # 제너레이터를 리스트로 변환
-                        if annotations_list:
-                            for annot in annotations_list:
-                                try:
-                                    # 원본 주석의 좌표
-                                    annot_rect = annot.rect
-                                    
-                                    # 스케일 및 중앙 정렬에 맞춰 좌표 변환
-                                    new_x0 = x + (annot_rect.x0 - src_rect.x0) * scale
-                                    new_y0 = y + (annot_rect.y0 - src_rect.y0) * scale
-                                    new_x1 = x + (annot_rect.x1 - src_rect.x0) * scale
-                                    new_y1 = y + (annot_rect.y1 - src_rect.y0) * scale
-                                    
-                                    new_annot_rect = pymupdf.Rect(new_x0, new_y0, new_x1, new_y1)
-                                    
-                                    # 주석 타입 확인 및 복사
-                                    annot_type = annot.type[0] if annot.type else -1
-                                    
-                                    # 1. FreeText (텍스트 박스, 타자기) - 타입 2
-                                    if annot_type == 2:
-                                        content = annot.info.get("content", "") if annot.info else ""
-                                        if content:
-                                            new_annot = new_page.add_freetext_annot(new_annot_rect, content)
-                                            try:
-                                                # FreeText 주석의 배경색은 update(fill_color=...)로 설정해야 함
-                                                fill_color = annot.colors.get("fill") if annot.colors else None
-                                                if fill_color:
-                                                    # fill_color는 (r, g, b) 튜플 형태 (0-1 범위)
-                                                    new_annot.update(fill_color=fill_color)
-                                                
-                                                # 테두리 색상은 set_colors로 설정
-                                                stroke_color = annot.colors.get("stroke") if annot.colors else None
-                                                if stroke_color:
-                                                    new_annot.set_colors(stroke=stroke_color)
-                                                
-                                                # 기타 속성 복사 (폰트 크기, 텍스트 색상 등)
-                                                if annot.info:
-                                                    if "fontsize" in annot.info:
-                                                        new_annot.update(fontsize=annot.info.get("fontsize"))
-                                                    if "text_color" in annot.info:
-                                                        new_annot.update(text_color=annot.info.get("text_color"))
-                                                
-                                                new_annot.update()
-                                            except Exception as e:
-                                                # 디버깅을 위해 예외 출력 (필요시 주석 처리)
-                                                # print(f"[WARNING] FreeText 주석 속성 복사 실패: {e}")
-                                                pass
-                                    
-                                    # 2. Text (스티커 메모) - 타입 0
-                                    elif annot_type == 0:
-                                        content = annot.info.get("content", "") if annot.info else ""
-                                        if content:
-                                            new_annot = new_page.add_text_annot(new_annot_rect.tl, content)
+                    # 회전값이 없는 경우: 이미지로 렌더링하여 삽입 (주석 포함)
+                    if rot == 0:
+                        try:
+                            # 페이지를 이미지로 렌더링 (주석 포함)
+                            mat = pymupdf.Matrix(scale, scale)
+                            pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
+                            
+                            # 이미지를 바이트로 변환
+                            img_bytes = pix.tobytes("png")
+                            
+                            # 새 페이지에 이미지 삽입
+                            new_page.insert_image(dest_rect, stream=img_bytes)
+                            print(f"[INFO] Page {page.number + 1}: 회전값 없음, 이미지 렌더링으로 처리")
+                        except Exception as img_error:
+                            # 이미지 렌더링 실패 시 기존 방식 사용
+                            print(f"[WARNING] Page {page.number + 1} 이미지 렌더링 실패, 기존 방식 사용: {img_error}")
+                            new_page.show_pdf_page(dest_rect, doc, page.number, rotate=apply_rot)
+                    else:
+                        # 회전값이 있는 경우: 기존 방식 사용 (주석 보존 필요)
+                        new_page.show_pdf_page(dest_rect, doc, page.number, rotate=apply_rot)
+                        
+                        # 주석 보존 (회전값이 있는 경우에만 주석을 개별적으로 복사)
+                        try:
+                            annotations_list = list(page.annots())  # 제너레이터를 리스트로 변환
+                            if annotations_list:
+                                for annot in annotations_list:
+                                    try:
+                                        # 원본 주석의 좌표
+                                        annot_rect = annot.rect
+                                        
+                                        # 스케일 및 중앙 정렬에 맞춰 좌표 변환
+                                        new_x0 = x + (annot_rect.x0 - src_rect.x0) * scale
+                                        new_y0 = y + (annot_rect.y0 - src_rect.y0) * scale
+                                        new_x1 = x + (annot_rect.x1 - src_rect.x0) * scale
+                                        new_y1 = y + (annot_rect.y1 - src_rect.y0) * scale
+                                        
+                                        new_annot_rect = pymupdf.Rect(new_x0, new_y0, new_x1, new_y1)
+                                        
+                                        # 주석 타입 확인 및 복사
+                                        annot_type = annot.type[0] if annot.type else -1
+                                        
+                                        # 1. FreeText (텍스트 박스, 타자기) - 타입 2
+                                        if annot_type == 2:
+                                            content = annot.info.get("content", "") if annot.info else ""
+                                            if content:
+                                                new_annot = new_page.add_freetext_annot(new_annot_rect, content)
+                                                try:
+                                                    # FreeText 주석의 배경색은 update(fill_color=...)로 설정해야 함
+                                                    fill_color = annot.colors.get("fill") if annot.colors else None
+                                                    if fill_color:
+                                                        # fill_color는 (r, g, b) 튜플 형태 (0-1 범위)
+                                                        new_annot.update(fill_color=fill_color)
+                                                    
+                                                    # 테두리 색상은 set_colors로 설정
+                                                    stroke_color = annot.colors.get("stroke") if annot.colors else None
+                                                    if stroke_color:
+                                                        new_annot.set_colors(stroke=stroke_color)
+                                                    
+                                                    # 기타 속성 복사 (폰트 크기, 텍스트 색상 등)
+                                                    if annot.info:
+                                                        if "fontsize" in annot.info:
+                                                            new_annot.update(fontsize=annot.info.get("fontsize"))
+                                                        if "text_color" in annot.info:
+                                                            new_annot.update(text_color=annot.info.get("text_color"))
+                                                    
+                                                    new_annot.update()
+                                                except Exception as e:
+                                                    # 디버깅을 위해 예외 출력 (필요시 주석 처리)
+                                                    # print(f"[WARNING] FreeText 주석 속성 복사 실패: {e}")
+                                                    pass
+                                        
+                                        # 2. Text (스티커 메모) - 타입 0
+                                        elif annot_type == 0:
+                                            content = annot.info.get("content", "") if annot.info else ""
+                                            if content:
+                                                new_annot = new_page.add_text_annot(new_annot_rect.tl, content)
+                                                try:
+                                                    stroke_color = annot.colors.get("stroke") if annot.colors else None
+                                                    if stroke_color:
+                                                        new_annot.set_colors(stroke=stroke_color)
+                                                    new_annot.update()
+                                                except:
+                                                    pass
+                                        
+                                        # 3. Highlight (형광펜) - 타입 8
+                                        elif annot_type == 8:
+                                            new_annot = new_page.add_highlight_annot(new_annot_rect)
                                             try:
                                                 stroke_color = annot.colors.get("stroke") if annot.colors else None
                                                 if stroke_color:
@@ -345,27 +491,124 @@ def extract_as_is():
                                                 new_annot.update()
                                             except:
                                                 pass
-                                    
-                                    # 3. Highlight (형광펜) - 타입 8
-                                    elif annot_type == 8:
-                                        new_annot = new_page.add_highlight_annot(new_annot_rect)
-                                        try:
-                                            stroke_color = annot.colors.get("stroke") if annot.colors else None
-                                            if stroke_color:
-                                                new_annot.set_colors(stroke=stroke_color)
-                                            new_annot.update()
-                                        except:
-                                            pass
-                                    
-                                    # 기타 타입은 일단 건너뜀 (Ink 등은 나중에 추가)
-                                    
-                                except Exception as annot_error:
-                                    # 개별 주석 처리 실패 시 계속 진행
-                                    continue
+
+                                        # 4. Line (선) - 타입 3
+                                        elif annot_type == 3:
+                                            try:
+                                                # Line 주석의 vertices를 사용하여 시작점과 끝점 계산
+                                                p1_new = None
+                                                p2_new = None
+                                                
+                                                # vertices 접근 시도 (Line 주석은 vertices가 필수)
+                                                try:
+                                                    vertices = annot.vertices
+                                                    if vertices and len(vertices) >= 2:
+                                                        # Line 주석의 vertices는 보통 4개 점: [시작, 끝, 시작, 끝] 또는 2개: [시작, 끝]
+                                                        # 첫 번째와 두 번째 점을 사용
+                                                        p1_old = vertices[0]
+                                                        p2_old = vertices[1]
+                                                        
+                                                        # Point 객체인 경우
+                                                        if isinstance(p1_old, pymupdf.Point):
+                                                            p1_new = pymupdf.Point(x + (p1_old.x - src_rect.x0) * scale, y + (p1_old.y - src_rect.y0) * scale)
+                                                            p2_new = pymupdf.Point(x + (p2_old.x - src_rect.x0) * scale, y + (p2_old.y - src_rect.y0) * scale)
+                                                        # 리스트/튜플 형태인 경우
+                                                        elif isinstance(p1_old, (list, tuple)) and len(p1_old) >= 2:
+                                                            p1_new = pymupdf.Point(x + (p1_old[0] - src_rect.x0) * scale, y + (p1_old[1] - src_rect.y0) * scale)
+                                                            p2_new = pymupdf.Point(x + (p2_old[0] - src_rect.x0) * scale, y + (p2_old[1] - src_rect.y0) * scale)
+                                                        # dict 형태인 경우 (x, y 키를 가진 경우)
+                                                        elif isinstance(p1_old, dict):
+                                                            p1_new = pymupdf.Point(x + (p1_old.get('x', p1_old.get(0, 0)) - src_rect.x0) * scale, 
+                                                                                  y + (p1_old.get('y', p1_old.get(1, 0)) - src_rect.y0) * scale)
+                                                            p2_new = pymupdf.Point(x + (p2_old.get('x', p2_old.get(0, 0)) - src_rect.x0) * scale,
+                                                                                  y + (p2_old.get('y', p2_old.get(1, 0)) - src_rect.y0) * scale)
+                                                        # 속성으로 접근하는 경우
+                                                        elif hasattr(p1_old, 'x') and hasattr(p1_old, 'y'):
+                                                            p1_new = pymupdf.Point(x + (p1_old.x - src_rect.x0) * scale, y + (p1_old.y - src_rect.y0) * scale)
+                                                            p2_new = pymupdf.Point(x + (p2_old.x - src_rect.x0) * scale, y + (p2_old.y - src_rect.y0) * scale)
+                                                except Exception as vertices_error:
+                                                    # vertices 접근 실패 시 디버깅 정보 출력
+                                                    print(f"[DEBUG] Line 주석 vertices 접근 실패: {vertices_error}, vertices={getattr(annot, 'vertices', 'N/A')}")
+                                                
+                                                # vertices로 점을 얻지 못한 경우 rect 사용 (fallback)
+                                                if p1_new is None or p2_new is None:
+                                                    annot_rect = annot.rect
+                                                    # Line 주석의 rect는 선을 감싸는 경계 상자이므로,
+                                                    # 실제 선의 방향을 추정하기 어렵습니다.
+                                                    # 하지만 일반적으로 rect의 중심을 지나는 대각선을 사용
+                                                    # 또는 rect의 좌하단과 우상단을 사용할 수도 있음
+                                                    # 일단 원본과 유사하게 보이도록 좌하단-우상단 사용
+                                                    p1_new = pymupdf.Point(x + (annot_rect.x0 - src_rect.x0) * scale, y + (annot_rect.y1 - src_rect.y0) * scale)
+                                                    p2_new = pymupdf.Point(x + (annot_rect.x1 - src_rect.x0) * scale, y + (annot_rect.y0 - src_rect.y0) * scale)
+                                                    print(f"[WARNING] Line 주석 vertices 없음, rect 사용: {annot_rect}")
+                                                
+                                                # Line 주석 생성
+                                                new_annot = new_page.add_line_annot(p1_new, p2_new)
+                                                
+                                                # 속성 복사
+                                                try:
+                                                    if annot.border:
+                                                        new_annot.set_border(annot.border)
+                                                    if annot.colors:
+                                                        stroke = annot.colors.get("stroke")
+                                                        if stroke:
+                                                            new_annot.set_colors(stroke=stroke)
+                                                    new_annot.update()
+                                                except Exception as attr_error:
+                                                    # 속성 복사 실패해도 주석은 생성되었으므로 계속 진행
+                                                    pass
+                                            except Exception as line_error:
+                                                # Line 주석 처리 실패 시 로그 출력 (디버깅용)
+                                                print(f"[WARNING] Line 주석 복사 실패 (Page {page.number + 1}): {line_error}")
+                                                import traceback
+                                                traceback.print_exc()
+                                                pass
+
+                                        # 5. Square (4), Circle (5) - 도형
+                                        elif annot_type in [4, 5]:
+                                            if annot_type == 5:
+                                                new_annot = new_page.add_circle_annot(new_annot_rect)
+                                            else:
+                                                new_annot = new_page.add_square_annot(new_annot_rect)
+                                            try:
+                                                if annot.border:
+                                                    new_annot.set_border(annot.border)
+                                                if annot.colors:
+                                                    stroke = annot.colors.get("stroke")
+                                                    fill = annot.colors.get("fill")
+                                                    new_annot.set_colors(stroke=stroke, fill=fill)
+                                                new_annot.update()
+                                            except:
+                                                pass
+
+                                        # 6. Ink (펜/서명) - 타입 15
+                                        elif annot_type == 15:
+                                            if hasattr(annot, "vertices") and annot.vertices:
+                                                old_ink = annot.vertices
+                                                new_ink = []
+                                                for stroke in old_ink:
+                                                    new_stroke = [pymupdf.Point(x + (p.x - src_rect.x0) * scale, y + (p.y - src_rect.y0) * scale) for p in stroke]
+                                                    new_ink.append(new_stroke)
+                                                if new_ink:
+                                                    new_annot = new_page.add_ink_annot(new_ink)
+                                                    try:
+                                                        if annot.border:
+                                                            new_annot.set_border(annot.border)
+                                                        if annot.colors:
+                                                            stroke = annot.colors.get("stroke")
+                                                            if stroke:
+                                                                new_annot.set_colors(stroke=stroke)
+                                                        new_annot.update()
+                                                    except:
+                                                        pass
+                                        
+                                    except Exception as annot_error:
+                                        # 개별 주석 처리 실패 시 계속 진행
+                                        continue
                                 
-                    except Exception as e:
-                        # 주석 목록 가져오기 실패 시 무시
-                        pass
+                        except Exception as e:
+                            # 주석 목록 가져오기 실패 시 무시
+                            pass
                     
                     # 회전값 적용하지 않음 (모든 페이지를 정방향 A4 세로형으로 통일)
                     # new_page.set_rotation(rot)
@@ -475,6 +718,51 @@ def extract_as_is():
         print("[DEBUG] 저장된 결과 PDF 검증:")
         try:
             result_doc = pymupdf.open(output_pdf)
+            
+            # [DEBUG START] 결과 파일 1페이지 객체 분석
+            print(f"\n{'='*50}")
+            print(f"[DEBUG] 11_results.pdf Page 1 심층 분석 시작")
+            try:
+                page1 = result_doc[0]
+                
+                # 1. Annotation (주석/서명) 확인
+                print(f"\n[1. Annotations (주석/서명)]")
+                annots = list(page1.annots())
+                if not annots:
+                    print(" -> 발견된 Annotation 없음")
+                for i, annot in enumerate(annots):
+                    # annot.type: [id, name] ex) [0, 'Text'], [15, 'Ink']
+                    print(f"  #{i+1} Type: {annot.type[0]} ({annot.type[1]})")
+                    print(f"      Rect: {annot.rect}")
+                    print(f"      Info: {annot.info}")
+                    if annot.type[0] == 19: # Widget
+                        print(f"      Field Value: {annot.field_value}")
+
+                # 2. Images (이미지) 확인
+                print(f"\n[2. Images (이미지)]")
+                images = page1.get_images()
+                if not images:
+                    print(" -> 발견된 Image 없음")
+                for i, img in enumerate(images):
+                    xref = img[0]
+                    try:
+                        bbox = page1.get_image_rects(xref)
+                        print(f"  #{i+1} Xref: {xref}, Loc: {bbox}")
+                    except:
+                        print(f"  #{i+1} Xref: {xref} (위치 확인 불가)")
+
+                # 3. Drawings (벡터 그래픽) 확인
+                print(f"\n[3. Drawings (벡터 그래픽)]")
+                drawings = page1.get_drawings()
+                print(f"  -> 총 {len(drawings)}개의 드로잉 패스 발견")
+                for i, d in enumerate(drawings[:5]):
+                    print(f"  #{i+1} Type: {d['type']}, Rect: {d['rect']}")
+
+            except Exception as e:
+                print(f"[DEBUG] 분석 중 에러 발생: {e}")
+            print(f"{'='*50}\n")
+            # [DEBUG END]
+
             for i, page in enumerate(result_doc):
                 print(f"[DEBUG] 결과 Page {i+1} - Rotation: {page.rotation}, Size: (Width: {page.rect.width:.2f}, Height: {page.rect.height:.2f})")
             result_doc.close()
