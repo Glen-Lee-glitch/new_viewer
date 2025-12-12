@@ -495,11 +495,11 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                     mask_pixmap = QPixmap(int(rect_item.width()), int(rect_item.height()))
                     mask_pixmap.fill(Qt.GlobalColor.white)
                     
-                    # 테두리 (검은색 실선)
-                    painter = QPainter(mask_pixmap)
-                    painter.setPen(QPen(Qt.GlobalColor.black, 1))
-                    painter.drawRect(0, 0, mask_pixmap.width()-1, mask_pixmap.height()-1)
-                    painter.end()
+                    # 테두리 (제거: setPen을 NoPen으로 설정하거나 테두리 그리기 생략)
+                    # painter = QPainter(mask_pixmap)
+                    # painter.setPen(Qt.PenStyle.NoPen) 
+                    # painter.drawRect(0, 0, mask_pixmap.width(), mask_pixmap.height())
+                    # painter.end()
 
                     # 4. _add_stamp_to_page 재사용
                     center_pos = rect_item.center()
