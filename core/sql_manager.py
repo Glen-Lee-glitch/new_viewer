@@ -1473,7 +1473,8 @@ def insert_additional_note(
     missing_docs: list | None,
     requirements: list | None,
     other_detail: str | None,
-    target_status: str | None = None
+    target_status: str | None = None,
+    detail_info: str | None = None
 ) -> bool:
     """
     additional_note 테이블에 특이사항 비고 데이터를 삽입하고, 
@@ -1488,6 +1489,8 @@ def insert_additional_note(
             - None이면 status 업데이트 안 함
             - '이메일 전송' 또는 '요청메일 전송' 상태인 경우 업데이트 안 함
             - 그 외의 경우 target_status로 업데이트
+        detail_info: 서류미비 상세 사유 내용 (선택사항)
+            - 내용이 있으면 저장, 없으면 NULL 유지
     
     Returns:
         삽입/업데이트 성공 여부
@@ -1498,26 +1501,29 @@ def insert_additional_note(
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
             # 1. 특이사항 저장 (내용이 있는 경우에만)
-            if missing_docs or requirements or other_detail:
+            if missing_docs or requirements or other_detail or detail_info:
                 with connection.cursor() as cursor:
                     # 리스트를 JSON 문자열로 변환 (None이면 NULL)
                     missing_docs_json = json.dumps(missing_docs, ensure_ascii=False) if missing_docs else None
                     requirements_json = json.dumps(requirements, ensure_ascii=False) if requirements else None
+                    # detail_info는 내용이 있으면 저장, 없으면 None (NULL 유지)
+                    detail_info_value = detail_info.strip() if detail_info and detail_info.strip() else None
                     
                     query = """
                         INSERT INTO additional_note (
-                            RN, missing_docs, requirements, other_detail
+                            RN, missing_docs, requirements, other_detail, detail_info
                         ) VALUES (
-                            %s, %s, %s, %s
+                            %s, %s, %s, %s, %s
                         )
                         ON DUPLICATE KEY UPDATE
                             missing_docs = VALUES(missing_docs),
                             requirements = VALUES(requirements),
                             other_detail = VALUES(other_detail),
+                            detail_info = VALUES(detail_info),
                             updated_at = CURRENT_TIMESTAMP
                     """
                     cursor.execute(query, (
-                        rn, missing_docs_json, requirements_json, other_detail
+                        rn, missing_docs_json, requirements_json, other_detail, detail_info_value
                     ))
             
             # 2. Status 업데이트 (target_status가 있는 경우)
