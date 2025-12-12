@@ -54,7 +54,7 @@ def claim_subsidy_work(rn: str, worker: str) -> bool:
                         return existing_worker == worker
 
                     # status가 '이메일 전송' 또는 '요청메일 전송'이면 status는 변경하지 않음
-                    if existing_status in ('이메일 전송', '요청메일 전송'):
+                    if existing_status in ('이메일 전송', '요청메일 전송', '중복메일', '중복메일확인'):
                         update_query = (
                             "UPDATE subsidy_applications SET worker = %s "
                             "WHERE RN = %s"
@@ -1536,7 +1536,7 @@ def insert_additional_note(
                     current_status = row[0] if row else None
                 
                 # 상태 업데이트 조건 확인
-                if current_status not in ('이메일 전송', '요청메일 전송'):
+                if current_status not in ('이메일 전송', '요청메일 전송', '중복메일확인', '중복메일'):
                     with connection.cursor() as cursor:
                         kst = pytz.timezone('Asia/Seoul')
                         current_time = datetime.now(kst)
