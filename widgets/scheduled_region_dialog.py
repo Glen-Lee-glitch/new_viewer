@@ -4,9 +4,9 @@ import pandas as pd
 from datetime import datetime
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, 
-    QPushButton, QHeaderView, QMessageBox, QDateEdit, QWidget, QLabel, QApplication
+    QPushButton, QHeaderView, QMessageBox, QDateTimeEdit, QWidget, QLabel, QApplication
 )
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt, QDate, QDateTime
 from PyQt6.QtGui import QColor
 
 # Ensure we can import from core/widgets if needed in the future
@@ -94,17 +94,12 @@ class ScheduledRegionDialog(QDialog):
             region_item.setFlags(region_item.flags() ^ Qt.ItemFlag.ItemIsEditable) # Make read-only
             self.table.setItem(row_idx, 0, region_item)
             
-            # 2. Plan Open Date (DateEdit Widget)
-            date_edit = QDateEdit()
-            date_edit.setDisplayFormat("yyyy-MM-dd")
+            # 2. Plan Open Date (DateTimeEdit Widget)
+            date_edit = QDateTimeEdit()
+            date_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
             date_edit.setCalendarPopup(True)
             
             # Set date if exists, otherwise set to empty/null representation (unchecked or custom)
-            # QDateEdit doesn't support "null" natively well without a checkbox or special handling.
-            # Using QDateEdit with a "clear" button approach or special date to represent null is tricky.
-            # Instead, let's use a widget that holds a DateEdit and a "Clear" button, or just use text edit for simplicity?
-            # Let's stick to QDateEdit. If null, we can set a special date or use a checkbox "설정".
-            # Better approach for Nullable Date: Use a QWidget container with CheckBox + DateEdit
             
             container = QWidget()
             h_layout = QHBoxLayout(container)
@@ -114,22 +109,35 @@ class ScheduledRegionDialog(QDialog):
             # Checkbox to enable/disable date (represents Null vs Not Null)
             chk = pd.notna(plan_date)
             
-            # Date Edit
-            date_widget = QDateEdit()
-            date_widget.setDisplayFormat("yyyy-MM-dd")
+            # DateTime Edit
+            date_widget = QDateTimeEdit()
+            date_widget.setDisplayFormat("yyyy-MM-dd HH:mm")
             date_widget.setCalendarPopup(True)
             
             if chk:
                 if isinstance(plan_date, str):
-                    qdate = QDate.fromString(plan_date, "yyyy-MM-dd")
+                    # Try parsing with time first, then date only
+                    try:
+                        qdate = QDateTime.fromString(plan_date, "yyyy-MM-dd HH:mm:ss")
+                        if not qdate.isValid():
+                             qdate = QDateTime.fromString(plan_date, "yyyy-MM-dd HH:mm")
+                    except:
+                        pass
+                        
+                    if not qdate.isValid():
+                         qdate = QDateTime.fromString(plan_date, "yyyy-MM-dd")
+                         
+                    if not qdate.isValid():
+                        qdate = QDateTime.currentDateTime()
+                        
                 elif isinstance(plan_date, (datetime, pd.Timestamp)):
-                    qdate = QDate(plan_date.year, plan_date.month, plan_date.day)
+                    qdate = QDateTime(plan_date.year, plan_date.month, plan_date.day, plan_date.hour, plan_date.minute, 0)
                 else:
-                    qdate = QDate.currentDate()
-                date_widget.setDate(qdate)
-                date_str = qdate.toString("yyyy-MM-dd")
+                    qdate = QDateTime.currentDateTime()
+                date_widget.setDateTime(qdate)
+                date_str = qdate.toString("yyyy-MM-dd HH:mm:00")
             else:
-                date_widget.setDate(QDate.currentDate())
+                date_widget.setDateTime(QDateTime.currentDateTime())
                 date_widget.setEnabled(False) # Initially disabled if null
                 date_str = None
                 
@@ -197,7 +205,10 @@ class ScheduledRegionDialog(QDialog):
             
             current_val = None
             if checkbox.isChecked():
-                current_val = date_edit.date().toString("yyyy-MM-dd")
+                # 초는 00으로 고정
+                dt = date_edit.dateTime()
+                # QDateTime -> string with :00 seconds
+                current_val = dt.toString("yyyy-MM-dd HH:mm:00")
             
             original_val = self.original_data.get(region)
             
