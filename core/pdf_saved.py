@@ -198,7 +198,14 @@ def compress_pdf_file(
 
                 # 9. 스탬프 데이터가 있으면 페이지에 삽입
                 if has_stamps:
-                    for stamp in final_stamp_data[new_idx]: # <--- 변환된 데이터 사용
+                    # 가리개(mask)를 먼저 그리고, 나머지(stamp/text)를 그 위에 그리기 위해 정렬
+                    # type이 'mask'이면 우선순위 0, 그 외에는 1
+                    sorted_stamps = sorted(
+                        final_stamp_data[new_idx],
+                        key=lambda s: 0 if s.get('type') == 'mask' else 1
+                    )
+                    
+                    for stamp in sorted_stamps: # <--- 변환된 데이터 사용
                         try:
                             stamp_pix: QPixmap = stamp['pixmap']
                             

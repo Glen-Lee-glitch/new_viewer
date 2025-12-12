@@ -583,7 +583,10 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 return 
 
             # Create the data dictionary FIRST
+            stamp_type = 'mask' if self._is_mask_mode else 'stamp'
+            
             stamp_data = {
+                'type': stamp_type,
                 'pixmap': scaled_pixmap,
                 'x_ratio': final_pos.x() / page_width,
                 'y_ratio': final_pos.y() / page_height,
