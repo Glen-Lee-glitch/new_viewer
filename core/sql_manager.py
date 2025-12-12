@@ -2065,6 +2065,55 @@ def fetch_after_apply_counts() -> tuple[int, int]:
         traceback.print_exc()
         return (0, 0)
 
+def fetch_scheduled_regions() -> pd.DataFrame:
+    """
+    '출고예정일' 테이블의 모든 데이터를 조회하여 DataFrame으로 반환한다.
+    
+    Returns:
+        DataFrame (region, plan_open_date, day_gap, updated_datetime 포함)
+    """
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "SELECT region, plan_open_date, day_gap, updated_datetime FROM 출고예정일 ORDER BY region"
+            df = pd.read_sql(query, connection)
+            return df
+    except Exception:
+        traceback.print_exc()
+        return pd.DataFrame()
+
+def update_scheduled_region(region: str, plan_open_date: str | None) -> bool:
+    """
+    '출고예정일' 테이블에서 특정 지역의 plan_open_date를 업데이트한다.
+    
+    Args:
+        region: 지역명
+        plan_open_date: 출고예정일 (문자열 'YYYY-MM-DD' 또는 None)
+        
+    Returns:
+        업데이트 성공 여부
+    """
+    if not region:
+        return False
+        
+    try:
+        # 한국 시간 (KST) 생성
+        kst = pytz.timezone('Asia/Seoul')
+        current_time = datetime.now(kst)
+        
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                query = """
+                    UPDATE 출고예정일 
+                    SET plan_open_date = %s, updated_datetime = %s
+                    WHERE region = %s
+                """
+                cursor.execute(query, (plan_open_date, current_time, region))
+                connection.commit()
+                return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()

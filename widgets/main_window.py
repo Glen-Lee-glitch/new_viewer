@@ -35,6 +35,7 @@ from widgets.config_dialog import ConfigDialog
 from widgets.necessary_widget import NecessaryWidget
 from widgets.multi_child_check_dialog import MultiChildCheckDialog
 from widgets.help_dialog import HelpDialog
+from widgets.scheduled_region_dialog import ScheduledRegionDialog
 
 
 class MainWindow(QMainWindow):
@@ -228,6 +229,12 @@ class MainWindow(QMainWindow):
         undo_action.setShortcut(QKeySequence.StandardKey.Undo)
         undo_action.triggered.connect(self._pdf_view_widget.undo_last_action)
         self.menu_edit.addAction(undo_action)
+
+        self.menu_edit.addSeparator()
+
+        # 예정 지자체 관리 액션 (UI 파일에 정의됨)
+        if hasattr(self, 'action_scheduled_local_government'):
+            self.action_scheduled_local_government.triggered.connect(self._open_scheduled_region_dialog)
         
         self.menu_edit.addSeparator()
         
@@ -480,6 +487,11 @@ class MainWindow(QMainWindow):
             payment_request_load_enabled = self._config_dialog.payment_request_load_enabled
             self._pdf_load_widget.set_payment_request_load_enabled(payment_request_load_enabled)
     
+    def _open_scheduled_region_dialog(self):
+        """예정 지자체 관리 다이얼로그를 연다."""
+        dialog = ScheduledRegionDialog(self)
+        dialog.exec()
+
     def _open_special_note_dialog(self):
         """특이사항 입력 다이얼로그를 연다."""
         dialog = SpecialNoteDialog(parent=self)
