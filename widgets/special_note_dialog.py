@@ -30,7 +30,7 @@ class SpecialNoteDialog(QDialog):
         loadUi(ui_path, self)
         
         # Dynamic Widget Storage
-        self.missing_checkboxes = {}  # {name: {'cb': QCheckBox, 'le': QLineEdit|None}}
+        self.missing_checkboxes = {}  # {name: {'cb': QCheckBox, 'le': QLineEdit|None, 'label': QLabel|None}}
         self.req_checkboxes = {}      # {name: {'cb': QCheckBox, 'le': QLineEdit|None}}
         
         # Initialize Dynamic UI
@@ -110,7 +110,9 @@ class SpecialNoteDialog(QDialog):
         row = 1
         col = 0
         max_col = 4 # Number of columns for checkboxes
+        is_missing_docs = (storage is self.missing_checkboxes)
 
+        # First pass: Create and place all checkboxes
         for item_text in items:
             cb = QCheckBox(item_text)
             storage[item_text] = {'cb': cb, 'le': None}
@@ -118,7 +120,7 @@ class SpecialNoteDialog(QDialog):
             # Place checkbox
             layout.addWidget(cb, row, col)
             
-            # If item is "기타", add a LineEdit
+            # If item is "기타", add a LineEdit (for both missing_docs and req)
             if item_text == "기타":
                 le = QLineEdit()
                 le.setPlaceholderText("직접 입력")
@@ -137,12 +139,52 @@ class SpecialNoteDialog(QDialog):
                     # New row for LineEdit if no space
                     row += 1
                     layout.addWidget(le, row, 0, 1, 4)
-                    col = max_col # Force next loop to new row if there were more items
+                    col = 0  # Reset column after adding LineEdit in new row
             
             col += 1
             if col >= max_col:
                 col = 0
                 row += 1
+        
+        # Second pass: For 서류미비, add a single LineEdit for all items
+        if is_missing_docs:
+            # Find the last row used for checkboxes
+            last_checkbox_row = row
+            
+            # Add a separator label
+            separator_row = last_checkbox_row + 1
+            separator_label = QLabel("해당 서류 내용:")
+            separator_label.setStyleSheet("color: gray; font-size: 9pt;")
+            separator_label.setVisible(False)
+            layout.addWidget(separator_label, separator_row, 0, 1, 1)
+            self.missing_docs_separator_label = separator_label
+            
+            # Add a single LineEdit for all 서류미비 items
+            line_edit_row = separator_row
+            le = QLineEdit()
+            le.setPlaceholderText("상세 사유 입력")
+            le.setVisible(False) # Initially hidden
+            layout.addWidget(le, line_edit_row, 1, 1, 3)
+            self.missing_docs_line_edit = le
+            
+            # Connect all checkboxes (except "기타") to update line edit visibility
+            for item_text in items:
+                if item_text != "기타":
+                    storage[item_text]['cb'].toggled.connect(self._update_missing_docs_line_edits)
+
+    def _update_missing_docs_line_edits(self):
+        """Update visibility of the single line edit when any 서류미비 checkbox is toggled."""
+        # Check if any checkbox is checked (excluding "기타" which has its own logic)
+        any_checked = any(
+            widgets['cb'].isChecked() and name != '기타' 
+            for name, widgets in self.missing_checkboxes.items()
+        )
+        
+        # Show/hide separator label and line edit
+        if hasattr(self, 'missing_docs_separator_label'):
+            self.missing_docs_separator_label.setVisible(any_checked)
+        if hasattr(self, 'missing_docs_line_edit'):
+            self.missing_docs_line_edit.setVisible(any_checked)
 
     def update_ui_state(self):
         """Show/Hide sub-frames based on main checkbox state and adjust size."""
