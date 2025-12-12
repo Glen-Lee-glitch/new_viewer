@@ -20,6 +20,7 @@ class ThumbnailViewWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.renderer: PdfRender | None = None
+        self._page_rotations: dict[int, int] = {}  # 페이지별 회전 정보 저장
         self.init_ui()
         self.setup_connections()
         
@@ -167,6 +168,12 @@ class ThumbnailViewWidget(QWidget):
         """PDF 렌더러를 설정하고 썸네일을 생성한다. page_order가 있으면 그 순서대로 생성한다."""
         self.renderer = renderer
         self.thumbnail_list_widget.clear()
+        
+        # 회전 정보 저장
+        if rotations:
+            self._page_rotations = rotations.copy()
+        else:
+            self._page_rotations.clear()
 
         if not self.renderer or self.renderer.get_page_count() == 0:
             return
@@ -179,7 +186,7 @@ class ThumbnailViewWidget(QWidget):
         for visual_index, actual_page_num in enumerate(page_order):
             try:
                 # 회전 각도 가져오기
-                user_rotation = rotations.get(actual_page_num, 0) if rotations else 0
+                user_rotation = self._page_rotations.get(actual_page_num, 0)
                 
                 # 실제 페이지 번호로 썸네일 이미지 생성
                 icon = self.renderer.create_thumbnail(actual_page_num, max_width=120, user_rotation=user_rotation)
@@ -198,6 +205,9 @@ class ThumbnailViewWidget(QWidget):
         """특정 페이지의 회전 상태를 업데이트한다."""
         if not self.renderer:
             return
+        
+        # 회전 정보 저장
+        self._page_rotations[page_num] = rotation
             
         for i in range(self.thumbnail_list_widget.count()):
             item = self.thumbnail_list_widget.item(i)
@@ -209,6 +219,27 @@ class ThumbnailViewWidget(QWidget):
                     item.setIcon(icon)
                 except Exception as e:
                     print(f"썸네일 회전 업데이트 오류 (페이지 {page_num}): {e}")
+                break
+
+    def update_page_thumbnail(self, page_num: int):
+        """특정 페이지의 썸네일을 업데이트한다. (자르기 등으로 페이지가 변경된 경우)"""
+        if not self.renderer:
+            return
+        
+        # 저장된 회전 정보 가져오기
+        user_rotation = self._page_rotations.get(page_num, 0)
+        
+        for i in range(self.thumbnail_list_widget.count()):
+            item = self.thumbnail_list_widget.item(i)
+            actual_page_num = item.data(Qt.ItemDataRole.UserRole)
+            
+            if actual_page_num == page_num:
+                try:
+                    # PDF 데이터가 변경되었으므로 새로운 썸네일 생성
+                    icon = self.renderer.create_thumbnail(page_num, max_width=120, user_rotation=user_rotation)
+                    item.setIcon(icon)
+                except Exception as e:
+                    print(f"썸네일 업데이트 오류 (페이지 {page_num}): {e}")
                 break
 
     def on_thumbnail_clicked(self, item):

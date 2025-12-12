@@ -31,6 +31,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     # --- 정보 패널 연동을 위한 신호 ---
     pdf_loaded = pyqtSignal(str, float, int)  # file_path, file_size_mb, total_pages
     page_info_updated = pyqtSignal(int, float, float, int)  # page_num, width, height, rotation
+    thumbnail_updated = pyqtSignal(int)  # page_num: 썸네일 업데이트가 필요한 페이지 번호
 
     def __init__(self):
         super().__init__()
@@ -294,9 +295,8 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 self._start_render_job(self.current_page)
             
             # 썸네일 업데이트 (자른 모든 페이지)
-            if hasattr(self, 'thumbnail_updated'):
-                for page_num in page_nums:
-                    self.thumbnail_updated.emit(page_num)
+            for page_num in page_nums:
+                self.thumbnail_updated.emit(page_num)
             
             if len(page_nums) == 1:
                 print(f"페이지 {page_nums[0] + 1} 자르기 적용 완료")

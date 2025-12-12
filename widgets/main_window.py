@@ -294,6 +294,7 @@ class MainWindow(QMainWindow):
         self._pdf_view_widget.page_info_updated.connect(self._info_panel.update_page_info)
         self._info_panel.text_stamp_requested.connect(self._pdf_view_widget.activate_text_stamp_mode)
         self._pdf_view_widget.page_rotation_changed.connect(self._thumbnail_viewer.update_page_rotation)
+        self._pdf_view_widget.thumbnail_updated.connect(self._thumbnail_viewer.update_page_thumbnail)
 
         # 페이지 네비게이션 버튼 클릭 시그널 연결
         self.ui_push_button_prev.clicked.connect(lambda: self.change_page(-1))
