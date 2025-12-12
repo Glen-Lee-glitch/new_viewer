@@ -1,11 +1,11 @@
 from pathlib import Path
 
 from PyQt6 import uic
-from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal, QPointF, QSizeF)
-from PyQt6.QtGui import QImage, QPainter, QPixmap, QFont, QFontMetrics, QPen
+from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal, QPointF, QSizeF, QRectF, QEvent)
+from PyQt6.QtGui import QImage, QPainter, QPixmap, QFont, QFontMetrics, QPen, QColor, QBrush
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QGraphicsPixmapItem,
                                  QGraphicsScene, QGraphicsView, QMessageBox,
-                                 QWidget, QGraphicsItem, QMenu)
+                                 QWidget, QGraphicsItem, QMenu, QGraphicsRectItem)
 
 import pymupdf
 from core.workers import PdfRenderWorker, PdfSaveWorker
@@ -55,6 +55,11 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self._stamp_pixmap: QPixmap | None = None
         self._stamp_desired_width: int = 110
 
+        # --- 가리개(Mask) 모드 ---
+        self._is_mask_mode = False
+        self._mask_start_pos: QPointF | None = None
+        self._mask_rect_item: QGraphicsRectItem | None = None
+        
         # --- 비동기 처리 및 캐싱 설정 ---
         self.thread_pool = QThreadPool.globalInstance()
         self.page_cache = {}  # 페이지 캐시: {page_num: QPixmap}
@@ -90,6 +95,14 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     def _activate_stamp_mode(self, stamp_info: dict): # 변경: image_path: str -> stamp_info: dict
         """스탬프 오버레이에서 도장이 선택되면 호출된다."""
         try:
+            # 1. 가리개(Mask) 모드 확인
+            if stamp_info.get('type') == 'mask':
+                self._is_mask_mode = True
+                self._is_stamp_mode = False # 스탬프 모드는 해제
+                self.setCursor(Qt.CursorShape.CrossCursor)
+                print("가리개(Mask) 모드 활성화")
+                return
+
             desired_width = stamp_info['width'] # 먼저 desired_width를 가져옴
 
             # stamp_info에 미리 생성된 pixmap이 있는지 확인
@@ -118,9 +131,15 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     def _deactivate_stamp_mode(self):
         """스탬프 모드를 비활성화한다."""
         self._is_stamp_mode = False
+        self._is_mask_mode = False
+        self._mask_start_pos = None
+        if self._mask_rect_item:
+            self.scene.removeItem(self._mask_rect_item)
+            self._mask_rect_item = None
+            
         self._stamp_pixmap = None
         self.unsetCursor()
-        print("스탬프 모드 비활성화")
+        print("스탬프/가리개 모드 비활성화")
 
     def activate_text_stamp_mode(self, text: str, font_size: int):
         """info_panel로부터 텍스트와 폰트 크기를 받아 스탬프 모드를 활성화한다."""
@@ -399,22 +418,118 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             QPainter.RenderHint.TextAntialiasing
         )
         view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-    
-    def mousePressEvent(self, event):
-        """마우스 클릭 이벤트를 처리한다 (스탬프 모드)."""
-        if self._is_stamp_mode and event.button() == Qt.MouseButton.LeftButton:
-            if self.current_page_item:
-                # 뷰의 좌표를 씬 좌표로 변환
-                scene_pos = self.pdf_graphics_view.mapToScene(self.pdf_graphics_view.mapFrom(self, event.pos()))
-                # 씬 좌표를 현재 페이지 아이템의 내부 좌표로 변환
-                item_pos = self.current_page_item.mapFromScene(scene_pos)
-                self._add_stamp_to_page(item_pos)
+        # 이벤트 필터 설치 (마우스 이벤트를 가로채기 위함)
+        view.viewport().installEventFilter(self)
+
+    def eventFilter(self, source, event):
+        """뷰포트 이벤트를 필터링하여 스탬프/가리개 모드를 처리한다."""
+        if hasattr(self, 'pdf_graphics_view') and source == self.pdf_graphics_view.viewport():
+            if self._is_stamp_mode or self._is_mask_mode:
+                if event.type() == QEvent.Type.MouseButtonPress:
+                    if self._handle_mouse_press(event):
+                        return True
+                elif event.type() == QEvent.Type.MouseMove:
+                    if self._handle_mouse_move(event):
+                        return True
+                elif event.type() == QEvent.Type.MouseButtonRelease:
+                    if self._handle_mouse_release(event):
+                        return True
+        return super().eventFilter(source, event)
+
+    def _handle_mouse_press(self, event):
+        """마우스 클릭 이벤트를 처리한다 (스탬프 모드, 가리개 모드)."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self._is_stamp_mode:
+                if self.current_page_item:
+                    # 뷰포트 좌표를 씬 좌표로 변환
+                    scene_pos = self.pdf_graphics_view.mapToScene(event.pos())
+                    # 씬 좌표를 현재 페이지 아이템의 내부 좌표로 변환
+                    item_pos = self.current_page_item.mapFromScene(scene_pos)
+                    self._add_stamp_to_page(item_pos)
+                
+                # 스탬프를 한 번 찍으면 모드 해제
+                self._deactivate_stamp_mode()
+                return True
+
+            elif self._is_mask_mode:
+                if self.current_page_item:
+                    # 시작점 기록 (Scene 좌표)
+                    self._mask_start_pos = self.pdf_graphics_view.mapToScene(event.pos())
+                    
+                    # 시각적 피드백을 위한 임시 사각형 생성
+                    if self._mask_rect_item:
+                        self.scene.removeItem(self._mask_rect_item)
+                    self._mask_rect_item = QGraphicsRectItem()
+                    self._mask_rect_item.setPen(QPen(Qt.GlobalColor.blue, 2, Qt.PenStyle.DashLine))
+                    self._mask_rect_item.setBrush(QBrush(QColor(200, 200, 200, 100))) # 반투명 회색
+                    self.scene.addItem(self._mask_rect_item)
+                    self._mask_rect_item.setRect(QRectF(self._mask_start_pos, self._mask_start_pos))
+                    self._mask_rect_item.setZValue(1000) # 최상단
+                
+                return True
+        return False
+
+    def _handle_mouse_move(self, event):
+        """마우스 이동 이벤트를 처리한다 (가리개 드래그)."""
+        if self._is_mask_mode and self._mask_start_pos and self._mask_rect_item:
+            current_pos = self.pdf_graphics_view.mapToScene(event.pos())
+            rect = QRectF(self._mask_start_pos, current_pos).normalized()
+            self._mask_rect_item.setRect(rect)
+            return True
+        return False
+
+    def _handle_mouse_release(self, event):
+        """마우스 버튼 떼기 이벤트를 처리한다 (가리개 확정)."""
+        if self._is_mask_mode and self._mask_start_pos and self._mask_rect_item and event.button() == Qt.MouseButton.LeftButton:
+            # 1. 최종 사각형 계산
+            current_pos = self.pdf_graphics_view.mapToScene(event.pos())
+            rect_scene = QRectF(self._mask_start_pos, current_pos).normalized()
             
-            # 스탬프를 한 번 찍으면 모드 해제
+            # 너무 작은 사각형은 무시
+            if rect_scene.width() > 5 and rect_scene.height() > 5:
+                # 2. Scene Rect -> Page Item Rect 변환
+                if self.current_page_item:
+                    rect_item = self.current_page_item.mapRectFromScene(rect_scene)
+                    
+                    # 3. 해당 크기의 단색 Pixmap 생성 (흰색 가리개)
+                    mask_pixmap = QPixmap(int(rect_item.width()), int(rect_item.height()))
+                    mask_pixmap.fill(Qt.GlobalColor.white)
+                    
+                    # 테두리 (검은색 실선)
+                    painter = QPainter(mask_pixmap)
+                    painter.setPen(QPen(Qt.GlobalColor.black, 1))
+                    painter.drawRect(0, 0, mask_pixmap.width()-1, mask_pixmap.height()-1)
+                    painter.end()
+
+                    # 4. _add_stamp_to_page 재사용
+                    center_pos = rect_item.center()
+                    
+                    original_pixmap = self._stamp_pixmap
+                    original_width = self._stamp_desired_width
+                    
+                    self._stamp_pixmap = mask_pixmap
+                    self._stamp_desired_width = -1 # 원본 크기 사용
+                    
+                    self._add_stamp_to_page(center_pos)
+                    
+                    # 복구
+                    self._stamp_pixmap = original_pixmap
+                    self._stamp_desired_width = original_width
+
+            # 정리 및 모드 해제
             self._deactivate_stamp_mode()
-            event.accept()
-        else:
-            super().mousePressEvent(event)
+            return True
+        return False
+    
+    # 기존 mousePressEvent, mouseMoveEvent, mouseReleaseEvent는 삭제 또는 super 호출로만 남김
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
 
     def _add_stamp_to_page(self, position):
         """페이지에 스탬프를 추가하고, MovableStampItem으로 관리한다."""

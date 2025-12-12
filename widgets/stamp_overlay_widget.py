@@ -60,6 +60,13 @@ class StampOverlayWidget(QWidget):
                 {'path': str(get_resource_path('assets/circle.png')), 'width': 50}
             ))
             menu.addAction(circle_action)
+
+            # 가리개 (Mask) 추가
+            mask_action = QAction("가리개", self)
+            mask_action.triggered.connect(lambda: self._on_stamp_button_clicked(
+                {'type': 'mask'}
+            ))
+            menu.addAction(mask_action)
             
             self.stamp_button_5.setMenu(menu)
 
