@@ -1937,6 +1937,47 @@ def fetch_ev_required_rns(worker_name: str) -> list[str]:
         traceback.print_exc()
         return []
 
+def fetch_duplicate_mail_rns(worker_name: str) -> list[str]:
+    """
+    subsidy_applications 테이블에서 '중복메일' 상태인 RN 목록을 반환합니다.
+    관리자급('이경구', '이호형')은 전체, 그 외에는 본인 것만 조회.
+    RN 기준 오름차순 정렬
+    """
+    if not worker_name:
+        return []
+
+    admins = ['이경구', '이호형']
+
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            if worker_name in admins:
+                query = """
+                    SELECT RN 
+                    FROM subsidy_applications 
+                    WHERE status = '중복메일'
+                    ORDER BY RN ASC
+                """
+                args = ()
+            else:
+                query = """
+                    SELECT RN 
+                    FROM subsidy_applications 
+                    WHERE worker = %s 
+                    AND status = '중복메일'
+                    ORDER BY RN ASC
+                """
+                args = (worker_name,)
+
+            with connection.cursor() as cursor:
+                cursor.execute(query, args)
+                rows = cursor.fetchall()
+                # 튜플의 첫 번째 요소인 RN만 추출하여 리스트로 반환
+                return [row[0] for row in rows]
+                
+    except Exception:
+        traceback.print_exc()
+        return []
+
 def fetch_after_apply_counts() -> tuple[int, int]:
     """
     after_apply 테이블에서 오늘과 내일의 신청 건수를 조회한다.

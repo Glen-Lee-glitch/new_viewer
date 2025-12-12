@@ -26,10 +26,14 @@ class AlarmWidget(QWidget):
         # ev_required 버튼 설정 (초기화만, 데이터 로드는 로그인 후)
         self._setup_ev_required_buttons()
         
+        # DA 추가요청(수신) 리스트 설정
+        self._setup_da_request_list()
+        
         # 데이터 로드 (worker_name이 있을 때만)
         if self._worker_name:
             self._load_completed_regions()
             self._update_ev_required_buttons()
+            self._update_da_request_list()
         
         # 특이사항 입력 버튼 연결
         if hasattr(self, 'open_maildialog'):
@@ -235,6 +239,57 @@ class AlarmWidget(QWidget):
         """데이터를 수동으로 새로고침한다."""
         self._load_completed_regions()
         self._update_ev_required_buttons()
+        self._update_da_request_list()
+
+    def _setup_da_request_list(self):
+        """DA 추가요청(수신) 그룹박스에 리스트 위젯을 설정한다."""
+        if hasattr(self, 'groupBox_3'):
+            # 기존 레이아웃 가져오기
+            layout = self.groupBox_3.layout()
+            if layout is None:
+                layout = QVBoxLayout(self.groupBox_3)
+            
+            # 레이아웃 마진 및 간격 조정
+            layout.setContentsMargins(2, 15, 2, 2)
+            layout.setSpacing(0)
+            
+            # 스타일 시트 제거
+            self.groupBox_3.setStyleSheet("")
+            
+            # 리스트 위젯 생성
+            self._da_request_list = QListWidget()
+            # 높이 조정 (적절히 조절)
+            self._da_request_list.setMaximumHeight(80) 
+            
+            # 폰트 크기 조정
+            font = self._da_request_list.font()
+            font.setPointSize(font.pointSize() - 2)
+            self._da_request_list.setFont(font)
+
+            layout.addWidget(self._da_request_list)
+
+    def _update_da_request_list(self):
+        """중복메일(DA 추가요청) 목록을 업데이트한다."""
+        if not self._worker_name or not hasattr(self, '_da_request_list'):
+            return
+            
+        from core.sql_manager import fetch_duplicate_mail_rns
+        
+        try:
+            rn_list = fetch_duplicate_mail_rns(self._worker_name)
+            
+            self._da_request_list.clear()
+            
+            if rn_list:
+                for rn in rn_list:
+                    self._da_request_list.addItem(f"🔔 {rn}")
+            else:
+                self._da_request_list.addItem("요청 내역 없음")
+                
+        except Exception as e:
+            print(f"DA 추가요청 로드 중 오류: {e}")
+            self._da_request_list.clear()
+            self._da_request_list.addItem("로드 실패")
 
     def _open_special_note_dialog(self):
         """특이사항 입력 다이얼로그를 연다."""
