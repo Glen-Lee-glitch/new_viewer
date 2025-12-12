@@ -267,6 +267,9 @@ class AlarmWidget(QWidget):
             self._da_request_list.setFont(font)
 
             layout.addWidget(self._da_request_list)
+            
+            # 더블 클릭 시그널 연결
+            self._da_request_list.itemDoubleClicked.connect(self._on_da_request_item_double_clicked)
 
     def _update_da_request_list(self):
         """중복메일(DA 추가요청) 목록을 업데이트한다."""
@@ -290,6 +293,45 @@ class AlarmWidget(QWidget):
             print(f"DA 추가요청 로드 중 오류: {e}")
             self._da_request_list.clear()
             self._da_request_list.addItem("로드 실패")
+
+    def _on_da_request_item_double_clicked(self, item):
+        """DA 추가요청 리스트 아이템 더블 클릭 시 이메일 내용을 확인한다."""
+        text = item.text()
+        if not text.startswith("🔔 "):
+            return
+            
+        # "🔔 RN..." 형식에서 RN 추출
+        rn = text.replace("🔔 ", "").strip()
+        if not rn:
+            return
+            
+        from core.sql_manager import get_recent_thread_id_by_rn, get_email_by_thread_id
+        from widgets.email_view_dialog import EmailViewDialog
+        from PyQt6.QtWidgets import QMessageBox
+        
+        try:
+            # 1. RN으로 thread_id 조회
+            thread_id = get_recent_thread_id_by_rn(rn)
+            if not thread_id:
+                QMessageBox.warning(self, "알림", "연결된 메일 정보를 찾을 수 없습니다.")
+                return
+                
+            # 2. thread_id로 이메일 내용 조회
+            email_data = get_email_by_thread_id(thread_id)
+            if not email_data:
+                QMessageBox.warning(self, "알림", "메일 내용을 불러올 수 없습니다.")
+                return
+                
+            # 3. 다이얼로그 표시
+            title = email_data.get('title', '제목 없음')
+            content = email_data.get('content', '내용 없음')
+            
+            dialog = EmailViewDialog(title=title, content=content, parent=self)
+            dialog.exec()
+            
+        except Exception as e:
+            print(f"이메일 확인 중 오류 발생: {e}")
+            QMessageBox.critical(self, "오류", f"이메일 확인 중 오류가 발생했습니다.\n{e}")
 
     def _open_special_note_dialog(self):
         """특이사항 입력 다이얼로그를 연다."""
