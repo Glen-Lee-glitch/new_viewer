@@ -1,5 +1,5 @@
 from pathlib import Path
-from PyQt6.QtWidgets import QWidget, QListWidget, QVBoxLayout, QLabel, QPushButton, QGridLayout, QScrollArea
+from PyQt6.QtWidgets import QWidget, QListWidget, QVBoxLayout, QLabel, QPushButton, QGridLayout, QScrollArea, QDialog
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6 import uic
 
@@ -329,8 +329,11 @@ class AlarmWidget(QWidget):
             title = email_data.get('title', '제목 없음')
             content = email_data.get('content', '내용 없음')
             
-            dialog = EmailViewDialog(title=title, content=content, original_worker=original_worker, parent=self)
-            dialog.exec()
+            dialog = EmailViewDialog(title=title, content=content, original_worker=original_worker, rn=rn, parent=self)
+            
+            # 다이얼로그가 '처리완료'로 닫혔을 때(Accepted) 목록 갱신
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.refresh_data()
             
         except Exception as e:
             print(f"이메일 확인 중 오류 발생: {e}")

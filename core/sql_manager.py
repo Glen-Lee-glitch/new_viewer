@@ -2009,6 +2009,24 @@ def get_original_worker_by_rn(rn: str) -> str | None:
         traceback.print_exc()
         return None
 
+def update_subsidy_status(rn: str, status: str) -> bool:
+    """
+    subsidy_applications 테이블에서 해당 RN의 status를 업데이트한다.
+    """
+    if not rn:
+        return False
+        
+    try:
+        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            query = "UPDATE subsidy_applications SET status = %s WHERE RN = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (status, rn))
+                connection.commit()
+                return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def fetch_after_apply_counts() -> tuple[int, int]:
     """
     after_apply 테이블에서 오늘과 내일의 신청 건수를 조회한다.

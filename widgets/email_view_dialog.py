@@ -1,12 +1,13 @@
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QTextEdit, QPushButton, QHBoxLayout
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QTextEdit, QPushButton, QHBoxLayout, QMessageBox
 
 
 class EmailViewDialog(QDialog):
     """이메일 내용 확인 다이얼로그"""
     
-    def __init__(self, title: str = "", content: str = "", original_worker: str = None, parent=None):
+    def __init__(self, title: str = "", content: str = "", original_worker: str = None, rn: str = None, parent=None):
         super().__init__(parent)
+        self.rn = rn
         self.setWindowTitle("이메일 확인")
         self.setMinimumWidth(600)
         self.setMinimumHeight(400)
@@ -55,11 +56,53 @@ class EmailViewDialog(QDialog):
         content_text.setStyleSheet("padding: 5px; border: 1px solid #ccc; background-color: #ffffff; color: #000000;")
         layout.addWidget(content_text)
         
-        # 닫기 버튼
+        # 버튼 영역
         button_layout = QHBoxLayout()
+        
+        # 처리완료 버튼 (RN이 있을 때만 표시)
+        if self.rn:
+            complete_button = QPushButton("처리완료")
+            complete_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50; 
+                    color: white; 
+                    font-weight: bold;
+                    padding: 5px 15px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+            """)
+            complete_button.clicked.connect(self._on_complete_clicked)
+            button_layout.addWidget(complete_button)
+        
         button_layout.addStretch()
+        
+        # 닫기 버튼
         close_button = QPushButton("닫기")
-        close_button.clicked.connect(self.accept)
+        close_button.clicked.connect(self.reject) # 닫기는 reject로 처리
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
+
+    def _on_complete_clicked(self):
+        """처리완료 버튼 클릭 시"""
+        if not self.rn:
+            return
+            
+        from core.sql_manager import update_subsidy_status
+        
+        reply = QMessageBox.question(
+            self, 
+            "확인", 
+            "이 건을 '중복메일확인' 상태로 변경하시겠습니까?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            if update_subsidy_status(self.rn, "중복메일확인"):
+                QMessageBox.information(self, "알림", "처리가 완료되었습니다.")
+                self.accept() # 성공 시 accept로 닫음 (부모 창에서 감지 가능)
+            else:
+                QMessageBox.critical(self, "오류", "상태 변경에 실패했습니다.")
 
