@@ -34,6 +34,7 @@ from widgets.detail_form_dialog import DetailFormDialog
 from widgets.config_dialog import ConfigDialog
 from widgets.necessary_widget import NecessaryWidget
 from widgets.multi_child_check_dialog import MultiChildCheckDialog
+from widgets.help_dialog import HelpDialog
 
 
 class MainWindow(QMainWindow):
@@ -262,6 +263,11 @@ class MainWindow(QMainWindow):
         preferences_action = QAction("환경설정", self)
         preferences_action.triggered.connect(self._open_config_dialog)
         self.menu_settings.addAction(preferences_action)
+
+        # 도움말 메뉴
+        help_action = QAction("도움말", self)
+        help_action.triggered.connect(self._open_help_dialog)
+        self.menu_help.addAction(help_action)
         
         # '파일' 메뉴 안의 '추가서류' 서브메뉴는 UI 파일에서 정의되어 있으며, hover 시 자동으로 서브메뉴가 표시됩니다.
         # 초기에는 비활성화 (컨텍스트 메뉴 작업일 때만 활성화)
@@ -526,6 +532,11 @@ class MainWindow(QMainWindow):
         self._detail_form_dialog.show()
         self._detail_form_dialog.raise_()
         self._detail_form_dialog.activateWindow()
+    
+    def _open_help_dialog(self):
+        """도움말 다이얼로그를 연다."""
+        dialog = HelpDialog(parent=self)
+        dialog.exec()
     
     def _open_ai_results_dialog(self):
         """현재 작업 중인 RN으로 AI 결과 다이얼로그를 연다."""
@@ -1093,6 +1104,8 @@ class MainWindow(QMainWindow):
         """
         if not metadata:
             return []
+        
+        import pandas as pd  # 함수 내부에서 pd.Timestamp 사용을 위해 필요
         
         outlier_types = []
         
