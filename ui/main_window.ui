@@ -92,6 +92,7 @@
     <property name="title">
      <string>편집</string>
     </property>
+    <addaction name="action_scheduled_local_government"/>
    </widget>
    <widget class="QMenu" name="menu_view">
     <property name="title">
@@ -267,6 +268,11 @@
   <action name="action_support_lease">
    <property name="text">
     <string>지원리스</string>
+   </property>
+  </action>
+  <action name="action_scheduled_local_government">
+   <property name="text">
+    <string>예정 지자체</string>
    </property>
   </action>
  </widget>
