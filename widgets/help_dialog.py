@@ -16,7 +16,7 @@ class HelpDialog(QDialog):
         
         # 다이얼로그 설정
         self.setWindowTitle("도움말")
-        self.setModal(True)
+        self.setModal(False)
         
         # 리스트 위젯에 임시 아이템 추가
         self.listWidget.addItem("임시1")

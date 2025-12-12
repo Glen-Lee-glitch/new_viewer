@@ -536,7 +536,7 @@ class MainWindow(QMainWindow):
     def _open_help_dialog(self):
         """도움말 다이얼로그를 연다."""
         dialog = HelpDialog(parent=self)
-        dialog.exec()
+        dialog.show()
     
     def _open_ai_results_dialog(self):
         """현재 작업 중인 RN으로 AI 결과 다이얼로그를 연다."""
