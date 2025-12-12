@@ -19,7 +19,7 @@ from core.pdf_render import PdfRender
 from core.pdf_saved import compress_pdf_with_multiple_stages
 from core.sql_manager import claim_subsidy_work
 from core.workers import BatchTestSignals, PdfBatchTestWorker
-from core.utility import normalize_basic_info
+from core.utility import normalize_basic_info, get_converted_path
 from widgets.pdf_load_widget import PdfLoadWidget
 from widgets.pdf_view_widget import PdfViewWidget
 from widgets.thumbnail_view_widget import ThumbnailViewWidget
@@ -1572,7 +1572,7 @@ class MainWindow(QMainWindow):
             rn = rn_match.group(1)
             
             # 원본 파일이 있는 디렉토리
-            new_files_dir = Path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\new')
+            new_files_dir = Path(get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\new'))
             
             # RN을 포함하는 모든 PDF 파일 찾기 (RN123.pdf, RN123_1.pdf, RN123_2.pdf 등)
             # glob 패턴 사용: RN123*.pdf
@@ -1669,7 +1669,7 @@ class MainWindow(QMainWindow):
             rn = rn_match.group(1)
             
             # 원본 파일이 있는 디렉토리
-            new_files_dir = Path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\new')
+            new_files_dir = Path(get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\new'))
             
             # RN을 포함하는 모든 PDF 파일 찾기
             matching_files = sorted(
@@ -1738,7 +1738,7 @@ class MainWindow(QMainWindow):
         import os
         # PdfRender는 상단에서 이미 import 됨
 
-        base_path = r'\\DESKTOP-R4MM6IR\Users\HP\Desktop\Tesla\24q4\지원\출고배정표'
+        base_path = get_converted_path(r'\\DESKTOP-R4MM6IR\Users\HP\Desktop\Tesla\24q4\지원\출고배정표')
         rn_number = self._current_rn 
 
         if not rn_number:

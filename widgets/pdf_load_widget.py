@@ -33,6 +33,7 @@ from core.sql_manager import (
     check_gemini_flags,
     update_give_works_worker
 )
+from core.utility import get_converted_path
 from widgets.email_view_dialog import EmailViewDialog
 from widgets.detail_form_dialog import DetailFormDialog
 from widgets.alert_dialog import show_alert, show_toast
@@ -183,7 +184,7 @@ class PdfLoadWidget(QWidget):
                     print(f"[지급 시작] 작업자 이름이 설정되지 않았습니다.")
                 
                 # 파일 경로 설정
-                search_dir = Path(r"C:\Users\HP\Desktop\Tesla\24q4\지급\지급서류\merged")
+                search_dir = Path(get_converted_path(r"C:\Users\HP\Desktop\Tesla\24q4\지급\지급서류\merged"))
                 
                 # RN이 포함된 PDF 파일 검색
                 pdf_files = list(search_dir.glob(f"*{rn}*.pdf"))
@@ -708,26 +709,7 @@ class PdfLoadWidget(QWidget):
     
     @staticmethod
     def _normalize_file_path(raw_path):
-        if raw_path is None:
-            return None
-
-        if isinstance(raw_path, Path):
-            path_str = str(raw_path)
-        else:
-            path_str = str(raw_path)
-
-        path_str = path_str.strip()
-        if path_str.startswith('"') and path_str.endswith('"') and len(path_str) >= 2:
-            path_str = path_str[1:-1]
-        elif path_str.startswith("'") and path_str.endswith("'") and len(path_str) >= 2:
-            path_str = path_str[1:-1]
-        
-        path_str = path_str.strip()
-
-        if path_str.upper().startswith('C:'):
-            path_str = r'\\DESKTOP-KMJ' + path_str[2:]
-
-        return path_str.strip()
+        return get_converted_path(raw_path)
     
     def _setup_filter_buttons(self):
         """필터 라디오 버튼 그룹 설정"""

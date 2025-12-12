@@ -13,6 +13,7 @@ from core.edit_mixin import ViewModeMixin, EditMixin
 from core.insert_utils import add_stamp_item
 from core.pdf_render import PdfRender
 from core.pdf_saved import compress_pdf_with_multiple_stages, export_deleted_pages
+from core.utility import get_converted_path
 from .crop_dialog import CropDialog
 from .floating_toolbar import FloatingToolbarWidget
 from .stamp_overlay_widget import StampOverlayWidget
@@ -677,7 +678,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 base_name = PathLib(base_path).stem if base_path else "untitled"
                 
                 # 작업자 폴더/날짜 구조로 저장 경로 구성
-                base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\2025_4Q_deleted'
+                base_dir = get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\2025_4Q_deleted')
                 today = datetime.now().strftime('%Y-%m-%d')
                 worker_folder = worker_name if worker_name else "미지정"
                 
@@ -725,10 +726,10 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             
             if is_give_works:
                 # 지급 테이블 시작인 경우
-                base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\지급_finished'
+                base_dir = get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\지급_finished')
             else:
                 # 일반 작업인 경우
-                base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\finished'
+                base_dir = get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\finished')
             
             today = datetime.now().strftime('%Y-%m-%d')
             
