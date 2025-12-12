@@ -203,6 +203,14 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         dialog = CropDialog(self)
         dialog.set_page_pixmap(preview_pixmap)
         
+        # MainWindow를 통해 썸네일 뷰어에서 선택된 페이지 정보 가져오기
+        main_window = self.window()
+        if hasattr(main_window, 'thumbnail_viewer'):
+            selected_visual_pages = main_window.thumbnail_viewer.get_selected_visual_pages()
+            # 선택된 페이지가 있고, CropDialog에 해당 메서드가 있으면 설정
+            if selected_visual_pages and hasattr(dialog, 'set_preset_pages'):
+                dialog.set_preset_pages(selected_visual_pages)
+        
         # 다이얼로그 실행
         if dialog.exec():
             # 자르기 적용

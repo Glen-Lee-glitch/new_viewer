@@ -273,6 +273,25 @@ class ThumbnailViewWidget(QWidget):
         
         self.page_order_changed.emit(new_order)
 
+    def get_selected_visual_pages(self) -> list[int]:
+        """선택된 페이지의 시각적 번호(1부터 시작)를 반환한다.
+        
+        Returns:
+            list[int]: 선택된 페이지의 시각적 번호 리스트 (1부터 시작, 정렬됨)
+        """
+        if not hasattr(self, 'thumbnail_list_widget'):
+            return []
+        
+        selected_items = self.thumbnail_list_widget.selectedItems()
+        if not selected_items:
+            return []
+        
+        # 선택된 모든 페이지의 row 번호를 수집 (1부터 시작하는 시각적 번호)
+        visual_page_nums = [self.thumbnail_list_widget.row(item) + 1 for item in selected_items]
+        visual_page_nums.sort()
+        
+        return visual_page_nums
+
     def set_current_page(self, page_num: int):
         """지정된 페이지 번호에 해당하는 썸네일을 선택 상태로 만든다."""
         if hasattr(self, 'thumbnail_list_widget'):

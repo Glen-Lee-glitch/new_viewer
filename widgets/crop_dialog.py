@@ -135,6 +135,7 @@ class CropDialog(QDialog):
         self.page_preview_view.setScene(self.scene)
         self.pixmap_item = None
         self.crop_rect_item = None
+        self._preset_pages: list[int] = []  # 미리 설정된 페이지 번호 (1부터 시작)
         
         ok_button = self.buttonBox.button(self.buttonBox.StandardButton.Ok)
         if ok_button: ok_button.setText("자르기 적용")
@@ -215,12 +216,83 @@ class CropDialog(QDialog):
         """체크박스 상태 변경 시 페이지 입력란 활성화/비활성화"""
         if hasattr(self, 'lineEdit_page'):
             self.lineEdit_page.setEnabled(state == Qt.CheckState.Checked.value)
+            
+            # 체크박스가 체크되고, 미리 설정된 페이지 번호가 있으면 자동으로 입력
+            if state == Qt.CheckState.Checked.value and hasattr(self, '_preset_pages') and self._preset_pages:
+                self._fill_preset_pages()
     
     def is_multi_page_mode(self) -> bool:
         """여러 페이지 자르기 모드인지 확인한다."""
         if hasattr(self, 'checkBox_dummy'):
             return self.checkBox_dummy.isChecked()
         return False
+
+    def set_preset_pages(self, visual_page_nums: list[int]):
+        """미리 설정할 페이지 번호를 설정한다. (1부터 시작하는 시각적 번호)
+        
+        Args:
+            visual_page_nums: 페이지 번호 리스트 (1부터 시작)
+        """
+        self._preset_pages = sorted(visual_page_nums) if visual_page_nums else []
+        
+        # 선택된 페이지가 2개 이상이면 자동으로 '여러 페이지 적용' 체크박스 활성화
+        if len(self._preset_pages) >= 2 and hasattr(self, 'checkBox_dummy'):
+            self.checkBox_dummy.setChecked(True)
+        # 이미 체크되어 있는 경우에도 반영
+        elif hasattr(self, 'checkBox_dummy') and self.checkBox_dummy.isChecked():
+            self._fill_preset_pages()
+    
+    def _fill_preset_pages(self):
+        """미리 설정된 페이지 번호를 입력란에 채운다."""
+        if not self._preset_pages or not hasattr(self, 'lineEdit_page'):
+            return
+        
+        # 페이지 번호를 문자열로 변환 (예: "1,2,3" 또는 "1-5")
+        if len(self._preset_pages) == 1:
+            # 단일 페이지
+            page_text = str(self._preset_pages[0])
+        else:
+            # 여러 페이지: 연속된 페이지는 범위로 표시
+            page_text = self._format_page_numbers(self._preset_pages)
+        
+        self.lineEdit_page.setText(page_text)
+    
+    def _format_page_numbers(self, page_nums: list[int]) -> str:
+        """페이지 번호 리스트를 문자열로 포맷팅한다. (예: "1-3,5,7-9")
+        
+        Args:
+            page_nums: 정렬된 페이지 번호 리스트 (1부터 시작)
+        
+        Returns:
+            str: 포맷팅된 페이지 번호 문자열
+        """
+        if not page_nums:
+            return ""
+        
+        parts = []
+        start = page_nums[0]
+        end = page_nums[0]
+        
+        for i in range(1, len(page_nums)):
+            if page_nums[i] == end + 1:
+                # 연속된 페이지
+                end = page_nums[i]
+            else:
+                # 연속이 끊김
+                if start == end:
+                    parts.append(str(start))
+                else:
+                    parts.append(f"{start}-{end}")
+                start = page_nums[i]
+                end = page_nums[i]
+        
+        # 마지막 범위 추가
+        if start == end:
+            parts.append(str(start))
+        else:
+            parts.append(f"{start}-{end}")
+        
+        return ",".join(parts)
     
     def get_target_pages(self) -> list[int]:
         """자르기를 적용할 페이지 목록을 파싱하여 반환한다.
