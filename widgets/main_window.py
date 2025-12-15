@@ -110,7 +110,8 @@ class MainWindow(QMainWindow):
         self._setup_global_shortcuts()
 
         # 로그인 다이얼로그 초기화
-        self._login_dialog = LoginDialog(self)
+        # parent를 None으로 설정하여 독립적인 윈도우로 생성 (작업 표시줄 표시 보장)
+        self._login_dialog = LoginDialog()
         self._current_rn = ""  # 현재 작업 중인 RN 번호 저장용
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 여부
         self._pending_outlier_check = False  # PDF 렌더 완료 후 이상치 체크 플래그

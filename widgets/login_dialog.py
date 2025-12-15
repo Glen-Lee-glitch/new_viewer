@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import QDialog, QMessageBox
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent
 from PyQt6 import uic
 from pathlib import Path
@@ -15,6 +16,10 @@ class LoginDialog(QDialog):
         # 다이얼로그 설정
         self.setWindowTitle("로그인")
         self.setModal(True)
+        
+        # 윈도우 작업표시줄에 아이콘이 나타나도록 설정 (부모 윈도우가 숨겨져 있을 때 필요)
+        # WindowStaysOnTopHint: 다른 프로그램 실행 시 뒤로 숨는 문제 방지
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
         
         # 검증 통과 플래그 (accept()가 호출되어도 검증을 통과한 경우에만 실제로 닫힘)
         self._validation_passed = False
