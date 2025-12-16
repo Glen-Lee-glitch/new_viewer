@@ -31,7 +31,8 @@ from core.sql_manager import (
     fetch_today_unfinished_subsidy_applications,
     get_email_by_thread_id,
     check_gemini_flags,
-    update_give_works_worker
+    update_give_works_worker,
+    update_rns_worker_id
 )
 from core.utility import get_converted_path
 from widgets.email_view_dialog import EmailViewDialog
@@ -97,6 +98,7 @@ class PdfLoadWidget(QWidget):
         self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 시작 여부
         self._filter_mode = 'all'  # 필터 모드: 'all', 'my', 'unfinished'
         self._worker_name = ''  # 현재 로그인한 작업자 이름
+        self._worker_id = None  # 현재 로그인한 작업자 ID
         self._payment_request_load_enabled = True  # 지급신청 로드 체크박스 상태 (기본값: True)
         self._is_first_load = True # 프로그램 시작 시 첫 로드 여부 플래그
         self.init_ui()
@@ -660,6 +662,30 @@ class PdfLoadWidget(QWidget):
         worker = row_data.get('worker')
         finished_file_path = row_data.get('finished_file_path')
         original_file_path = row_data.get('original_filepath')
+        
+        # RN 추출
+        rn = self._safe_item_text(rn_item)
+        
+        # 작업자가 비어있을 때 worker_id 업데이트 (지급 테이블과 유사한 로직)
+        if not worker or not worker.strip():
+            if self._worker_id:
+                success = update_rns_worker_id(rn, self._worker_id)
+                if success:
+                    print(f"[지원 시작] 작업자 ID 업데이트 완료: {self._worker_id} (RN: {rn})")
+                    # 테이블의 작업자 컬럼(2번)도 업데이트
+                    worker_item = table.item(row, 2)
+                    if worker_item and self._worker_name:
+                        worker_item.setText(self._worker_name)
+                    # row_data와 worker 변수도 업데이트
+                    row_data['worker'] = self._worker_name
+                    worker = self._worker_name
+                    rn_item.setData(Qt.ItemDataRole.UserRole, row_data)
+                else:
+                    print(f"[지원 시작] 작업자 ID 업데이트 실패 (RN: {rn})")
+            else:
+                print(f"[지원 시작] 작업자 ID가 설정되지 않았습니다.")
+        else:
+            print(f"[지원 시작] 작업자 업데이트 건너뜀: 이미 '{worker}'로 할당됨")
 
         file_path = ""
         # 작업자가 할당된 경우, finished_file_path 우선 사용
@@ -759,6 +785,10 @@ class PdfLoadWidget(QWidget):
     def set_worker_name(self, worker_name: str):
         """작업자 이름을 설정한다."""
         self._worker_name = worker_name or ''
+    
+    def set_worker_id(self, worker_id: int | None):
+        """작업자 ID를 설정한다."""
+        self._worker_id = worker_id
     
     def set_payment_request_load_enabled(self, enabled: bool):
         """지급신청 로드 체크박스 상태를 설정한다."""

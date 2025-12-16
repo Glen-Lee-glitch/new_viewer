@@ -1291,6 +1291,41 @@ def fetch_give_works() -> pd.DataFrame:
         traceback.print_exc()
         return pd.DataFrame()
 
+def update_rns_worker_id(rn: str, worker_id: int) -> bool:
+    """
+    rns 테이블의 worker_id 필드를 업데이트한다.
+    
+    Args:
+        rn: RN 번호
+        worker_id: 작업자 ID
+        
+    Returns:
+        업데이트 성공 여부
+    """
+    if not rn:
+        raise ValueError("rn must be provided")
+    if worker_id is None:
+        raise ValueError("worker_id must be provided")
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            connection.begin()
+            try:
+                with connection.cursor() as cursor:
+                    update_query = (
+                        "UPDATE rns SET worker_id = %s "
+                        "WHERE \"RN\" = %s"
+                    )
+                    cursor.execute(update_query, (worker_id, rn))
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def update_give_works_worker(rn: str, worker: str) -> bool:
     """
     give_works 테이블의 신청자(worker) 필드를 업데이트한다.

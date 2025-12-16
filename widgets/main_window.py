@@ -456,9 +456,10 @@ class MainWindow(QMainWindow):
             if hasattr(self, '_alarm_widget'):
                 self._alarm_widget._worker_name = self._worker_name
                 self._alarm_widget.refresh_data()
-            # 로그인 후 PDF 로드 위젯에 작업자 이름 설정
+            # 로그인 후 PDF 로드 위젯에 작업자 이름 및 ID 설정
             if hasattr(self, '_pdf_load_widget'):
                 self._pdf_load_widget.set_worker_name(self._worker_name)
+                self._pdf_load_widget.set_worker_id(self._worker_id)
                 # 프로그램 시작 시 체크박스 상태 초기화 (기본값: True)
                 self._pdf_load_widget.set_payment_request_load_enabled(True)
             
