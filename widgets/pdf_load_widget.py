@@ -373,18 +373,12 @@ class PdfLoadWidget(QWidget):
                 'page_number': row.get('page_number'),  # page_number 추가
                 'issue_date': row.get('issue_date'), # issue_date 추가
                 'birth_date': row.get('birth_date', ''), # birth_date 추가
-                'address_1': row.get('address_1', '') # address_1 추가
+                'address_1': row.get('address_1', ''), # address_1 추가
+                'all_ai': row.get('all_ai', 0)  # all_ai 추가
             }
 
-            # 'AI' 칼럼 값 계산
-            ai_status = 'X'
-            구매계약서 = row_data['구매계약서'] == 1
-            초본 = row_data['초본'] == 1
-            공동명의 = row_data['공동명의'] == 1
-            is_법인 = row_data.get('is_법인', 0) == 1
-
-            if 구매계약서 and (초본 or 공동명의 or is_법인):
-                ai_status = 'O'
+            # 'AI' 칼럼 값 계산 - rns.all_ai 컬럼 사용
+            ai_status = 'O' if row_data.get('all_ai', 0) == 1 else 'X'
             
             # 컬럼 순서: ['지역', 'RN', '작업자', '결과', 'AI', '이상치']
             region_item = QTableWidgetItem(row_data['region'])
@@ -799,12 +793,9 @@ class PdfLoadWidget(QWidget):
             QMessageBox.warning(self, "검색 실패", f"RN 번호 '{rn}'에 해당하는 데이터를 찾을 수 없습니다.")
             return
             
-        # AI 결과가 있는 경우 -> AI 결과 창 열기 (start_selected_work 로직과 동일하게)
-        구매계약서 = data.get('구매계약서') == 1
-        초본 = data.get('초본') == 1
-        공동명의 = data.get('공동명의') == 1
-        is_법인 = data.get('is_법인', 0) == 1
-        if 구매계약서 and (초본 or 공동명의 or is_법인):
+        # AI 결과가 있는 경우 -> AI 결과 창 열기 (all_ai 컬럼 사용)
+        all_ai = data.get('all_ai', 0) == 1
+        if all_ai:
             self.ai_review_requested.emit(rn)
 
         # 파일 경로 확인

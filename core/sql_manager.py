@@ -56,6 +56,7 @@ def _build_subsidy_query_base():
         '  NULL AS chobon_birth_date, '
         '  NULL AS chobon_address_1, '
         '  0 AS is_법인, '
+        '  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, '
         '  \'\' AS outlier, '
         '  \'\' AS result '
         'FROM rns r '
