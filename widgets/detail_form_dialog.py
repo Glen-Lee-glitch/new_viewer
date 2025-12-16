@@ -375,8 +375,11 @@ class DetailFormDialog(QDialog):
         else:
              self.label_firstandyouth.setText("")
              
-        # 5. 차종 데이터 로드
-        model_name = fetch_subsidy_model(rn)
+        # 5. 차종 데이터 로드 (구매계약서의 vehicle_config 사용)
+        model_name = contract_data.get('vehicle_config', '')
+        if not model_name:
+            # vehicle_config가 없으면 기존 방식으로 fallback
+            model_name = fetch_subsidy_model(rn)
         
         # 모델명 매핑
         model_mapping = {

@@ -422,17 +422,23 @@ def get_today_completed_subsidies(worker: str = None) -> list:
 
 def fetch_gemini_contract_results(rn: str) -> dict:
     """
-    test_ai_구매계약서 테이블에서 RN으로 데이터를 조회한다.
+    analysis_results 테이블의 '구매계약서' JSONB 컬럼에서 RN으로 데이터를 조회한다. (PostgreSQL 버전)
     """
     if not rn:
         return {}
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # JSONB에서 필드 추출
             query = """
-                SELECT ai_계약일자, ai_이름, 전화번호, 이메일
-                FROM test_ai_구매계약서
-                WHERE RN = %s
+                SELECT 
+                    "구매계약서"->>'order_date' AS ai_계약일자,
+                    "구매계약서"->>'customer_name' AS ai_이름,
+                    "구매계약서"->>'phone_number' AS 전화번호,
+                    "구매계약서"->>'email' AS 이메일,
+                    "구매계약서"->>'vehicle_config' AS vehicle_config
+                FROM analysis_results
+                WHERE "RN" = %s AND "구매계약서" IS NOT NULL
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
@@ -442,7 +448,8 @@ def fetch_gemini_contract_results(rn: str) -> dict:
                         'ai_계약일자': row[0],
                         'ai_이름': row[1],
                         '전화번호': row[2],
-                        '이메일': row[3]
+                        '이메일': row[3],
+                        'vehicle_config': row[4]
                     }
                 return {}
     except Exception:
@@ -451,17 +458,26 @@ def fetch_gemini_contract_results(rn: str) -> dict:
 
 def check_gemini_flags(rn: str) -> dict:
     """
-    gemini_results 테이블에서 RN으로 플래그들을 조회한다.
+    analysis_results 테이블과 rns 테이블에서 RN으로 플래그들을 조회한다. (PostgreSQL 버전)
     """
     if not rn:
         return {}
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # 1. analysis_results 테이블의 JSONB 컬럼 존재 여부 확인
+            # 2. rns 테이블의 special 배열에 특정 키워드가 포함되어 있는지 확인
+            # 공동명의 여부는 rns.special 배열에 '공동명의'가 있거나, analysis_results."초본"->'second_person'이 존재하면 True
             query = """
-                SELECT 구매계약서, 청년생애, 다자녀, 공동명의, 초본
-                FROM gemini_results
-                WHERE RN = %s
+                SELECT 
+                    a."구매계약서" IS NOT NULL AS "구매계약서",
+                    (a."청년생애" IS NOT NULL OR '청년생애' = ANY(r.special)) AS "청년생애",
+                    (a."다자녀" IS NOT NULL OR '다자녀' = ANY(r.special)) AS "다자녀",
+                    ('공동명의' = ANY(r.special) OR (a."초본" IS NOT NULL AND a."초본"->>'second_person' IS NOT NULL)) AS "공동명의",
+                    a."초본" IS NOT NULL AS "초본"
+                FROM analysis_results a
+                JOIN rns r ON a."RN" = r."RN"
+                WHERE a."RN" = %s
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
@@ -481,27 +497,36 @@ def check_gemini_flags(rn: str) -> dict:
 
 def fetch_gemini_youth_results(rn: str) -> dict:
     """
-    test_ai_청년생애 테이블에서 RN으로 데이터를 조회한다.
-    JSON 칼럼을 파이썬 리스트로 변환하여 반환한다.
+    analysis_results 테이블의 '청년생애' JSONB 컬럼에서 RN으로 데이터를 조회한다. (PostgreSQL 버전)
     """
     if not rn:
         return {}
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # JSONB 필드 추출
             query = """
-                SELECT local_name, range_date
-                FROM test_ai_청년생애
-                WHERE RN = %s
+                SELECT 
+                    "청년생애"->'local_name',
+                    "청년생애"->'range_date'
+                FROM analysis_results
+                WHERE "RN" = %s AND "청년생애" IS NOT NULL
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
                 row = cursor.fetchone()
                 if row:
-                    import json
+                    # JSONB는 자동으로 파이썬 객체로 변환됨
+                    local_name = row[0]
+                    range_date = row[1]
+                    
+                    # 만약 문자열로 온다면 파싱
+                    if isinstance(local_name, str): local_name = json.loads(local_name)
+                    if isinstance(range_date, str): range_date = json.loads(range_date)
+                    
                     return {
-                        'local_name': json.loads(row[0]) if row[0] else [],
-                        'range_date': json.loads(row[1]) if row[1] else []
+                        'local_name': local_name if local_name else [],
+                        'range_date': range_date if range_date else []
                     }
                 return {}
     except Exception:
@@ -510,17 +535,24 @@ def fetch_gemini_youth_results(rn: str) -> dict:
 
 def fetch_gemini_chobon_results(rn: str) -> dict:
     """
-    test_ai_초본 테이블에서 RN으로 데이터를 조회한다.
+    analysis_results 테이블의 '초본' JSONB 컬럼에서 RN으로 데이터를 조회한다. (PostgreSQL 버전)
+    공동명의인 경우 'first_person' 내부 데이터를 사용한다.
     """
     if not rn:
         return {}
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # first_person 키가 있으면 그 안의 값을, 없으면 최상위 값을 조회
             query = """
-                SELECT name, birth_date, address_1, address_2, gender
-                FROM test_ai_초본
-                WHERE RN = %s
+                SELECT 
+                    COALESCE("초본"->'first_person'->>'name', "초본"->>'name') AS name,
+                    COALESCE("초본"->'first_person'->>'birth_date', "초본"->>'birth_date') AS birth_date,
+                    COALESCE("초본"->'first_person'->>'address_1', "초본"->>'address_1') AS address_1,
+                    COALESCE("초본"->'first_person'->>'address_2', "초본"->>'address_2') AS address_2,
+                    COALESCE("초본"->'first_person'->>'gender', "초본"->>'gender') AS gender
+                FROM analysis_results
+                WHERE "RN" = %s AND "초본" IS NOT NULL
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
@@ -540,25 +572,31 @@ def fetch_gemini_chobon_results(rn: str) -> dict:
 
 def fetch_gemini_multichild_results(rn: str) -> dict:
     """
-    test_ai_다자녀 테이블에서 RN으로 데이터를 조회한다.
+    analysis_results 테이블의 '다자녀' JSONB 컬럼에서 RN으로 데이터를 조회한다. (PostgreSQL 버전)
     """
     if not rn:
         return {}
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # "다자녀"->'child_birth_date'를 추출 (JSONB 배열)
             query = """
-                SELECT child_birth_date
-                FROM test_ai_다자녀
-                WHERE RN = %s
+                SELECT "다자녀"->'child_birth_date'
+                FROM analysis_results
+                WHERE "RN" = %s AND "다자녀" IS NOT NULL
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
                 row = cursor.fetchone()
                 if row:
-                    import json
+                    # row[0]는 이미 파이썬 리스트일 가능성이 높음 (psycopg2가 JSONB 변환 지원)
+                    # 만약 문자열로 온다면 json.loads 필요
+                    child_birth_date = row[0]
+                    if isinstance(child_birth_date, str):
+                        child_birth_date = json.loads(child_birth_date)
+                    
                     return {
-                        'child_birth_date': json.loads(row[0]) if row[0] else []
+                        'child_birth_date': child_birth_date if child_birth_date else []
                     }
                 return {}
     except Exception:
@@ -567,24 +605,41 @@ def fetch_gemini_multichild_results(rn: str) -> dict:
 
 def fetch_gemini_business_results(rn: str) -> dict:
     """
-    test_ai_사업자등록증 테이블에서 RN으로 데이터를 조회한다.
+    analysis_results 테이블의 '사업자등록증' JSONB 컬럼에서 RN으로 데이터를 조회한다. (PostgreSQL 버전)
     """
     if not rn:
         return {}
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # JSONB 키는 추정치 (추후 실제 데이터 확인 필요)
             query = """
-                SELECT is_법인, 법인명, 대표자, 등록번호, 사업자등록번호, 사업자명, 법인주소
-                FROM test_ai_사업자등록증
-                WHERE RN = %s
+                SELECT 
+                    "사업자등록증"->>'is_corporation',
+                    "사업자등록증"->>'corporation_name',
+                    "사업자등록증"->>'representative',
+                    "사업자등록증"->>'registration_number',
+                    "사업자등록증"->>'business_registration_number',
+                    "사업자등록증"->>'business_name',
+                    "사업자등록증"->>'address'
+                FROM analysis_results
+                WHERE "RN" = %s AND "사업자등록증" IS NOT NULL
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
                 row = cursor.fetchone()
                 if row:
+                    # is_법인 처리 (문자열 'true'/'false' 또는 불리언)
+                    is_corp = row[0]
+                    if isinstance(is_corp, str):
+                        is_corp = is_corp.lower() == 'true'
+                    elif is_corp is None:
+                        is_corp = False
+                    else:
+                        is_corp = bool(is_corp)
+
                     return {
-                        'is_법인': bool(row[0]) if row[0] is not None else False,
+                        'is_법인': is_corp,
                         '기관명': row[1],  # 법인명을 기관명으로 매핑
                         '대표자': row[2],
                         '법인등록번호': row[3],  # 등록번호를 법인등록번호로 매핑
@@ -599,34 +654,43 @@ def fetch_gemini_business_results(rn: str) -> dict:
 
 def fetch_gemini_joint_results(rn: str) -> dict:
     """
-    test_ai_공동명의 테이블에서 RN으로 데이터를 조회한다.
+    analysis_results 테이블의 '초본' JSONB 컬럼에서 공동명의 데이터를 조회한다. (PostgreSQL 버전)
     first_person과 second_person 정보를 모두 반환한다.
     """
     if not rn:
         return {}
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # 초본 JSONB에서 first_person, second_person 추출
+            # second_person이 없거나 null이면 공동명의가 아닐 수 있음
             query = """
-                SELECT first_person_name, first_person_birth_date, first_person_gender, 
-                       first_person_address_1, first_person_address_2,
-                       second_person_name, second_person_birth_date, second_person_gender,
-                       second_person_address_1, second_person_address_2
-                FROM test_ai_공동명의
-                WHERE RN = %s
+                SELECT 
+                    "초본"->'first_person'->>'name' AS first_person_name,
+                    "초본"->'first_person'->>'birth_date' AS first_person_birth_date,
+                    "초본"->'first_person'->>'gender' AS first_person_gender,
+                    "초본"->'first_person'->>'address_1' AS first_person_address_1,
+                    "초본"->'first_person'->>'address_2' AS first_person_address_2,
+                    "초본"->'second_person'->>'name' AS second_person_name,
+                    "초본"->'second_person'->>'birth_date' AS second_person_birth_date,
+                    "초본"->'second_person'->>'gender' AS second_person_gender,
+                    "초본"->'second_person'->>'address_1' AS second_person_address_1,
+                    "초본"->'second_person'->>'address_2' AS second_person_address_2
+                FROM analysis_results
+                WHERE "RN" = %s AND "초본" IS NOT NULL
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
                 row = cursor.fetchone()
                 if row:
+                    # 데이터가 하나라도 있어야 의미 있음 (특히 second_person)
+                    # 하지만 호출부에서 공동명의 플래그를 확인하고 호출하므로 그대로 반환
                     return {
-                        # first_person 정보 (초본 데이터 대체용)
                         'name': row[0],
                         'birth_date': row[1],
                         'gender': row[2],
                         'address_1': row[3],
                         'address_2': row[4],
-                        # second_person 정보
                         'second_person_name': row[5],
                         'second_person_birth_date': row[6],
                         'second_person_gender': row[7],
