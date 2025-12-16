@@ -1,4 +1,7 @@
 import pymysql
+import psycopg2
+import psycopg2.extras
+from core.data_manage import DB_CONFIG
 from datetime import datetime, date, time, timedelta
 import pytz
 import pandas as pd
@@ -12,640 +15,84 @@ from contextlib import closing
 warnings.filterwarnings('ignore', message='pandas only supports SQLAlchemy', category=UserWarning)
 
 FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
-FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id', 'file_rendered']  # 'file_status'는 주석 처리됨
-
-# MySQL 연결 정보
-DB_CONFIG = {
-    'host': '192.168.0.114',
-    'port': 3306,
-    'user': 'my_pc_user',
-    'password': '!Qdhdbrclf56',
-    'db': 'greetlounge',
-    'charset': 'utf8mb4'
-}
+FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id', 'file_rendered']
 
 def claim_subsidy_work(rn: str, worker: str) -> bool:
-    if not rn:
-        raise ValueError("rn must be provided")
-    if not worker:
-        raise ValueError("worker must be provided")
+    # PostgreSQL 임시 구현: worker 컬럼이 없으므로 False 반환
+    return False
+    # TODO: worker 컬럼 추가 후 구현 필요
 
-    try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            connection.begin()
-            try:
-                with connection.cursor() as cursor:
-                    lock_query = (
-                        "SELECT worker, status FROM subsidy_applications "
-                        "WHERE RN = %s FOR UPDATE"
-                    )
-                    cursor.execute(lock_query, (rn,))
-                    row = cursor.fetchone()
-
-                    if row is None:
-                        connection.rollback()
-                        return False
-
-                    existing_worker = row[0]
-                    existing_status = row[1] if len(row) > 1 else None
-                    
-                    if existing_worker:
-                        connection.rollback()
-                        return existing_worker == worker
-
-                    # status가 '이메일 전송' 또는 '요청메일 전송'이면 status는 변경하지 않음
-                    if existing_status in ('이메일 전송', '요청메일 전송', '중복메일', '중복메일확인'):
-                        update_query = (
-                            "UPDATE subsidy_applications SET worker = %s "
-                            "WHERE RN = %s"
-                        )
-                        cursor.execute(update_query, (worker, rn))
-                    else:
-                        update_query = (
-                            "UPDATE subsidy_applications SET worker = %s, status = %s "
-                            "WHERE RN = %s"
-                        )
-                        cursor.execute(update_query, (worker, '처리중', rn))
-                connection.commit()
-                return True
-            except Exception:
-                connection.rollback()
-                raise
-    except Exception:
-        traceback.print_exc()
-        return False
 
 def _build_subsidy_query_base():
-    """지원금 신청 데이터 조회용 기본 쿼리 문자열을 반환한다."""
+    """지원금 신청 데이터 조회용 기본 쿼리 문자열을 반환한다. (PostgreSQL 버전)"""
     return (
-        "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, sa.recent_received_date, "
-        "       sa.finished_file_path, " # finished_file_path 추가
-        # "       CASE WHEN e.attached_file = 1 THEN '여' ELSE '부' END AS file_status, "  # 주석 처리됨
-        "       e.attached_file_path AS original_filepath, "
-        "       sa.recent_thread_id, "
-        "       e.file_rendered, "
-        "       gr.구매계약서, "
-        "       gr.초본, "
-        "       gr.공동명의, "
-        "       gr.다자녀, "
-        "       sa.urgent, "
-        "       sa.mail_count, "
-        "       d.child_birth_date, "
-        "       cb.issue_date, "
-        "       cb.chobon, "
-        "       c.ai_계약일자, c.ai_이름, c.전화번호, c.이메일, c.차종, c.page_number, "
-        "       cb.name AS chobon_name, cb.birth_date AS chobon_birth_date, cb.address_1 AS chobon_address_1, "
-        "       biz.is_법인, "
-        "       CASE "
-        "           WHEN gr.구매계약서 = 1 AND (gr.초본 = 1 OR gr.공동명의 = 1) THEN "
-        "               CASE "
-        "                   WHEN (gr.구매계약서 = 1 AND (c.ai_계약일자 IS NULL OR c.ai_이름 IS NULL OR c.전화번호 IS NULL OR c.이메일 IS NULL OR c.ai_계약일자 < '2025-01-01')) "
-        "                   OR (gr.초본 = 1 AND (cb.name IS NULL OR cb.birth_date IS NULL OR cb.address_1 IS NULL OR cb.chobon = 0)) "
-        "                   OR (gr.청년생애 = 1 AND (y.local_name IS NULL OR y.range_date IS NULL)) "
-        "                   THEN 'O' "
-        "                   ELSE 'X' "
-        "               END "
-        "           ELSE '' "
-        "       END AS outlier, "
-        "       sa.status AS result "
-        "FROM subsidy_applications sa "
-        "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
-        "LEFT JOIN gemini_results gr ON sa.RN COLLATE utf8mb4_unicode_ci = gr.RN COLLATE utf8mb4_unicode_ci "
-        "LEFT JOIN test_ai_구매계약서 c ON sa.RN COLLATE utf8mb4_unicode_ci = c.RN COLLATE utf8mb4_unicode_ci "
-        "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
-        "LEFT JOIN test_ai_청년생애 y ON sa.RN COLLATE utf8mb4_unicode_ci = y.RN COLLATE utf8mb4_unicode_ci "
-        "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
-        "LEFT JOIN test_ai_사업자등록증 biz ON sa.RN COLLATE utf8mb4_unicode_ci = biz.RN COLLATE utf8mb4_unicode_ci "
+        'SELECT '
+        '  r."RN" AS "RN", '
+        '  r.region, '
+        '  NULL AS worker, '
+        '  r.customer AS name, '
+        '  array_to_string(r.special, \', \') AS special_note, '
+        '  r.last_received_date AS recent_received_date, '
+        '  NULL AS finished_file_path, '
+        '  e.original_pdf_path AS original_filepath, '
+        '  r.recent_thread_id, '
+        '  0 AS file_rendered, '
+        '  0 AS "구매계약서", '
+        '  0 AS "초본", '
+        '  0 AS "공동명의", '
+        '  0 AS "다자녀", '
+        '  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, '
+        '  r.mail_count, '
+        '  NULL AS child_birth_date, '
+        '  NULL AS issue_date, '
+        '  0 AS chobon, '
+        '  NULL AS ai_계약일자, '
+        '  NULL AS ai_이름, '
+        '  NULL AS 전화번호, '
+        '  NULL AS 이메일, '
+        '  r.model AS 차종, '
+        '  NULL AS page_number, '
+        '  NULL AS chobon_name, '
+        '  NULL AS chobon_birth_date, '
+        '  NULL AS chobon_address_1, '
+        '  0 AS is_법인, '
+        '  \'\' AS outlier, '
+        '  \'\' AS result '
+        'FROM rns r '
+        'LEFT JOIN emails e ON r.recent_thread_id = e.thread_id '
     )
 
 def fetch_recent_subsidy_applications():
-    """최근 접수된 지원금 신청 데이터를 조회하고 출력한다."""
+    """최근 접수된 지원금 신청 데이터를 조회하고 출력한다. (PostgreSQL 버전)"""
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = _build_subsidy_query_base() + (
-                "WHERE sa.recent_received_date >= %s "
-                "ORDER BY sa.recent_received_date DESC "
-                "LIMIT 30"
+                'WHERE r.last_received_date >= %s '
+                'ORDER BY r.last_received_date DESC '
+                'LIMIT 30'
             )
-            params = ('2025-09-30 09:00',)
+            params = ('2025-01-01 00:00:00',)
             df = pd.read_sql(query, connection, params=params)
 
         if df.empty:
             print('조회된 데이터가 없습니다.')
             return df
-
-        def _is_child_over_18(birth_date_str: str) -> bool:
-            """생년월일 문자열을 받아 만나이 18세를 초과하는지 (즉, 만 19세 이상인지) 확인한다."""
-            try:
-                birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
-                today = datetime.now().date()
-                
-                age = today.year - birth_date.year
-                
-                if age > 19:
-                    return True
-                if age < 19:
-                    return False
-                
-                return (today.month, today.day) >= (birth_date.month, birth_date.day)
-
-            except (ValueError, TypeError):
-                return True
-
-        def is_multichild_outlier(row) -> bool:
-            """다자녀 관련 정보가 이상치인지 확인. 이상치이면 True 반환."""
-            try:
-                다자녀값 = row['다자녀']
-                if pd.isna(다자녀값) or 다자녀값 != 1:
-                    return False
-
-                dates_str = row['child_birth_date']
-                if pd.isna(dates_str) or not dates_str:
-                    return True
-
-                dates = json.loads(dates_str)
-                if not isinstance(dates, list) or not dates:
-                    return True
-
-                return any(_is_child_over_18(d) for d in dates)
-            except (json.JSONDecodeError, TypeError, KeyError):
-                return True
-
-        def is_chobon_issue_date_outlier(row) -> bool:
-            """초본 issue_date가 31일 이상 전인지 확인. 이상치이면 True 반환."""
-            try:
-                # 초본 서류가 있는 경우에만 체크 (gr.초본 = 1)
-                초본값 = row['초본']
-                if pd.isna(초본값) or 초본값 != 1:
-                    return False
-
-                issue_date = row['issue_date']
-                if pd.isna(issue_date) or issue_date is None:
-                    return False
-
-                # 한국 시간 기준으로 오늘 날짜 계산
-                kst = pytz.timezone('Asia/Seoul')
-                today = datetime.now(kst).date()
-                
-                # issue_date 파싱
-                issue_date_obj = None
-                if isinstance(issue_date, str):
-                    # 문자열인 경우 여러 형식 시도
-                    try:
-                        issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
-                    except ValueError:
-                        # 다른 형식 시도 (예: "2025-10-10 00:00:00")
-                        try:
-                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
-                        except ValueError:
-                            # ISO 형식 시도 (예: "2025-10-09T15:00:00.000Z")
-                            try:
-                                issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
-                            except ValueError:
-                                return False
-                elif isinstance(issue_date, datetime):
-                    issue_date_obj = issue_date.date()
-                elif isinstance(issue_date, date):
-                    # 이미 date 객체인 경우
-                    issue_date_obj = issue_date
-                elif isinstance(issue_date, pd.Timestamp):
-                    issue_date_obj = issue_date.date()
-                else:
-                    return False
-
-                if issue_date_obj is None:
-                    return False
-
-                # 날짜 차이 계산 (오늘 - issue_date)
-                days_diff = (today - issue_date_obj).days
-                
-                # 31일 이상 차이나면 이상치
-                return days_diff >= 31
-            except (ValueError, TypeError, AttributeError, KeyError):
-                return False
-
-        def is_contract_date_outlier(row) -> bool:
-            """ai_계약일자가 오늘-4일보다 나중인 경우 True 반환"""
-            try:
-                contract_date_val = row['ai_계약일자']
-                if pd.isna(contract_date_val) or contract_date_val is None:
-                    return False
-                
-                contract_date = None
-                if isinstance(contract_date_val, str):
-                    try:
-                        contract_date = datetime.strptime(contract_date_val.split()[0], "%Y-%m-%d").date()
-                    except ValueError:
-                        return False
-                elif isinstance(contract_date_val, datetime):
-                    contract_date = contract_date_val.date()
-                elif isinstance(contract_date_val, date):
-                    contract_date = contract_date_val
-                elif isinstance(contract_date_val, pd.Timestamp):
-                    contract_date = contract_date_val.date()
-                else:
-                    return False
-
-                today = datetime.now().date()
-                four_days_ago = today - timedelta(days=4)
-                
-                return contract_date > four_days_ago
-            except (ValueError, TypeError, AttributeError, KeyError):
-                return False
-
-        def is_chobon_address_outlier(row) -> bool:
-            """초본 address_1에 region 문자열이 포함되어 있지 않으면 True 반환"""
-            try:
-                초본값 = row.get('초본')
-                region = row.get('region')
-                address_1 = row.get('address_1')
-
-                # 초본 서류가 있고, region과 address_1이 유효한 경우에만 체크
-                if pd.notna(초본값) and 초본값 == 1 and region and address_1:
-                    # region이 address_1에 포함되어 있지 않으면 이상치
-                    return region not in address_1
-                return False
-            except (ValueError, TypeError, KeyError, AttributeError):
-                return False
-
-        def update_outlier(row):
-            """outlier 값을 업데이트하는 함수"""
-            # 기존 outlier 값 확인
-            current_outlier = row['outlier']
             
-            # NaN이나 None 처리
-            if pd.isna(current_outlier):
-                current_outlier = ''
-            
-            # 문자열로 변환하여 비교
-            current_outlier_str = str(current_outlier).strip()
-            
-            # 이미 'O'이면 그대로 반환
-            if current_outlier_str == 'O':
-                return 'O'
-            
-            # 계약일자 이상치 체크
-            if is_contract_date_outlier(row):
-                return 'O'
-
-            # 다자녀 이상치 체크
-            if is_multichild_outlier(row):
-                return 'O'
-            
-            # 초본 issue_date 이상치 체크
-            if is_chobon_issue_date_outlier(row):
-                return 'O'
-            
-            # 초본 chobon == 0 이상치 체크
-            try:
-                초본값 = row.get('초본', 0)
-                chobon값 = row.get('chobon')
-                if (pd.notna(초본값) and 초본값 == 1) and (pd.notna(chobon값) and chobon값 == 0):
-                    return 'O'
-            except (ValueError, TypeError, KeyError):
-                pass
-            
-            # 초본 address_1 지역 불일치 이상치 체크
-            if is_chobon_address_outlier(row):
-                return 'O'
-            
-            # 이상치가 아니면 기존 값 반환 (문자열로 변환)
-            return current_outlier_str if current_outlier_str else ''
-        
-        df['outlier'] = df.apply(update_outlier, axis=1)
-
-        # 간단한 한 줄 디버그 출력
-        print(f'새로고침 완료: {len(df)}개 데이터 조회됨')
         return df
 
-    except Exception:  # pragma: no cover - 긴급 디버깅용
+    except Exception:
         traceback.print_exc()
         return pd.DataFrame()
+
 
 def fetch_today_subsidy_applications_by_worker(worker_name: str):
-    """이전 영업일 18시 이후의 지원금 신청 데이터 중 특정 작업자에게 할당된 데이터를 조회한다."""
-    if not worker_name:
-        return pd.DataFrame()
-    
-    try:
-        # 이전 영업일 18시 이후 시간 계산
-        cutoff_datetime = get_previous_business_day_after_18h()
-        
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = _build_subsidy_query_base() + (
-                "WHERE sa.recent_received_date >= %s "
-                "AND sa.worker = %s "
-                "ORDER BY sa.recent_received_date DESC "
-                "LIMIT 30"
-            )
-            params = (cutoff_datetime, worker_name)
-            df = pd.read_sql(query, connection, params=params)
-
-        if df.empty:
-            return df
-
-        # 이상치 계산 로직 (fetch_recent_subsidy_applications와 동일)
-        def _is_child_over_18(birth_date_str: str) -> bool:
-            try:
-                birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
-                today = datetime.now().date()
-                age = today.year - birth_date.year
-                if age > 19:
-                    return True
-                if age < 19:
-                    return False
-                return (today.month, today.day) >= (birth_date.month, birth_date.day)
-            except (ValueError, TypeError):
-                return True
-
-        def is_multichild_outlier(row) -> bool:
-            try:
-                다자녀값 = row['다자녀']
-                if pd.isna(다자녀값) or 다자녀값 != 1:
-                    return False
-                dates_str = row['child_birth_date']
-                if pd.isna(dates_str) or not dates_str:
-                    return True
-                dates = json.loads(dates_str)
-                if not isinstance(dates, list) or not dates:
-                    return True
-                return any(_is_child_over_18(d) for d in dates)
-            except (json.JSONDecodeError, TypeError, KeyError):
-                return True
-
-        def is_chobon_issue_date_outlier(row) -> bool:
-            try:
-                초본값 = row['초본']
-                if pd.isna(초본값) or 초본값 != 1:
-                    return False
-                issue_date = row['issue_date']
-                if pd.isna(issue_date) or issue_date is None:
-                    return False
-                kst = pytz.timezone('Asia/Seoul')
-                today = datetime.now(kst).date()
-                issue_date_obj = None
-                if isinstance(issue_date, str):
-                    try:
-                        issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
-                    except ValueError:
-                        try:
-                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
-                        except ValueError:
-                            try:
-                                issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
-                            except ValueError:
-                                return False
-                elif isinstance(issue_date, datetime):
-                    issue_date_obj = issue_date.date()
-                elif isinstance(issue_date, date):
-                    issue_date_obj = issue_date
-                elif isinstance(issue_date, pd.Timestamp):
-                    issue_date_obj = issue_date.date()
-                else:
-                    return False
-                if issue_date_obj is None:
-                    return False
-                days_diff = (today - issue_date_obj).days
-                return days_diff >= 31
-            except (ValueError, TypeError, AttributeError, KeyError):
-                return False
-
-        def is_contract_date_outlier(row) -> bool:
-            """ai_계약일자가 오늘-4일보다 나중인 경우 True 반환"""
-            try:
-                contract_date_val = row['ai_계약일자']
-                if pd.isna(contract_date_val) or contract_date_val is None:
-                    return False
-                
-                contract_date = None
-                if isinstance(contract_date_val, str):
-                    try:
-                        contract_date = datetime.strptime(contract_date_val.split()[0], "%Y-%m-%d").date()
-                    except ValueError:
-                        return False
-                elif isinstance(contract_date_val, datetime):
-                    contract_date = contract_date_val.date()
-                elif isinstance(contract_date_val, date):
-                    contract_date = contract_date_val
-                elif isinstance(contract_date_val, pd.Timestamp):
-                    contract_date = contract_date_val.date()
-                else:
-                    return False
-
-                today = datetime.now().date()
-                four_days_ago = today - timedelta(days=4)
-                
-                return contract_date > four_days_ago
-            except (ValueError, TypeError, AttributeError, KeyError):
-                return False
-
-        def is_chobon_address_outlier(row) -> bool:
-            """초본 address_1에 region 문자열이 포함되어 있지 않으면 True 반환"""
-            try:
-                초본값 = row.get('초본')
-                region = row.get('region')
-                address_1 = row.get('address_1')
-
-                # 초본 서류가 있고, region과 address_1이 유효한 경우에만 체크
-                if pd.notna(초본값) and 초본값 == 1 and region and address_1:
-                    # region이 address_1에 포함되어 있지 않으면 이상치
-                    return region not in address_1
-                return False
-            except (ValueError, TypeError, KeyError, AttributeError):
-                return False
-
-        def update_outlier(row):
-            current_outlier = row['outlier']
-            if pd.isna(current_outlier):
-                current_outlier = ''
-            current_outlier_str = str(current_outlier).strip()
-            if current_outlier_str == 'O':
-                return 'O'
-            if is_multichild_outlier(row):
-                return 'O'
-            if is_chobon_issue_date_outlier(row):
-                return 'O'
-            # 초본 chobon == 0 이상치 체크
-            try:
-                초본값 = row.get('초본', 0)
-                chobon값 = row.get('chobon')
-                if (pd.notna(초본값) and 초본값 == 1) and (pd.notna(chobon값) and chobon값 == 0):
-                    return 'O'
-            except (ValueError, TypeError, KeyError):
-                pass
-            
-            # 초본 address_1 지역 불일치 이상치 체크
-            if is_chobon_address_outlier(row):
-                return 'O'
-            return current_outlier_str if current_outlier_str else ''
-        
-        df['outlier'] = df.apply(update_outlier, axis=1)
-        return df
-
-    except Exception:
-        traceback.print_exc()
-        return pd.DataFrame()
+    """이전 영업일 18시 이후의 지원금 신청 데이터 중 특정 작업자에게 할당된 데이터를 조회한다. (PostgreSQL 버전: 임시 미구현)"""
+    return pd.DataFrame()
 
 def fetch_today_unfinished_subsidy_applications():
-    """이전 영업일 18시 이후의 지원금 신청 데이터 중 작업자가 할당되지 않은 데이터를 조회한다."""
-    try:
-        # 이전 영업일 18시 이후 시간 계산
-        cutoff_datetime = get_previous_business_day_after_18h()
-        
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = _build_subsidy_query_base() + (
-                "WHERE sa.recent_received_date >= %s "
-                "AND (sa.worker IS NULL OR sa.worker = '') "
-                "ORDER BY sa.recent_received_date DESC "
-                "LIMIT 30"
-            )
-            params = (cutoff_datetime,)
-            df = pd.read_sql(query, connection, params=params)
+    """이전 영업일 18시 이후의 지원금 신청 데이터 중 작업자가 할당되지 않은 데이터를 조회한다. (PostgreSQL 버전: 임시 미구현)"""
+    return pd.DataFrame()
 
-        if df.empty:
-            return df
-
-        # 이상치 계산 로직 (fetch_recent_subsidy_applications와 동일)
-        def _is_child_over_18(birth_date_str: str) -> bool:
-            try:
-                birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
-                today = datetime.now().date()
-                age = today.year - birth_date.year
-                if age > 19:
-                    return True
-                if age < 19:
-                    return False
-                return (today.month, today.day) >= (birth_date.month, birth_date.day)
-            except (ValueError, TypeError):
-                return True
-
-        def is_multichild_outlier(row) -> bool:
-            try:
-                다자녀값 = row['다자녀']
-                if pd.isna(다자녀값) or 다자녀값 != 1:
-                    return False
-                dates_str = row['child_birth_date']
-                if pd.isna(dates_str) or not dates_str:
-                    return True
-                dates = json.loads(dates_str)
-                if not isinstance(dates, list) or not dates:
-                    return True
-                return any(_is_child_over_18(d) for d in dates)
-            except (json.JSONDecodeError, TypeError, KeyError):
-                return True
-
-        def is_chobon_issue_date_outlier(row) -> bool:
-            try:
-                초본값 = row['초본']
-                if pd.isna(초본값) or 초본값 != 1:
-                    return False
-                issue_date = row['issue_date']
-                if pd.isna(issue_date) or issue_date is None:
-                    return False
-                kst = pytz.timezone('Asia/Seoul')
-                today = datetime.now(kst).date()
-                issue_date_obj = None
-                if isinstance(issue_date, str):
-                    try:
-                        issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
-                    except ValueError:
-                        try:
-                            issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
-                        except ValueError:
-                            try:
-                                issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
-                            except ValueError:
-                                return False
-                elif isinstance(issue_date, datetime):
-                    issue_date_obj = issue_date.date()
-                elif isinstance(issue_date, date):
-                    issue_date_obj = issue_date
-                elif isinstance(issue_date, pd.Timestamp):
-                    issue_date_obj = issue_date.date()
-                else:
-                    return False
-                if issue_date_obj is None:
-                    return False
-                days_diff = (today - issue_date_obj).days
-                return days_diff >= 31
-            except (ValueError, TypeError, AttributeError, KeyError):
-                return False
-
-        def is_contract_date_outlier(row) -> bool:
-            """ai_계약일자가 오늘-4일보다 나중인 경우 True 반환"""
-            try:
-                contract_date_val = row['ai_계약일자']
-                if pd.isna(contract_date_val) or contract_date_val is None:
-                    return False
-                
-                contract_date = None
-                if isinstance(contract_date_val, str):
-                    try:
-                        contract_date = datetime.strptime(contract_date_val.split()[0], "%Y-%m-%d").date()
-                    except ValueError:
-                        return False
-                elif isinstance(contract_date_val, datetime):
-                    contract_date = contract_date_val.date()
-                elif isinstance(contract_date_val, date):
-                    contract_date = contract_date_val
-                elif isinstance(contract_date_val, pd.Timestamp):
-                    contract_date = contract_date_val.date()
-                else:
-                    return False
-
-                today = datetime.now().date()
-                four_days_ago = today - timedelta(days=4)
-                
-                return contract_date > four_days_ago
-            except (ValueError, TypeError, AttributeError, KeyError):
-                return False
-
-        def is_chobon_address_outlier(row) -> bool:
-            """초본 address_1에 region 문자열이 포함되어 있지 않으면 True 반환"""
-            try:
-                초본값 = row.get('초본')
-                region = row.get('region')
-                address_1 = row.get('address_1')
-
-                # 초본 서류가 있고, region과 address_1이 유효한 경우에만 체크
-                if pd.notna(초본값) and 초본값 == 1 and region and address_1:
-                    # region이 address_1에 포함되어 있지 않으면 이상치
-                    return region not in address_1
-                return False
-            except (ValueError, TypeError, KeyError, AttributeError):
-                return False
-
-        def update_outlier(row):
-            current_outlier = row['outlier']
-            if pd.isna(current_outlier):
-                current_outlier = ''
-            current_outlier_str = str(current_outlier).strip()
-            if current_outlier_str == 'O':
-                return 'O'
-            if is_multichild_outlier(row):
-                return 'O'
-            if is_chobon_issue_date_outlier(row):
-                return 'O'
-            # 초본 chobon == 0 이상치 체크
-            try:
-                초본값 = row.get('초본', 0)
-                chobon값 = row.get('chobon')
-                if (pd.notna(초본값) and 초본값 == 1) and (pd.notna(chobon값) and chobon값 == 0):
-                    return 'O'
-            except (ValueError, TypeError, KeyError):
-                pass
-
-            # 초본 address_1 지역 불일치 이상치 체크
-            if is_chobon_address_outlier(row):
-                return 'O'
-            return current_outlier_str if current_outlier_str else ''
-        
-        df['outlier'] = df.apply(update_outlier, axis=1)
-        return df
-
-    except Exception:
-        traceback.print_exc()
-        return pd.DataFrame()
 
 def fetch_application_data_by_rn(rn: str) -> dict | None:
     """

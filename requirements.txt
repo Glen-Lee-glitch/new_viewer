@@ -12,6 +12,7 @@ openpyxl
 
 # 데이터베이스
 mysql-connector-python
+psycopg2-binary
 
 # Google API 관련
 google-api-python-client

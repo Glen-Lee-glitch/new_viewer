@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent
 from PyQt6 import uic
 from pathlib import Path
-from core.sql_manager import get_worker_names, fetch_after_apply_counts
+from core.sql_manager import fetch_after_apply_counts
 
 class LoginDialog(QDialog):
     def __init__(self, parent=None):
@@ -61,18 +61,6 @@ class LoginDialog(QDialog):
         # 빈 입력 체크
         if not worker_name:
             QMessageBox.warning(self, "입력 오류", "작업자 이름을 입력해주세요.")
-            self.lineEdit_worker.setFocus()
-            self._validation_passed = False
-            return
-        
-        # 유효한 작업자 목록 가져오기
-        valid_workers = get_worker_names()
-        
-        # 작업자 이름 유효성 검사
-        if worker_name not in valid_workers:
-            error_msg = f"'{worker_name}'은(는) 등록되지 않은 작업자입니다.\n\n등록된 작업자 목록:\n"
-            error_msg += "\n".join(f"• {worker}" for worker in valid_workers)
-            QMessageBox.warning(self, "등록되지 않은 작업자", error_msg)
             self.lineEdit_worker.setFocus()
             self._validation_passed = False
             return
