@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
         self._initial_resize_done = False  # 초기 크기 조정 완료 플래그
         self._auto_return_to_main_after_save = False
         self._worker_name = ""  # 작업자 이름 저장용 (위젯 생성 전에 초기화)
+        self._worker_id = None  # 작업자 ID 저장용 (위젯 생성 전에 초기화)
         self._original_filepath: str | None = None # 현재 로드된 PDF의 원본 파일 경로
         self._is_current_file_processed: bool = False # 현재 파일이 전처리된 파일인지 여부
         self._is_give_works_started: bool = False  # 지급 테이블에서 시작 여부
@@ -449,6 +450,7 @@ class MainWindow(QMainWindow):
             self.move(target_screen.geometry().topLeft())
 
             self._worker_name = self._login_dialog.get_worker_name()
+            self._worker_id = self._login_dialog.get_worker_id()
             self._update_worker_label()
             # 로그인 후 알람 위젯 업데이트
             if hasattr(self, '_alarm_widget'):

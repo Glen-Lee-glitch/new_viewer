@@ -248,6 +248,30 @@ def get_worker_names():
         traceback.print_exc()
     return workers
 
+def get_worker_id_by_name(worker_name: str) -> int | None:
+    """
+    workers 테이블에서 작업자 이름(worker_name)으로 worker_id를 조회한다. (PostgreSQL 버전)
+    
+    Args:
+        worker_name: 작업자 이름
+        
+    Returns:
+        worker_id (int) 또는 None (존재하지 않는 경우)
+    """
+    if not worker_name:
+        return None
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT worker_id FROM workers WHERE worker_name = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (worker_name,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def get_mail_content_by_thread_id(thread_id: str) -> str:
     """
     thread_id로 emails 테이블에서 content를 조회한다.

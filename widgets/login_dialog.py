@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent
 from PyQt6 import uic
 from pathlib import Path
-from core.sql_manager import fetch_after_apply_counts, get_worker_names
+from core.sql_manager import fetch_after_apply_counts, get_worker_names, get_worker_id_by_name
 
 class LoginDialog(QDialog):
     def __init__(self, parent=None):
@@ -102,3 +102,10 @@ class LoginDialog(QDialog):
     def get_worker_name(self) -> str:
         """입력된 작업자 이름을 반환한다."""
         return self.lineEdit_worker.text().strip()
+    
+    def get_worker_id(self) -> int | None:
+        """입력된 작업자 이름에 해당하는 worker_id를 반환한다."""
+        worker_name = self.get_worker_name()
+        if not worker_name:
+            return None
+        return get_worker_id_by_name(worker_name)
