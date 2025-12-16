@@ -233,12 +233,12 @@ def test_fetch_emails():
 
 def get_worker_names():
     """
-    workers 테이블에서 모든 작업자 이름(name) 리스트를 반환한다.
+    workers 테이블에서 모든 작업자 이름(worker_name) 리스트를 반환한다. (PostgreSQL 버전)
     """
     workers = []
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = "SELECT name FROM workers"
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT worker_name FROM workers ORDER BY worker_name"
             with connection.cursor() as cursor:
                 cursor.execute(query)
                 rows = cursor.fetchall()
