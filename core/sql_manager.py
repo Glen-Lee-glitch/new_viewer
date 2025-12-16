@@ -1563,51 +1563,19 @@ def fetch_ev_required_rns(worker_name: str) -> list[str]:
 
 def fetch_duplicate_mail_rns(worker_name: str) -> list[str]:
     """
-    subsidy_applications 테이블에서 '중복메일' 상태인 RN 목록을 반환합니다.
+    rns 테이블에서 '중복메일' 상태인 RN 목록을 반환합니다. (PostgreSQL 버전)
     관리자급('이경구', '이호형')은 전체, 그 외에는 본인 것만 조회.
     RN 기준 오름차순 정렬
+    
+    Note: PostgreSQL 마이그레이션으로 인해 현재는 빈 리스트를 반환합니다.
+    추후 rns 테이블에 status 컬럼이 추가되면 구현 필요.
     """
     if not worker_name:
         return []
-
-    admins = ['이경구', '이호형']
-
-    try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            if worker_name in admins:
-                query = """
-                    SELECT RN 
-                    FROM subsidy_applications 
-                    WHERE status = '중복메일'
-                    ORDER BY RN ASC
-                """
-                args = ()
-            else:
-                # 일반 작업자는 duplicated_rn 테이블의 가장 최근 original_worker가 본인인 경우만 조회
-                query = """
-                    SELECT S.RN 
-                    FROM subsidy_applications S
-                    WHERE S.status = '중복메일'
-                    AND (
-                        SELECT D.original_worker
-                        FROM duplicated_rn D
-                        WHERE D.RN = S.RN
-                        ORDER BY D.received_date DESC
-                        LIMIT 1
-                    ) = %s
-                    ORDER BY S.RN ASC
-                """
-                args = (worker_name,)
-
-            with connection.cursor() as cursor:
-                cursor.execute(query, args)
-                rows = cursor.fetchall()
-                # 튜플의 첫 번째 요소인 RN만 추출하여 리스트로 반환
-                return [row[0] for row in rows]
-                
-    except Exception:
-        traceback.print_exc()
-        return []
+    
+    # TODO: PostgreSQL 마이그레이션 후 rns 테이블에 status 컬럼 추가 시 구현 필요
+    # 현재는 빈 리스트 반환하여 에러 방지
+    return []
 
 def get_original_worker_by_rn(rn: str) -> str | None:
     """
