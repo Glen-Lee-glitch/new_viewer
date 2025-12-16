@@ -29,7 +29,7 @@ def _build_subsidy_query_base():
         'SELECT '
         '  r."RN" AS "RN", '
         '  r.region, '
-        '  NULL AS worker, '
+        '  w.worker_name AS worker, '
         '  r.customer AS name, '
         '  array_to_string(r.special, \', \') AS special_note, '
         '  r.last_received_date AS recent_received_date, '
@@ -61,6 +61,7 @@ def _build_subsidy_query_base():
         '  \'\' AS result '
         'FROM rns r '
         'LEFT JOIN emails e ON r.recent_thread_id = e.thread_id '
+        'LEFT JOIN workers w ON r.worker_id = w.worker_id '
     )
 
 def fetch_recent_subsidy_applications():
