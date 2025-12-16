@@ -550,7 +550,8 @@ def check_gemini_flags(rn: str) -> dict:
                     (a."청년생애" IS NOT NULL OR '청년생애' = ANY(r.special)) AS "청년생애",
                     (a."다자녀" IS NOT NULL OR '다자녀' = ANY(r.special)) AS "다자녀",
                     ('공동명의' = ANY(r.special) OR (a."초본" IS NOT NULL AND a."초본"->>'second_person' IS NOT NULL)) AS "공동명의",
-                    a."초본" IS NOT NULL AS "초본"
+                    a."초본" IS NOT NULL AS "초본",
+                    ('개인사업자' = ANY(r.special)) AS "개인사업자"
                 FROM analysis_results a
                 JOIN rns r ON a."RN" = r."RN"
                 WHERE a."RN" = %s
@@ -564,7 +565,8 @@ def check_gemini_flags(rn: str) -> dict:
                         '청년생애': bool(row[1]),
                         '다자녀': bool(row[2]),
                         '공동명의': bool(row[3]),
-                        '초본': bool(row[4])
+                        '초본': bool(row[4]),
+                        '개인사업자': bool(row[5])
                     }
                 return {}
     except Exception:
@@ -688,16 +690,16 @@ def fetch_gemini_business_results(rn: str) -> dict:
     
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            # JSONB 키는 추정치 (추후 실제 데이터 확인 필요)
+            # 실제 JSONB 키는 한글 키 사용 (대표자, 사업자명, 사업장주소, 사업자등록번호)
             query = """
                 SELECT 
                     "사업자등록증"->>'is_corporation',
                     "사업자등록증"->>'corporation_name',
-                    "사업자등록증"->>'representative',
+                    "사업자등록증"->>'대표자',
                     "사업자등록증"->>'registration_number',
-                    "사업자등록증"->>'business_registration_number',
-                    "사업자등록증"->>'business_name',
-                    "사업자등록증"->>'address'
+                    "사업자등록증"->>'사업자등록번호',
+                    "사업자등록증"->>'사업자명',
+                    "사업자등록증"->>'사업장주소'
                 FROM analysis_results
                 WHERE "RN" = %s AND "사업자등록증" IS NOT NULL
             """
@@ -714,14 +716,22 @@ def fetch_gemini_business_results(rn: str) -> dict:
                     else:
                         is_corp = bool(is_corp)
 
+                    # 한글 키와 영문 키 모두 처리 (하위 호환성)
+                    기관명 = row[1] if row[1] else None
+                    대표자 = row[2] if row[2] else None
+                    법인등록번호 = row[3] if row[3] else None
+                    사업자등록번호 = row[4] if row[4] else None
+                    사업자명 = row[5] if row[5] else None
+                    사업장주소 = row[6] if row[6] else None
+                    
                     return {
                         'is_법인': is_corp,
-                        '기관명': row[1],  # 법인명을 기관명으로 매핑
-                        '대표자': row[2],
-                        '법인등록번호': row[3],  # 등록번호를 법인등록번호로 매핑
-                        '사업자등록번호': row[4],
-                        '개인사업자명': row[5],  # 사업자명을 개인사업자명으로 매핑
-                        '법인주소': row[6]  # 법인주소 추가
+                        '기관명': 기관명,  # 법인명을 기관명으로 매핑
+                        '대표자': 대표자,
+                        '법인등록번호': 법인등록번호,  # 등록번호를 법인등록번호로 매핑
+                        '사업자등록번호': 사업자등록번호,
+                        '개인사업자명': 사업자명,  # 사업자명을 개인사업자명으로 매핑
+                        '법인주소': 사업장주소  # 사업장주소를 법인주소로 매핑
                     }
                 return {}
     except Exception:

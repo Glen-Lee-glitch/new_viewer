@@ -204,9 +204,18 @@ class DetailFormDialog(QDialog):
         biz_data = fetch_gemini_business_results(rn)
         is_corporation = biz_data.get('is_법인', False)
         
-        # 개인사업자 여부 확인 (is_법인이 False이지만 사업자 데이터가 있는 경우)
+        # 플래그 확인 (개인사업자 플래그 우선 확인)
+        flags = check_gemini_flags(rn)
+        is_individual_business_flag = flags.get('개인사업자', False)
+        
+        # 개인사업자 여부 확인
+        # 1순위: rns.special에 '개인사업자'가 있으면 개인사업자
+        # 2순위: is_법인이 False이지만 사업자 데이터가 있는 경우
         is_individual_business = False
-        if not is_corporation:
+        if is_individual_business_flag:
+            # special에 '개인사업자'가 있으면 무조건 개인사업자로 판단
+            is_individual_business = True
+        elif not is_corporation:
             # 사업자등록번호나 개인사업자명이 있으면 개인사업자로 판단
             사업자등록번호 = biz_data.get('사업자등록번호', '')
             개인사업자명 = biz_data.get('개인사업자명', '')
@@ -283,10 +292,7 @@ class DetailFormDialog(QDialog):
         # 이메일
         self.label_email.setText(str(contract_data.get('이메일', '')))
 
-        # 3. 플래그 확인
-        flags = check_gemini_flags(rn)
-
-        # 4. 주소 처리 (법인인 경우 법인주소, 개인사업자/개인인 경우 초본 주소)
+        # 3. 주소 처리 (법인인 경우 법인주소, 개인사업자/개인인 경우 초본 주소)
         if is_corporation:
             # 법인인 경우: 법인주소 사용
             법인주소 = biz_data.get('법인주소', '')
