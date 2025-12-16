@@ -4,6 +4,14 @@ import os
 import platform
 from PIL import Image, ImageDraw, ImageFont
 import io
+import psycopg2
+import sys
+# 상위 디렉토리 접근을 위해 sys.path 추가
+try:
+    sys.path.append(str(Path(__file__).parent.parent))
+except:
+    pass
+from core.data_manage import DB_CONFIG
 
 def find_korean_font():
     """시스템에서 한글 폰트 파일 경로를 찾습니다."""
@@ -775,5 +783,322 @@ def extract_as_is():
         import traceback
         traceback.print_exc()
 
+
+def fetch_rn_pdf_data():
+    """DB에서 RN, file_path, page_number를 조회합니다."""
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT r."RN", r.file_path, ar."구매계약서" 
+            FROM rns r 
+            INNER JOIN analysis_results ar ON r."RN" = ar."RN" 
+            WHERE r.file_path IS NOT NULL AND ar."구매계약서" IS NOT NULL
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            rn, file_path, contract_json = row
+            # JSONB에서 page_number 추출
+            if isinstance(contract_json, str):
+                import json
+                try:
+                    contract_json = json.loads(contract_json)
+                except:
+                    contract_json = {}
+            
+            # JSONB 객체(dict)인 경우
+            page_number = contract_json.get("page_number") if isinstance(contract_json, dict) else None
+            
+            if page_number is not None:
+                try:
+                    results.append({
+                        "rn": rn,
+                        "file_path": file_path,
+                        "page_number": int(page_number)
+                    })
+                except ValueError:
+                    pass
+        
+        cursor.close()
+        conn.close()
+        return results
+    except Exception as e:
+        print(f"DB 조회 중 오류 발생: {e}")
+        return []
+
+def process_single_pdf_with_page(rn: str, file_path: str, page_number: int, output_dir: Path) -> bool:
+    """단일 PDF 처리 함수: 특정 페이지에만 텍스트 삽입"""
+    input_pdf = Path(file_path)
+    output_pdf = output_dir / f"{rn}_result.pdf"
+    
+    # 윈도우 네트워크 경로 처리
+    if platform.system() == "Windows" and file_path.startswith("\\\\"):
+         input_pdf = Path(file_path)
+
+    print(f"Input: {input_pdf}")
+
+    if not input_pdf.exists():
+        print(f"오류: 파일을 찾을 수 없습니다 -> {input_pdf}")
+        return False
+
+    try:
+        doc = pymupdf.open(input_pdf)
+        text_content = "출고예정일 12/09"
+        font_size = 15
+
+        # 파일 크기 확인 및 압축 저장
+        file_size = input_pdf.stat().st_size
+        limit_size = 7 * 1024 * 1024  # 7MB
+        is_compressed = False
+
+        if file_size > limit_size:
+            print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 초과)")
+            print(f"[INFO] 이미지 압축을 시작합니다... (병렬 처리)")
+            
+            # 1. 압축 대상 이미지 정보 수집 (순차)
+            xref_to_image_data = {}
+            xref_to_locations = {}
+            
+            for page_num, page in enumerate(doc):
+                page_rotation = page.rotation
+                image_list = page.get_images()
+                if image_list:
+                    for img in image_list:
+                        try:
+                            xref = img[0]
+                            img_name = img[7]
+                            
+                            img_rects = []
+                            try:
+                                page.set_rotation(0)
+                                img_rects = page.get_image_rects(xref)
+                                page.set_rotation(page_rotation)
+                            except:
+                                try:
+                                    page.set_rotation(0)
+                                    img_rects = page.get_image_rects(img_name)
+                                    page.set_rotation(page_rotation)
+                                except:
+                                    page.set_rotation(page_rotation)
+                                    pass
+                            
+                            if not img_rects:
+                                continue
+                            
+                            if xref not in xref_to_image_data:
+                                base_image = doc.extract_image(xref)
+                                image_bytes = base_image["image"]
+                                image_ext = base_image["ext"]
+                                xref_to_image_data[xref] = (image_bytes, image_ext, len(image_bytes))
+                            
+                            if xref not in xref_to_locations:
+                                xref_to_locations[xref] = []
+                            
+                            for img_rect in img_rects:
+                                xref_to_locations[xref].append((page_num, img_rect, page_rotation))
+                            
+                        except Exception:
+                            continue
+            
+            tasks = []
+            task_info = []
+            for xref, (image_bytes, image_ext, original_size) in xref_to_image_data.items():
+                tasks.append((image_bytes, image_ext))
+                task_info.append((xref, original_size))
+
+            print(f"[INFO] 총 {len(tasks)}개의 이미지를 압축합니다.")
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                results = list(executor.map(compress_single_image, tasks))
+            
+            for (xref, original_size), compressed_image_bytes in zip(task_info, results):
+                if compressed_image_bytes:
+                    compressed_size = len(compressed_image_bytes)
+                    if compressed_size < original_size * 0.9:
+                        if xref in xref_to_locations:
+                            locations = xref_to_locations[xref]
+                            if locations:
+                                first_page_num, _, _ = locations[0]
+                                try:
+                                    page = doc[first_page_num]
+                                    current_rotation = page.rotation
+                                    page.set_rotation(0)
+                                    page.delete_image(xref)
+                                    page.set_rotation(current_rotation)
+                                except Exception as e:
+                                    pass
+                            
+                            for page_num, img_rect, page_rotation in locations:
+                                try:
+                                    page = doc[page_num]
+                                    current_rotation = page.rotation
+                                    page.set_rotation(0)
+                                    page.insert_image(img_rect, stream=compressed_image_bytes)
+                                    page.set_rotation(current_rotation)
+                                except Exception as e:
+                                    pass
+            is_compressed = True
+        else:
+            print(f"[INFO] 입력 파일 크기: {file_size / 1024 / 1024:.2f} MB (7MB 이하) - 처리 생략")
+            doc.close()
+            return False
+        
+        # A4 리사이징 로직
+        try:
+            needs_resize = False
+            A4_WIDTH, A4_HEIGHT = 595.276, 841.890
+            TOLERANCE = 5.0
+
+            for page in doc:
+                original_rot = page.rotation
+                page.set_rotation(0)
+                w, h = page.rect.width, page.rect.height
+                page.set_rotation(original_rot)
+                
+                long_side, short_side = max(w, h), min(w, h)
+                if abs(long_side - A4_HEIGHT) > TOLERANCE or abs(short_side - A4_WIDTH) > TOLERANCE:
+                    needs_resize = True
+                    break
+            
+            if needs_resize:
+                print("[INFO] A4 규격이 아닌 페이지가 감지되어 리사이징을 진행합니다.")
+                new_doc = pymupdf.open()
+                
+                for page in doc:
+                    rot = page.rotation
+                    page.set_rotation(0)
+                    src_rect = page.rect
+                    tgt_width, tgt_height = A4_WIDTH, A4_HEIGHT
+                    new_page = new_doc.new_page(width=tgt_width, height=tgt_height)
+                    
+                    if rot in [90, 270]:
+                        src_w, src_h = src_rect.height, src_rect.width
+                        apply_rot = 90 if rot == 270 else rot
+                    else:
+                        src_w, src_h = src_rect.width, src_rect.height
+                        apply_rot = rot
+                    
+                    scale = min(tgt_width / src_w, tgt_height / src_h)
+                    new_w = src_w * scale
+                    new_h = src_h * scale
+                    x = (tgt_width - new_w) / 2
+                    y = (tgt_height - new_h) / 2
+                    dest_rect = pymupdf.Rect(x, y, x + new_w, y + new_h)
+                    
+                    if rot == 0:
+                        try:
+                            mat = pymupdf.Matrix(scale, scale)
+                            pix = page.get_pixmap(matrix=mat, alpha=False, annots=True)
+                            img_bytes = pix.tobytes("png")
+                            new_page.insert_image(dest_rect, stream=img_bytes)
+                        except Exception:
+                            new_page.show_pdf_page(dest_rect, doc, page.number, rotate=apply_rot)
+                    else:
+                        new_page.show_pdf_page(dest_rect, doc, page.number, rotate=apply_rot)
+                        # 주석 복사 (간소화)
+                        try:
+                            for annot in page.annots():
+                                # 여기에 주석 복사 로직이 들어가야 함 (extract_as_is 참조)
+                                pass
+                        except:
+                            pass
+
+                old_doc = doc
+                doc = new_doc
+                old_doc.close()
+        except Exception as e:
+            print(f"[WARNING] 리사이징 중 오류 발생: {e}")
+
+        # 텍스트 삽입 (특정 페이지만)
+        target_page_idx = page_number - 1
+        if 0 <= target_page_idx < len(doc):
+            print(f"[INFO] {page_number}페이지에 텍스트 삽입을 시작합니다...")
+            page = doc[target_page_idx]
+            try:
+                original_rot = page.rotation
+                page.set_rotation(0)
+                
+                text_image_bytes = create_text_image(text_content, font_size)
+                
+                if original_rot != 0:
+                    img = Image.open(io.BytesIO(text_image_bytes))
+                    rotated_img = img.rotate(original_rot, expand=True, fillcolor=(255, 255, 255, 0))
+                    rotated_bytes = io.BytesIO()
+                    rotated_img.save(rotated_bytes, format='PNG')
+                    text_image_bytes = rotated_bytes.getvalue()
+                
+                text_image = pymupdf.open(stream=text_image_bytes, filetype="png")
+                img_page = text_image[0]
+                img_rect = img_page.rect
+                img_width = img_rect.width
+                img_height = img_rect.height
+                text_image.close()
+                
+                rect = page.rect
+                x = (rect.width - img_width) / 2
+                y = (rect.height / 2) - (img_height / 2) + (font_size * 0.35)
+                
+                if original_rot == 270:
+                    x = x - 60
+                elif original_rot == 0:
+                    y = y + 60
+                
+                image_rect = pymupdf.Rect(x, y, x + img_width, y + img_height)
+                page.insert_image(image_rect, stream=text_image_bytes)
+                page.set_rotation(original_rot)
+                print(f"[INFO] Page {page_number}에 텍스트 '{text_content}' 삽입 완료")
+            except Exception as e:
+                print(f"[WARNING] 텍스트 삽입 실패: {e}")
+        else:
+            print(f"[WARNING] 요청한 페이지 {page_number}가 문서 범위를 벗어납니다 (총 {len(doc)}페이지)")
+
+        # 저장
+        if is_compressed:
+            doc.save(output_pdf, deflate=True, garbage=4)
+        else:
+            doc.save(output_pdf)
+        
+        doc.close()
+        print(f"완료: {output_pdf} 에 저장되었습니다.")
+        return True
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return False
+
+def process_pdfs_from_database():
+    """DB에서 데이터를 조회하여 일괄 처리합니다."""
+    data_list = fetch_rn_pdf_data()
+    print(f"[INFO] 총 {len(data_list)}개의 처리할 데이터를 찾았습니다.")
+    
+    base_dir = Path(__file__).parent.parent
+    output_dir = base_dir / "test" / "test_results"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    success_count = 0
+    fail_count = 0
+    
+    for data in data_list:
+        rn = data["rn"]
+        file_path = data["file_path"]
+        page_number = data["page_number"]
+        
+        print(f"\n[{rn}] 처리 시작 (페이지: {page_number})")
+        if process_single_pdf_with_page(rn, file_path, page_number, output_dir):
+            success_count += 1
+        else:
+            fail_count += 1
+            
+    print(f"\n{'='*50}")
+    print(f"[RESULT] 총 {len(data_list)}건 중 성공: {success_count}, 실패: {fail_count}")
+    print(f"결과 폴더: {output_dir}")
+
 if __name__ == "__main__":
-    extract_as_is()
+    # extract_as_is()
+    process_pdfs_from_database()
+
