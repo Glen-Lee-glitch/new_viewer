@@ -17,10 +17,62 @@ warnings.filterwarnings('ignore', message='pandas only supports SQLAlchemy', cat
 FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
 FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id', 'file_rendered']
 
-def claim_subsidy_work(rn: str, worker: str) -> bool:
-    # PostgreSQL 임시 구현: worker 컬럼이 없으므로 False 반환
-    return False
-    # TODO: worker 컬럼 추가 후 구현 필요
+def claim_subsidy_work(rn: str, worker_id: int) -> bool:
+    """
+    지원 테이블에서 작업을 클레임(할당)한다.
+    
+    Args:
+        rn: RN 번호
+        worker_id: 작업자 ID
+        
+    Returns:
+        True: 작업 할당 성공 (NULL이었거나 자신이 이미 할당된 경우)
+        False: 다른 작업자가 이미 할당된 경우
+    """
+    if not rn or worker_id is None:
+        return False
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            connection.begin()
+            try:
+                with connection.cursor() as cursor:
+                    # 현재 worker_id 조회
+                    select_query = "SELECT worker_id FROM rns WHERE \"RN\" = %s"
+                    cursor.execute(select_query, (rn,))
+                    row = cursor.fetchone()
+                    
+                    if not row:
+                        # RN이 존재하지 않음
+                        connection.rollback()
+                        return False
+                    
+                    current_worker_id = row[0]
+                    
+                    # worker_id가 NULL이면 현재 작업자로 할당
+                    if current_worker_id is None:
+                        update_query = "UPDATE rns SET worker_id = %s WHERE \"RN\" = %s"
+                        cursor.execute(update_query, (worker_id, rn))
+                        connection.commit()
+                        print(f"[작업 할당] RN: {rn}, worker_id: {worker_id} (NULL -> 할당)")
+                        return True
+                    
+                    # 이미 자신이 할당된 경우
+                    if current_worker_id == worker_id:
+                        print(f"[작업 할당] RN: {rn}, worker_id: {worker_id} (이미 할당됨)")
+                        connection.rollback()  # 커밋 불필요
+                        return True
+                    
+                    # 다른 작업자가 할당된 경우
+                    print(f"[작업 할당 실패] RN: {rn}, 현재 worker_id: {current_worker_id}, 요청 worker_id: {worker_id}")
+                    connection.rollback()
+                    return False
+            except Exception:
+                connection.rollback()
+                raise
+    except Exception:
+        traceback.print_exc()
+        return False
 
 
 def _build_subsidy_query_base():
@@ -274,13 +326,13 @@ def get_worker_id_by_name(worker_name: str) -> int | None:
 
 def get_mail_content_by_thread_id(thread_id: str) -> str:
     """
-    thread_id로 emails 테이블에서 content를 조회한다.
+    thread_id로 emails 테이블에서 content를 조회한다. (PostgreSQL 버전)
     """
     if not thread_id:
         return ""
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = "SELECT content FROM emails WHERE thread_id = %s"
             with connection.cursor() as cursor:
                 cursor.execute(query, (thread_id,))
@@ -292,7 +344,7 @@ def get_mail_content_by_thread_id(thread_id: str) -> str:
 
 def get_email_by_thread_id(thread_id: str) -> dict | None:
     """
-    thread_id로 emails 테이블에서 title과 content를 조회하여 딕셔너리로 반환한다.
+    thread_id로 emails 테이블에서 title과 content를 조회하여 딕셔너리로 반환한다. (PostgreSQL 버전)
     
     Args:
         thread_id: 이메일 thread_id
@@ -304,7 +356,7 @@ def get_email_by_thread_id(thread_id: str) -> dict | None:
         return None
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = "SELECT title, content FROM emails WHERE thread_id = %s"
             with connection.cursor() as cursor:
                 cursor.execute(query, (thread_id,))

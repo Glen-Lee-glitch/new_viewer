@@ -760,7 +760,8 @@ class MainWindow(QMainWindow):
             return
 
         # 일반 사용자가 이미 할당된 RN번호를 시작하려고 하는 경우 오류 메시지 표시 및 진행 불가
-        if not claim_subsidy_work(rn_value, worker_name):
+        # worker_id를 사용하여 작업 할당 시도
+        if not self._worker_id or not claim_subsidy_work(rn_value, self._worker_id):
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
             msg_box.setWindowTitle("이미 작업 중")
