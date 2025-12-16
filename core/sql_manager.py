@@ -808,14 +808,14 @@ def fetch_subsidy_model(rn: str) -> str:
 
 def fetch_subsidy_region(rn: str) -> str:
     """
-    subsidy_applications 테이블에서 RN으로 지역(region) 정보를 조회한다.
+    rns 테이블에서 RN으로 지역(region) 정보를 조회한다. (PostgreSQL 버전)
     """
     if not rn:
         return ""
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = "SELECT region FROM subsidy_applications WHERE RN = %s"
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = 'SELECT region FROM rns WHERE "RN" = %s'
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
                 row = cursor.fetchone()
@@ -949,7 +949,7 @@ def fetch_subsidy_amount(region: str, model: str, rn: str = None) -> str:
 
 def calculate_delivery_date(region: str) -> str:
     """
-    오늘 날짜와 지역을 기반으로 출고예정일을 계산한다.
+    오늘 날짜와 지역을 기반으로 출고예정일을 계산한다. (주말만 제외)
     
     Args:
         region: 지역명
@@ -970,26 +970,22 @@ def calculate_delivery_date(region: str) -> str:
         kst = pytz.timezone('Asia/Seoul')
         today = datetime.now(kst).date()
         
-        # 공휴일 조회
-        holidays = fetch_holidays()
-        
-        # 1단계: 오늘 날짜 + day_gap일 (주말/공휴일 포함해서 단순히 일수만 더함)
+        # 1단계: 오늘 날짜 + day_gap일 (주말 포함해서 단순히 일수만 더함)
         delivery_date = today + timedelta(days=day_gap)
         
-        # 2단계: 계산된 날짜가 주말/공휴일이면 다음 영업일로 조정
+        # 2단계: 계산된 날짜가 주말이면 다음 영업일로 조정 (공휴일은 추후 추가 예정)
         max_iterations = 100
         iteration = 0
         
         while iteration < max_iterations:
             weekday = delivery_date.weekday()  # 월요일=0, 일요일=6
             is_weekend = weekday >= 5  # 토요일(5) 또는 일요일(6)
-            is_holiday = delivery_date in holidays
             
-            # 주말/공휴일이 아니면 반환
-            if not is_weekend and not is_holiday:
+            # 주말이 아니면 반환
+            if not is_weekend:
                 break
             
-            # 주말/공휴일이면 다음 날로 이동
+            # 주말이면 다음 날로 이동
             delivery_date = delivery_date + timedelta(days=1)
             iteration += 1
         
@@ -1235,18 +1231,18 @@ def fetch_preprocessed_data(worker_name: str) -> pd.DataFrame:
 
 def fetch_delivery_day_gap(region: str) -> int | None:
     """
-    '출고예정일' 테이블에서 지역(region)에 해당하는 day_gap을 조회한다.
+    region_metadata 테이블에서 지역(region)에 해당하는 day_gap을 조회한다. (PostgreSQL 버전)
     """
     if not region:
         return None
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = "SELECT day_gap FROM 출고예정일 WHERE region = %s"
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT day_gap FROM region_metadata WHERE region = %s"
             with connection.cursor() as cursor:
                 cursor.execute(query, (region,))
                 row = cursor.fetchone()
-                return row[0] if row else None
+                return row[0] if row and row[0] is not None else None
     except Exception:
         traceback.print_exc()
         return None
