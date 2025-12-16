@@ -34,7 +34,7 @@ def claim_subsidy_work(rn: str, worker_id: int) -> bool:
     
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            connection.begin()
+            # psycopg2는 자동으로 트랜잭션을 시작하므로 begin() 호출 불필요
             try:
                 with connection.cursor() as cursor:
                     # 현재 worker_id 조회
@@ -1361,7 +1361,7 @@ def update_rns_worker_id(rn: str, worker_id: int) -> bool:
     
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            connection.begin()
+            # psycopg2는 자동으로 트랜잭션을 시작하므로 begin() 호출 불필요
             try:
                 with connection.cursor() as cursor:
                     update_query = (
