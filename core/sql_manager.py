@@ -1028,14 +1028,14 @@ def calculate_delivery_date(region: str) -> str:
 
 def get_recent_thread_id_by_rn(rn: str) -> str | None:
     """
-    RN으로 subsidy_applications 테이블에서 recent_thread_id를 조회한다.
+    RN으로 rns 테이블에서 recent_thread_id를 조회한다. (PostgreSQL 버전)
     """
     if not rn:
         return None
 
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = "SELECT recent_thread_id FROM subsidy_applications WHERE RN = %s"
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT recent_thread_id FROM rns WHERE \"RN\" = %s"
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
                 row = cursor.fetchone()
@@ -1605,34 +1605,77 @@ def fetch_ev_required_rns(worker_name: str) -> list[str]:
 def fetch_duplicate_mail_rns(worker_name: str) -> list[str]:
     """
     rns 테이블에서 '중복메일' 상태인 RN 목록을 반환합니다. (PostgreSQL 버전)
-    관리자급('이경구', '이호형')은 전체, 그 외에는 본인 것만 조회.
-    RN 기준 오름차순 정렬
     
-    Note: PostgreSQL 마이그레이션으로 인해 현재는 빈 리스트를 반환합니다.
-    추후 rns 테이블에 status 컬럼이 추가되면 구현 필요.
+    1. 관리자급('이경구', '이호형'): 전체 조회
+    2. 일반 작업자:
+       - 본인에게 할당된 건 (worker_id 일치)
+       - 또는 worker_id가 NULL인 건 (미할당 건은 모두에게 노출)
+    
+    RN 기준 오름차순 정렬
     """
     if not worker_name:
         return []
     
-    # TODO: PostgreSQL 마이그레이션 후 rns 테이블에 status 컬럼 추가 시 구현 필요
-    # 현재는 빈 리스트 반환하여 에러 방지
-    return []
+    # 관리자 목록
+    ADMIN_WORKERS = ['이경구', '이호형']
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                # 1. 관리자인 경우: 모든 '중복메일' 건 조회
+                if worker_name in ADMIN_WORKERS:
+                    query = """
+                        SELECT "RN"
+                        FROM rns
+                        WHERE status = '중복메일'
+                        ORDER BY "RN" ASC
+                    """
+                    cursor.execute(query)
+                
+                # 2. 일반 작업자인 경우
+                else:
+                    # 먼저 worker_name으로 worker_id 조회
+                    cursor.execute("SELECT worker_id FROM workers WHERE worker_name = %s", (worker_name,))
+                    row = cursor.fetchone()
+                    
+                    if not row:
+                        # 작업자가 DB에 없으면 조회 불가
+                        return []
+                    
+                    worker_id = row[0]
+                    
+                    # 본인 할당 건 OR 미할당(NULL) 건 조회
+                    query = """
+                        SELECT "RN"
+                        FROM rns
+                        WHERE status = '중복메일' 
+                          AND (worker_id = %s OR worker_id IS NULL)
+                        ORDER BY "RN" ASC
+                    """
+                    cursor.execute(query, (worker_id,))
+                
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+                
+    except Exception:
+        traceback.print_exc()
+        return []
 
 def get_original_worker_by_rn(rn: str) -> str | None:
     """
-    duplicated_rn 테이블에서 해당 RN의 가장 최근 original_worker를 조회한다.
+    rns 테이블에서 해당 RN의 담당자(original_worker)를 조회한다. (PostgreSQL 버전)
+    workers 테이블과 조인하여 worker_name을 반환.
     """
     if not rn:
         return None
         
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = """
-                SELECT original_worker 
-                FROM duplicated_rn 
-                WHERE RN = %s 
-                ORDER BY received_date DESC 
-                LIMIT 1
+                SELECT w.worker_name 
+                FROM rns r
+                JOIN workers w ON r.worker_id = w.worker_id
+                WHERE r."RN" = %s
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (rn,))
