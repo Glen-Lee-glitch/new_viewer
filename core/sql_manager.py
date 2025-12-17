@@ -1687,14 +1687,14 @@ def get_original_worker_by_rn(rn: str) -> str | None:
 
 def update_subsidy_status(rn: str, status: str) -> bool:
     """
-    subsidy_applications 테이블에서 해당 RN의 status를 업데이트한다.
+    rns 테이블에서 해당 RN의 status를 업데이트한다. (PostgreSQL 버전)
     """
     if not rn:
         return False
         
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = "UPDATE subsidy_applications SET status = %s WHERE RN = %s"
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "UPDATE rns SET status = %s WHERE \"RN\" = %s"
             with connection.cursor() as cursor:
                 cursor.execute(query, (status, rn))
                 connection.commit()
