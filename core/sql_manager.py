@@ -477,44 +477,6 @@ def get_daily_worker_payment_progress():
         traceback.print_exc()
         return pd.DataFrame()
 
-def update_subsidy_status(rn: str, status: str) -> bool:
-    """
-    subsidy_applications 테이블의 status를 업데이트한다.
-    
-    Args:
-        rn: RN 번호
-        status: 업데이트할 상태값
-        
-    Returns:
-        업데이트 성공 여부
-    """
-    if not rn:
-        raise ValueError("rn must be provided")
-    if not status:
-        raise ValueError("status must be provided")
-    
-    try:
-        # 한국 시간 (KST) 생성
-        kst = pytz.timezone('Asia/Seoul')
-        current_time = datetime.now(kst)
-        
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            with connection.cursor() as cursor:
-                update_query = """
-                    UPDATE subsidy_applications 
-                    SET status = %s, status_updated_at = %s
-                    WHERE RN = %s
-                """
-                cursor.execute(update_query, (status, current_time, rn))
-                connection.commit()
-                
-                # 업데이트된 행 수 확인
-                return cursor.rowcount > 0
-                
-    except Exception:
-        traceback.print_exc()
-        return False
-
 def get_today_completed_subsidies(worker: str = None) -> list:
     """
     오늘 '지원' 처리된 지원금 신청 목록 (지역, 신청날짜)을 반환한다.
