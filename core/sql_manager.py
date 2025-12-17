@@ -131,7 +131,7 @@ def fetch_recent_subsidy_applications():
         if df.empty:
             print('조회된 데이터가 없습니다.')
             return df
-            
+
         return df
 
     except Exception:
@@ -139,13 +139,81 @@ def fetch_recent_subsidy_applications():
         return pd.DataFrame()
 
 
-def fetch_today_subsidy_applications_by_worker(worker_name: str):
-    """이전 영업일 18시 이후의 지원금 신청 데이터 중 특정 작업자에게 할당된 데이터를 조회한다. (PostgreSQL 버전: 임시 미구현)"""
-    return pd.DataFrame()
+def fetch_today_subsidy_applications_by_worker(worker_id: int) -> pd.DataFrame:
+    """
+    이전 영업일 18시 이후의 지원금 신청 데이터 중
+    특정 작업자(worker_id)에 할당된 데이터를 조회한다. (PostgreSQL 버전)
+    """
+    if worker_id is None:
+        return pd.DataFrame()
 
-def fetch_today_unfinished_subsidy_applications():
-    """이전 영업일 18시 이후의 지원금 신청 데이터 중 작업자가 할당되지 않은 데이터를 조회한다. (PostgreSQL 버전: 임시 미구현)"""
-    return pd.DataFrame()
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            threshold_dt = get_previous_business_day_after_18h()
+            if threshold_dt is not None:
+                threshold_str = threshold_dt.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                # fallback: 어제 18시
+                fallback_dt = datetime.now() - timedelta(days=1)
+                threshold_str = fallback_dt.replace(hour=18, minute=0, second=0, microsecond=0).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+            query = _build_subsidy_query_base() + (
+                'WHERE r.last_received_date >= %s '
+                '  AND r.worker_id = %s '
+                'ORDER BY r.last_received_date DESC '
+                'LIMIT 30'
+            )
+            params = (threshold_str, worker_id)
+            df = pd.read_sql(query, connection, params=params)
+
+        if df.empty:
+            print('조회된 데이터가 없습니다.')
+            return df
+
+        return df
+
+    except Exception:
+        traceback.print_exc()
+        return pd.DataFrame()
+
+
+def fetch_today_unfinished_subsidy_applications() -> pd.DataFrame:
+    """
+    이전 영업일 18시 이후의 지원금 신청 데이터 중
+    작업자가 할당되지 않은 데이터를 조회한다. (PostgreSQL 버전)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            threshold_dt = get_previous_business_day_after_18h()
+            if threshold_dt is not None:
+                threshold_str = threshold_dt.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                # fallback: 어제 18시
+                fallback_dt = datetime.now() - timedelta(days=1)
+                threshold_str = fallback_dt.replace(hour=18, minute=0, second=0, microsecond=0).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+            query = _build_subsidy_query_base() + (
+                'WHERE r.last_received_date >= %s '
+                '  AND r.worker_id IS NULL '
+                'ORDER BY r.last_received_date DESC '
+                'LIMIT 30'
+            )
+            params = (threshold_str,)
+            df = pd.read_sql(query, connection, params=params)
+
+        if df.empty:
+            print('조회된 데이터가 없습니다.')
+            return df
+
+        return df
+
+    except Exception:
+        traceback.print_exc()
+        return pd.DataFrame()
 
 
 def fetch_application_data_by_rn(rn: str) -> dict | None:

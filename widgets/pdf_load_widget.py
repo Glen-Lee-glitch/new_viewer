@@ -321,10 +321,10 @@ class PdfLoadWidget(QWidget):
             if self._filter_mode == 'all':
                 df = fetch_recent_subsidy_applications()
             elif self._filter_mode == 'my':
-                if not self._worker_name:
+                if not self._worker_id:
                     table.setRowCount(0)
                     return
-                df = fetch_today_subsidy_applications_by_worker(self._worker_name)
+                df = fetch_today_subsidy_applications_by_worker(self._worker_id)
             elif self._filter_mode == 'unfinished':
                 df = fetch_today_unfinished_subsidy_applications()
             else:
