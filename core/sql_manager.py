@@ -1249,7 +1249,7 @@ def is_admin_user(worker_name: str) -> bool:
 
 def update_finished_file_path(rn: str, file_path: str) -> bool:
     """
-    subsidy_applications 테이블의 finished_file_path를 업데이트한다.
+    rns 테이블의 file_path를 업데이트한다. (PostgreSQL 버전)
     
     Args:
         rn: RN 번호
@@ -1264,19 +1264,21 @@ def update_finished_file_path(rn: str, file_path: str) -> bool:
         raise ValueError("file_path must be provided")
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            with connection.cursor() as cursor:
-                update_query = """
-                    UPDATE subsidy_applications 
-                    SET finished_file_path = %s
-                    WHERE RN = %s
-                """
-                cursor.execute(update_query, (file_path, rn))
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # psycopg2는 자동으로 트랜잭션을 시작하므로 begin() 호출 불필요
+            try:
+                with connection.cursor() as cursor:
+                    update_query = (
+                        "UPDATE rns "
+                        "SET file_path = %s "
+                        "WHERE \"RN\" = %s"
+                    )
+                    cursor.execute(update_query, (file_path, rn))
                 connection.commit()
-                
-                # 업데이트된 행 수 확인
-                return cursor.rowcount > 0
-                
+                return True
+            except Exception:
+                connection.rollback()
+                raise
     except Exception:
         traceback.print_exc()
         return False

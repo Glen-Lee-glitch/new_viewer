@@ -729,7 +729,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 base_dir = get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\지급_finished')
             else:
                 # 일반 작업인 경우
-                base_dir = get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\finished')
+                base_dir = get_converted_path(r'\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\25q4_test\finished_file')
             
             today = datetime.now().strftime('%Y-%m-%d')
             
