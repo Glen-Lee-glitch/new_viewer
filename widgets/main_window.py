@@ -1674,45 +1674,22 @@ class MainWindow(QMainWindow):
                 return
         
         try:
-            from pathlib import Path
-            import re
-            
-            # RN 추출
-            original_path_obj = Path(self._original_filepath)
-            filename_stem = original_path_obj.stem
-            
-            # RN을 추출하는 정규식
-            rn_match = re.match(r"(RN\d+)", filename_stem)
-            if not rn_match:
-                QMessageBox.warning(self, "오류", "원본 파일 경로에서 RN을 추출할 수 없습니다.")
+            # RN 확인
+            if not self._current_rn:
+                QMessageBox.warning(self, "오류", "현재 RN 정보를 찾을 수 없습니다.")
                 return
+            rn = self._current_rn
+
+            # DB에서 원본 파일 경로 조회
+            original_filepath_from_db = get_original_pdf_path_by_rn(rn)
             
-            rn = rn_match.group(1)
-            
-            # 원본 파일이 있는 디렉토리
-            new_files_dir = Path(get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\new'))
-            
-            # RN을 포함하는 모든 PDF 파일 찾기
-            matching_files = sorted(
-                new_files_dir.glob(f"{re.escape(rn)}*.pdf"),
-                key=lambda p: (
-                    p.stem,
-                    int(re.search(r'_(\d+)$', p.stem).group(1)) if re.search(r'_(\d+)$', p.stem) else 0
-                )
-            )
-            
-            if not matching_files:
+            if not original_filepath_from_db:
                 QMessageBox.warning(self, "오류", f"원본 파일(RN: {rn})을 찾을 수 없습니다.")
                 return
-            
-            # 원본 PDF 파일들을 하나로 병합하여 메모리에 로드
-            original_doc = pymupdf.open()
-            for file_path in matching_files:
-                with pymupdf.open(str(file_path)) as f:
-                    original_doc.insert_pdf(f)
-            
-            original_pdf_bytes = original_doc.tobytes(garbage=4, deflate=True)
-            original_doc.close()
+
+            # 원본 PDF 파일을 메모리에 로드
+            with pymupdf.open(original_filepath_from_db) as original_doc:
+                original_pdf_bytes = original_doc.tobytes(garbage=4, deflate=True)
             
             # 선택된 각 페이지에 대해 교체 수행
             # '보이는' 순서를 '실제' 페이지 번호로 변환
