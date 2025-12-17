@@ -85,7 +85,7 @@ class NecessaryWidget(QWidget):
             parent = parent.parent()
         
         # 경로 생성 (pdf_view_widget의 save_pdf와 동일한 로직)
-        base_dir = r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\finished'
+        base_dir = r'\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\25q4_test\finished_file'
         today = datetime.now().strftime('%Y-%m-%d')
         
         # 작업자 이름이 없으면 "미지정" 폴더 사용
