@@ -1124,8 +1124,33 @@ def insert_additional_note(
         raise ValueError("rn must be provided")
     
     try:
+        # 1. PostgreSQL - Status 업데이트 (target_status가 있는 경우)
+        if target_status:
+            try:
+                with closing(psycopg2.connect(**DB_CONFIG)) as pg_conn:
+                    with pg_conn.cursor() as pg_cursor:
+                        # 현재 상태 조회
+                        pg_cursor.execute("SELECT status FROM rns WHERE \"RN\" = %s", (rn,))
+                        row = pg_cursor.fetchone()
+                        current_status = row[0] if row else None
+                        
+                        # 상태 업데이트 조건 확인
+                        if current_status not in ('이메일 전송', '요청메일 전송', '중복메일확인', '중복메일'):
+                            update_query = """
+                                UPDATE rns 
+                                SET status = %s
+                                WHERE "RN" = %s
+                            """
+                            pg_cursor.execute(update_query, (target_status, rn))
+                            pg_conn.commit()
+            except Exception as e:
+                print(f"[insert_additional_note] PostgreSQL update failed: {e}")
+                traceback.print_exc()
+                # Status 업데이트 실패 시에도 additional_note 저장 시도? 
+                # 일단 예외 로깅만 하고 진행 (MySQL 로직과 분리됨)
+
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            # 1. 특이사항 저장 (내용이 있는 경우에만)
+            # 2. 특이사항 저장 (내용이 있는 경우에만)
             if missing_docs or requirements or other_detail or detail_info:
                 with connection.cursor() as cursor:
                     # 리스트를 JSON 문자열로 변환 (None이면 NULL)
@@ -1150,28 +1175,6 @@ def insert_additional_note(
                     cursor.execute(query, (
                         rn, missing_docs_json, requirements_json, other_detail, detail_info_value
                     ))
-            
-            # 2. Status 업데이트 (target_status가 있는 경우)
-            if target_status:
-                # 현재 상태 조회
-                current_status = None
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT status FROM subsidy_applications WHERE RN = %s", (rn,))
-                    row = cursor.fetchone()
-                    current_status = row[0] if row else None
-                
-                # 상태 업데이트 조건 확인
-                if current_status not in ('이메일 전송', '요청메일 전송', '중복메일확인', '중복메일'):
-                    with connection.cursor() as cursor:
-                        kst = pytz.timezone('Asia/Seoul')
-                        current_time = datetime.now(kst)
-                        
-                        update_query = """
-                            UPDATE subsidy_applications 
-                            SET status = %s, status_updated_at = %s
-                            WHERE RN = %s
-                        """
-                        cursor.execute(update_query, (target_status, current_time, rn))
             
             connection.commit()
             return True
