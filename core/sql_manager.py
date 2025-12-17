@@ -1747,6 +1747,41 @@ def update_scheduled_region(region: str, plan_open_date: str | None) -> bool:
         traceback.print_exc()
         return False
 
+def get_original_pdf_path_by_rn(rn: str) -> str | None:
+    """
+    RN을 사용하여 emails 테이블에서 original_pdf_path를 조회하거나,
+    없을 경우 rns 테이블에서 file_path를 조회하여 반환한다.
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                # 1. rns 테이블에서 recent_thread_id와 file_path 조회
+                select_rns_query = "SELECT recent_thread_id, file_path FROM rns WHERE \"RN\" = %s"
+                cursor.execute(select_rns_query, (rn,))
+                rns_result = cursor.fetchone()
+
+                if rns_result:
+                    thread_id = rns_result.get('recent_thread_id')
+                    
+                    if thread_id:
+                        # 2. emails 테이블에서 thread_id로 original_pdf_path 조회
+                        select_emails_query = "SELECT original_pdf_path FROM emails WHERE thread_id = %s"
+                        cursor.execute(select_emails_query, (thread_id,))
+                        emails_result = cursor.fetchone()
+                        if emails_result and emails_result['original_pdf_path']:
+                            return emails_result['original_pdf_path']
+
+                    # 3. emails에서 찾지 못했거나 thread_id가 없는 경우 rns 테이블에서 file_path 조회
+                    if rns_result['file_path']:
+                        return rns_result['file_path']
+                
+                return None
+
+    except Exception as e:
+        print(f"Error fetching original PDF path for RN {rn}: {e}")
+        traceback.print_exc()
+        return None
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
