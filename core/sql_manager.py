@@ -85,7 +85,7 @@ def _build_subsidy_query_base():
         '  r.customer AS name, '
         '  array_to_string(r.special, \', \') AS special_note, '
         '  r.last_received_date AS recent_received_date, '
-        '  NULL AS finished_file_path, '
+        '  r.file_path AS finished_file_path, '
         '  e.original_pdf_path AS original_filepath, '
         '  r.recent_thread_id, '
         '  0 AS file_rendered, '
