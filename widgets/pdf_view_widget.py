@@ -630,14 +630,14 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             self.mail_overlay.show_overlay(self.size())
     
     def keyPressEvent(self, event):
-        """키보드 'Q', 'E'를 눌러 페이지를 변경하고, Ctrl+Z로 되돌리기를 실행한다."""
+        """키보드 'Q', 'E' 또는 화살표 위/아래를 눌러 페이지를 변경하고, Ctrl+Z로 되돌리기를 실행한다."""
         if event.key() == Qt.Key.Key_Z and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             self._undo_last_action()
         elif event.key() == Qt.Key.Key_Delete:
             self._prompt_delete_current_page()
-        elif event.key() == Qt.Key.Key_Q:
+        elif event.key() == Qt.Key.Key_Q or event.key() == Qt.Key.Key_Up:
             self.page_change_requested.emit(-1)
-        elif event.key() == Qt.Key.Key_E:
+        elif event.key() == Qt.Key.Key_E or event.key() == Qt.Key.Key_Down:
             self.page_change_requested.emit(1)
         else:
             super().keyPressEvent(event)

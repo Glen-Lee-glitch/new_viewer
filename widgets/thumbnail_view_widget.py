@@ -37,10 +37,10 @@ class ThumbnailViewWidget(QWidget):
             elif event.key() == Qt.Key.Key_Delete:
                 self._prompt_delete_selected_page()
                 return True
-            elif event.key() == Qt.Key.Key_Q:
+            elif event.key() == Qt.Key.Key_Q or event.key() == Qt.Key.Key_Up:
                 self.page_change_requested.emit(-1)
                 return True  # 이벤트가 처리되었음을 알림
-            elif event.key() == Qt.Key.Key_E:
+            elif event.key() == Qt.Key.Key_E or event.key() == Qt.Key.Key_Down:
                 self.page_change_requested.emit(1)
                 return True  # 이벤트가 처리되었음을 알림
         
