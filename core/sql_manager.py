@@ -1127,6 +1127,30 @@ def get_chained_emails_content_by_thread_id(thread_id: str) -> str | None:
         traceback.print_exc()
         return None
 
+def get_chained_emails_file_path_by_thread_id(thread_id: str) -> str | None:
+    """
+    chained_emails 테이블에서 thread_id로 chained_file_path를 조회한다. (PostgreSQL 버전)
+    
+    Args:
+        thread_id: 조회할 thread_id
+        
+    Returns:
+        chained_file_path 문자열 또는 None
+    """
+    if not thread_id:
+        return None
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT chained_file_path FROM chained_emails WHERE thread_id = %s LIMIT 1"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (thread_id,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def insert_reply_email(
     thread_id: str | None,
     rn: str,

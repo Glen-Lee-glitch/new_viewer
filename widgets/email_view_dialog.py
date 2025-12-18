@@ -5,9 +5,10 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QTextEdit, QPushButton
 class EmailViewDialog(QDialog):
     """이메일 내용 확인 다이얼로그"""
     
-    def __init__(self, title: str = "", content: str = "", original_worker: str = None, rn: str = None, parent=None):
+    def __init__(self, title: str = "", content: str = "", original_worker: str = None, rn: str = None, thread_id: str = None, parent=None):
         super().__init__(parent)
         self.rn = rn
+        self.thread_id = thread_id
         self.setWindowTitle("이메일 확인")
         self.setMinimumWidth(600)
         self.setMinimumHeight(400)
@@ -83,6 +84,24 @@ class EmailViewDialog(QDialog):
         
         button_layout.addStretch()
         
+        # 첨부 후 재확인 버튼 (thread_id가 있을 때만 표시)
+        if self.thread_id:
+            attach_recheck_button = QPushButton("첨부 후 재확인")
+            attach_recheck_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3; 
+                    color: white; 
+                    font-weight: bold;
+                    padding: 5px 15px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
+            attach_recheck_button.clicked.connect(self._on_attach_and_recheck_clicked)
+            button_layout.addWidget(attach_recheck_button)
+
         # 닫기 버튼
         close_button = QPushButton("닫기")
         close_button.clicked.connect(self.reject) # 닫기는 reject로 처리
@@ -111,4 +130,9 @@ class EmailViewDialog(QDialog):
                 self.accept() # 성공 시 accept로 닫음 (부모 창에서 감지 가능)
             else:
                 QMessageBox.critical(self, "오류", "상태 변경에 실패했습니다.")
+
+    def _on_attach_and_recheck_clicked(self):
+        """첨부 후 재확인 버튼 클릭 시"""
+        # 결과 코드 2로 다이얼로그 종료
+        self.done(2)
 

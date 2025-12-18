@@ -811,8 +811,13 @@ class MainWindow(QMainWindow):
             self._pdf_view_widget.set_mail_content(mail_content)
 
     def check_chained_emails(self):
-        """현재 작업 중인 작업건의 thread_id를 조회하고 chained_emails 테이블에서 존재 여부를 확인한다."""
-        from core.sql_manager import get_recent_thread_id_by_rn, check_thread_id_in_chained_emails, get_chained_emails_content_by_thread_id
+        """현재 작업 중인 작업건의 thread_id를 조회하고 chained_emails 테이블에서 존재 여부를 확인한다.
+        
+        Returns:
+            bool: True이면 저장 프로세스를 계속 진행, False이면 중단(병합 로직 수행 등)
+        """
+        from core.sql_manager import (get_recent_thread_id_by_rn, check_thread_id_in_chained_emails, 
+                                     get_chained_emails_content_by_thread_id, get_chained_emails_file_path_by_thread_id)
         from widgets.email_view_dialog import EmailViewDialog
         
         current_rn = self._current_rn or self._give_works_rn
@@ -825,22 +830,78 @@ class MainWindow(QMainWindow):
         if thread_id and check_thread_id_in_chained_emails(thread_id):
             print(f"[_save_document 호출] chained_emails 테이블에 thread_id 존재: {thread_id}")
             
-            # MCP를 통해 chained_emails 테이블의 content 컬럼 조회 (sql_manager 함수 사용)
+            # content 조회
             try:
                 content = get_chained_emails_content_by_thread_id(thread_id)
                 
                 # 이메일 확인 창 띄우기 (title은 비우고 content만 표시)
                 if content:
-                    dialog = EmailViewDialog(title="", content=content, parent=self)
-                    dialog.exec()
+                    dialog = EmailViewDialog(title="", content=content, thread_id=thread_id, parent=self)
+                    result = dialog.exec()
+                    
+                    # '첨부 후 재확인' 버튼을 누른 경우 (result == 2)
+                    if result == 2:
+                        print("[check_chained_emails] '첨부 후 재확인' 선택됨. 서류 병합 시도.")
+                        file_path = get_chained_emails_file_path_by_thread_id(thread_id)
+                        if file_path:
+                            if self._merge_chained_file(file_path):
+                                return False # 병합 성공 시 저장 중단 (재확인을 위해)
+                        else:
+                            print(f"[check_chained_emails] 병합할 파일 경로가 없습니다. thread_id: {thread_id}")
+                            QMessageBox.warning(self, "알림", "병합할 파일 경로를 찾을 수 없습니다.")
+                    
             except Exception as e:
                 print(f"[check_chained_emails] content 조회 중 오류: {e}")
                 traceback.print_exc()
-    
+        
+        return True # 기본적으로는 저장 프로세스 계속 진행
+
+    def _merge_chained_file(self, file_path: str):
+        """chained_emails의 PDF 파일을 현재 PDF에 병합한다."""
+        if not file_path or not os.path.exists(file_path):
+            print(f"[서류 병합 실패] 파일이 존재하지 않음: {file_path}")
+            QMessageBox.warning(self, "오류", f"병합할 파일을 찾을 수 없습니다:\n{file_path}")
+            return False
+
+        try:
+            if not self.renderer:
+                from core.pdf_render import PdfRender
+                self.renderer = PdfRender()
+
+            old_page_count = self.renderer.get_page_count()
+            
+            # 파일 병합
+            self.renderer.append_file(file_path)
+            
+            # 페이지 순서 업데이트 (기존 순서 유지 + 새 페이지 추가)
+            self._page_order.extend(range(old_page_count, self.renderer.get_page_count()))
+            
+            # 썸네일 뷰 갱신 (기존 회전 정보 유지)
+            self._thumbnail_viewer.set_renderer(self.renderer, self._page_order, rotations=self._pdf_view_widget.get_page_rotations())
+            
+            # PDF 뷰어 갱신 (렌더러 재설정 및 화면 갱신, 오버레이 보존)
+            self._pdf_view_widget.set_renderer(self.renderer, clear_overlay=False)
+            
+            # 마지막 페이지로 이동
+            last_page_index = self.renderer.get_page_count() - 1
+            if last_page_index >= 0:
+                QTimer.singleShot(100, lambda: self.go_to_page(last_page_index))
+            
+            print(f"[서류 병합 완료] {os.path.basename(file_path)}")
+            return True
+
+        except Exception as e:
+            print(f"[서류 병합 중 오류] {e}")
+            traceback.print_exc()
+            QMessageBox.critical(self, "오류", f"서류 병합 중 오류가 발생했습니다:\n{e}")
+            return False
+
     def _save_document(self):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
         # 현재 작업 중인 작업건의 thread_id 조회 및 chained_emails 확인
-        self.check_chained_emails()
+        if not self.check_chained_emails():
+            print("[_save_document] check_chained_emails 결과에 따라 저장 프로세스를 중단합니다.")
+            return
         
         if self.renderer:
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
