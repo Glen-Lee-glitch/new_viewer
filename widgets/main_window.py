@@ -1061,7 +1061,6 @@ class MainWindow(QMainWindow):
         # 알람 위젯에서 시작한 작업인 경우 chained_emails 검토 건너뛰기
         if self._is_alarm_rn_work:
             print("[_save_document] 알람 위젯에서 시작한 작업이므로 chained_emails 검토를 건너뜁니다.")
-            self._is_alarm_rn_work = False  # 플래그 초기화
         else:
             # 현재 작업 중인 작업건의 thread_id 조회 및 chained_emails 확인
             if not self.check_chained_emails():
@@ -1093,6 +1092,17 @@ class MainWindow(QMainWindow):
         
     def _handle_save_completed(self):
         """PDF 저장이 완료되었을 때 호출된다."""
+        
+        # 알람 위젯에서 시작한 작업이었다면 status 업데이트 및 플래그 리셋
+        if self._is_alarm_rn_work and self._current_rn:
+            from core.sql_manager import update_subsidy_status
+            success = update_subsidy_status(self._current_rn, 'pdf 전처리')
+            if success:
+                print(f"[알람 위젯 작업] RN {self._current_rn}의 status를 'pdf 전처리'로 업데이트 완료")
+            else:
+                print(f"[알람 위젯 작업] RN {self._current_rn}의 status 업데이트 실패")
+            self._is_alarm_rn_work = False  # 플래그 리셋
+            print("[알람 위젯 작업 플래그] 저장 완료 후 초기화됨")
         
         # 지급 테이블 작업이었다면 플래그 리셋
         if self._is_give_works_started:
