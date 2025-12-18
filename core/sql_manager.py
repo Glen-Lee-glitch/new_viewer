@@ -1103,7 +1103,7 @@ def insert_additional_note(
 ) -> bool:
     """
     additional_note 테이블에 특이사항 비고 데이터를 삽입하고, 
-    조건에 따라 subsidy_applications 테이블의 status를 업데이트한다.
+    조건에 따라 rns 테이블의 status를 업데이트한다. (PostgreSQL 버전)
     
     Args:
         rn: RN 번호 (필수)
@@ -1124,7 +1124,7 @@ def insert_additional_note(
         raise ValueError("rn must be provided")
     
     try:
-        # 1. PostgreSQL - Status 업데이트 (target_status가 있는 경우)
+        # 1. PostgreSQL - rns.status 업데이트 (target_status가 있는 경우)
         if target_status:
             try:
                 with closing(psycopg2.connect(**DB_CONFIG)) as pg_conn:
@@ -1146,11 +1146,11 @@ def insert_additional_note(
             except Exception as e:
                 print(f"[insert_additional_note] PostgreSQL update failed: {e}")
                 traceback.print_exc()
-                # Status 업데이트 실패 시에도 additional_note 저장 시도? 
-                # 일단 예외 로깅만 하고 진행 (MySQL 로직과 분리됨)
+                # Status 업데이트 실패 시에도 additional_note 저장 시도는 계속 진행
 
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            # 2. 특이사항 저장 (내용이 있는 경우에만)
+        # 2. PostgreSQL - additional_note 저장 (내용이 있는 경우에만)
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # 특이사항 내용이 하나라도 있는 경우에만 저장
             if missing_docs or requirements or other_detail or detail_info:
                 with connection.cursor() as cursor:
                     # 리스트를 JSON 문자열로 변환 (None이면 NULL)
@@ -1159,17 +1159,18 @@ def insert_additional_note(
                     # detail_info는 내용이 있으면 저장, 없으면 None (NULL 유지)
                     detail_info_value = detail_info.strip() if detail_info and detail_info.strip() else None
                     
+                    # RN 기준으로 Upsert (기존 MySQL ON DUPLICATE KEY UPDATE 대응)
                     query = """
                         INSERT INTO additional_note (
-                            RN, missing_docs, requirements, other_detail, detail_info
+                            "RN", missing_docs, requirements, other_detail, detail_info
                         ) VALUES (
                             %s, %s, %s, %s, %s
                         )
-                        ON DUPLICATE KEY UPDATE
-                            missing_docs = VALUES(missing_docs),
-                            requirements = VALUES(requirements),
-                            other_detail = VALUES(other_detail),
-                            detail_info = VALUES(detail_info),
+                        ON CONFLICT ("RN") DO UPDATE
+                        SET missing_docs = EXCLUDED.missing_docs,
+                            requirements = EXCLUDED.requirements,
+                            other_detail = EXCLUDED.other_detail,
+                            detail_info = EXCLUDED.detail_info,
                             updated_at = CURRENT_TIMESTAMP
                     """
                     cursor.execute(query, (

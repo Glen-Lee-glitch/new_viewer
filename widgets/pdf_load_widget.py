@@ -140,8 +140,9 @@ class PdfLoadWidget(QWidget):
         # 커스텀 델리게이트 적용 (기존 HighlightDelegate)
         table.setItemDelegate(HighlightDelegate(table))
         
-        # 마지막 컬럼(5번)에 버튼 델리게이트 적용
+        # AI 컬럼(4번)에 '보기' 버튼, 마지막 컬럼(5번)에 '시작' 버튼 델리게이트 적용
         # setItemDelegateForColumn은 전체 델리게이트보다 우선순위가 높음
+        table.setItemDelegateForColumn(4, ButtonDelegate(table, "보기"))
         table.setItemDelegateForColumn(5, ButtonDelegate(table, "시작"))
 
         self.populate_recent_subsidy_rows()
@@ -151,11 +152,14 @@ class PdfLoadWidget(QWidget):
     
     def _handle_cell_clicked(self, row, column):
         """테이블 셀 클릭 시 처리"""
-        # 버튼 컬럼(5번) 클릭 시 작업 시작
+        # '보기' 컬럼(5번) 클릭 시 작업 시작
         if column == 5:
             self._is_context_menu_work = True
             self._start_work_by_row(row)
             self._is_context_menu_work = False
+        # 'AI' 컬럼(4번) 클릭 시 AI 결과 보기
+        elif column == 4:
+            self._show_gemini_results(row)
     
     def _handle_give_works_cell_clicked(self, row, column):
         """지급 테이블 셀 클릭 시 처리"""
