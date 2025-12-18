@@ -1671,6 +1671,109 @@ def fetch_ev_required_rns(worker_name: str) -> list[str]:
         traceback.print_exc()
         return []
 
+def fetch_ev_complement_rns(worker_name: str) -> list[str]:
+    """
+    ev_complement 테이블에서 조건에 맞는 RN 목록을 조회한다.
+    조건: ev_complement.RN을 rns 테이블과 조인하여 rns.worker_id가 현재 작업자의 worker_id와 일치
+    
+    Args:
+        worker_name: 작업자 이름
+        
+    Returns:
+        RN 목록 리스트
+    """
+    if not worker_name:
+        return []
+    
+    try:
+        # worker_name으로 worker_id 조회
+        worker_id = get_worker_id_by_name(worker_name)
+        if worker_id is None:
+            return []
+        
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT DISTINCT ec."RN"
+                FROM ev_complement ec
+                INNER JOIN rns r ON ec."RN" = r."RN"
+                WHERE r.worker_id = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (worker_id,))
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
+def fetch_chained_emails_rns(worker_name: str) -> list[str]:
+    """
+    chained_emails 테이블의 thread_id를 통해 rns 테이블과 조인하여 RN 목록을 조회한다.
+    조건: rns.worker_id가 현재 작업자의 worker_id와 일치하고, status='서류미비 도착'
+    
+    Args:
+        worker_name: 작업자 이름
+        
+    Returns:
+        RN 목록 리스트
+    """
+    if not worker_name:
+        return []
+    
+    try:
+        # worker_name으로 worker_id 조회
+        worker_id = get_worker_id_by_name(worker_name)
+        if worker_id is None:
+            return []
+        
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT DISTINCT r."RN"
+                FROM chained_emails ce
+                INNER JOIN rns r ON ce.thread_id = r.recent_thread_id
+                WHERE r.worker_id = %s AND r.status = '서류미비 도착'
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (worker_id,))
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
+def fetch_all_ev_required_rns(worker_name: str) -> list[str]:
+    """
+    세 가지 소스에서 RN 목록을 조회하여 중복 제거 후 반환한다.
+    1. rns 테이블 (status='서류미비 도착')
+    2. ev_complement 테이블 (rns와 조인하여 worker_id 매칭)
+    3. chained_emails 테이블 (rns와 조인)
+    
+    Args:
+        worker_name: 작업자 이름
+        
+    Returns:
+        중복 제거된 RN 목록 리스트 (정렬됨)
+    """
+    if not worker_name:
+        return []
+        
+    rns_set = set()
+    
+    # 1. rns 테이블 조회
+    rns_list = fetch_ev_required_rns(worker_name)
+    rns_set.update(rns_list)
+    
+    # 2. ev_complement 테이블 조회
+    ev_comp_list = fetch_ev_complement_rns(worker_name)
+    rns_set.update(ev_comp_list)
+    
+    # 3. chained_emails 테이블 조회
+    chained_list = fetch_chained_emails_rns(worker_name)
+    rns_set.update(chained_list)
+    
+    # 정렬하여 반환
+    return sorted(list(rns_set))
+
 def fetch_duplicate_mail_rns(worker_name: str) -> list[str]:
     """
     rns 테이블에서 '중복메일' 상태인 RN 목록을 반환합니다. (PostgreSQL 버전)

@@ -102,8 +102,8 @@ class AlarmWidget(QWidget):
         if not hasattr(self, 'groupBox_2'):
             return
         
-        from core.sql_manager import fetch_ev_required_rns
-        rn_list = fetch_ev_required_rns(self._worker_name)
+        from core.sql_manager import fetch_all_ev_required_rns
+        rn_list = fetch_all_ev_required_rns(self._worker_name)
         
         # groupBox_2의 레이아웃 가져오기
         parent_layout = self.groupBox_2.layout()
