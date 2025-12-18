@@ -188,8 +188,13 @@ class AlarmWidget(QWidget):
                 }}
             """)
             
-            # 버튼 클릭 시 RN 작업 요청 시그널 발생
-            btn.clicked.connect(lambda checked, r=rn: self.rn_work_requested.emit(r))
+            # 버튼 클릭 핸들러 설정
+            if source_type == 'ev_complement':
+                # ev_complement 타입은 아무 작동도 하지 않음 (추후 구현 예정)
+                btn.clicked.connect(lambda checked: self._handle_ev_complement_click())
+            else:
+                # 기존 RN 작업 요청 시그널 발생
+                btn.clicked.connect(lambda checked, r=rn: self.rn_work_requested.emit(r))
             
             container_layout.addWidget(btn)
         
@@ -226,6 +231,13 @@ class AlarmWidget(QWidget):
         # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
         # 아무것도 표시하지 않도록 리스트만 클리어
         self._finished_list.clear()
+    
+    def _handle_ev_complement_click(self):
+        """
+        ev_complement 타입 버튼 클릭 시 호출되는 함수.
+        현재는 아무 작동도 하지 않으며, 추후 구현 예정.
+        """
+        pass
     
     def refresh_data(self):
         """데이터를 수동으로 새로고침한다."""
