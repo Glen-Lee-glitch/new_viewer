@@ -812,7 +812,9 @@ class MainWindow(QMainWindow):
 
     def check_chained_emails(self):
         """현재 작업 중인 작업건의 thread_id를 조회하고 chained_emails 테이블에서 존재 여부를 확인한다."""
-        from core.sql_manager import get_recent_thread_id_by_rn, check_thread_id_in_chained_emails
+        from core.sql_manager import get_recent_thread_id_by_rn, check_thread_id_in_chained_emails, get_chained_emails_content_by_thread_id
+        from widgets.email_view_dialog import EmailViewDialog
+        
         current_rn = self._current_rn or self._give_works_rn
         thread_id = None
         if current_rn:
@@ -822,6 +824,18 @@ class MainWindow(QMainWindow):
         # chained_emails 테이블에서 thread_id 존재 여부 확인
         if thread_id and check_thread_id_in_chained_emails(thread_id):
             print(f"[_save_document 호출] chained_emails 테이블에 thread_id 존재: {thread_id}")
+            
+            # MCP를 통해 chained_emails 테이블의 content 컬럼 조회 (sql_manager 함수 사용)
+            try:
+                content = get_chained_emails_content_by_thread_id(thread_id)
+                
+                # 이메일 확인 창 띄우기 (title은 비우고 content만 표시)
+                if content:
+                    dialog = EmailViewDialog(title="", content=content, parent=self)
+                    dialog.exec()
+            except Exception as e:
+                print(f"[check_chained_emails] content 조회 중 오류: {e}")
+                traceback.print_exc()
     
     def _save_document(self):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""

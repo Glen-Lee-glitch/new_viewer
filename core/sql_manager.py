@@ -1102,6 +1102,31 @@ def check_thread_id_in_chained_emails(thread_id: str) -> bool:
         traceback.print_exc()
         return False
 
+def get_chained_emails_content_by_thread_id(thread_id: str) -> str | None:
+    """
+    chained_emails 테이블에서 thread_id로 content를 조회한다. (PostgreSQL 버전)
+    MCP를 통해 조회하는 것과 동일한 결과를 반환한다.
+    
+    Args:
+        thread_id: 조회할 thread_id
+        
+    Returns:
+        content 문자열 또는 None
+    """
+    if not thread_id:
+        return None
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT content FROM chained_emails WHERE thread_id = %s LIMIT 1"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (thread_id,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def insert_reply_email(
     thread_id: str | None,
     rn: str,
