@@ -258,64 +258,14 @@ class PdfLoadWidget(QWidget):
         self.populate_give_works_rows()
     
     def populate_give_works_rows(self):
-        """give_works 테이블 데이터를 지급 테이블 위젯에 채운다."""
+        """
+        TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+        give_works 테이블 데이터를 지급 테이블 위젯에 채운다.
+        """
         table = self.tableWidget
-        try:
-            df = fetch_give_works()
-        except Exception as error:
-            QMessageBox.warning(self, "데이터 로드 실패", f"지급 데이터 조회 중 오류가 발생했습니다.\n{error}")
-            table.setRowCount(0)
-            return
-        
-        if df is None or df.empty:
-            table.setRowCount(0)
-            return
-        
-        row_count = len(df)
-        table.setRowCount(row_count)
-        
-        # 디버그: RN 목록 출력
-        rn_list = []
-        for row_index, (_, row) in enumerate(df.iterrows()):
-            # 컬럼 순서: ['RN', '작업자', '지역', '상태', '메모']
-            # 매핑: RN -> RN, 신청자 -> 작업자, 지역 -> 지역
-            rn = self._sanitize_text(row.get('RN', ''))
-            worker = self._sanitize_text(row.get('신청자', ''))
-            region = self._sanitize_text(row.get('지역', ''))
-            
-            # 디버그: RN 수집
-            if rn:
-                rn_list.append(rn)
-            
-            # RN 컬럼 (0번)
-            rn_item = QTableWidgetItem(rn)
-            table.setItem(row_index, 0, rn_item)
-            
-            # 작업자 컬럼 (1번)
-            worker_item = QTableWidgetItem(worker)
-            table.setItem(row_index, 1, worker_item)
-            
-            # 지역 컬럼 (2번)
-            region_item = QTableWidgetItem(region)
-            table.setItem(row_index, 2, region_item)
-            
-            # 상태 컬럼 (3번) - 빈 값으로 설정
-            status_item = QTableWidgetItem("")
-            table.setItem(row_index, 3, status_item)
-            
-            # 메모 컬럼 (4번) - 6자리까지만 표시, 전체 메모는 UserRole에 저장
-            memo_full = self._sanitize_text(row.get('메모', ''))
-            memo_display = memo_full[:6] if len(memo_full) > 6 else memo_full
-            memo_item = QTableWidgetItem(memo_display)
-            memo_item.setData(Qt.ItemDataRole.UserRole, memo_full)  # 전체 메모 저장
-            table.setItem(row_index, 4, memo_item)
-
-            # 버튼 컬럼 (5번) - 델리게이트가 그려줌
-            button_item = QTableWidgetItem("")
-            table.setItem(row_index, 5, button_item)
-        
-        # 디버그: RN 목록 출력
-        print(f"[지급 테이블] 미완료 건수: {len(rn_list)}개")
+        # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+        # 아무것도 표시하지 않도록 테이블만 클리어
+        table.setRowCount(0)
 
     def populate_recent_subsidy_rows(self):
         """최근 지원금 신청 데이터를 테이블에 채운다."""

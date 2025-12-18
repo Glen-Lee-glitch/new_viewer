@@ -89,15 +89,14 @@ class LoginDialog(QDialog):
         event.accept()
     
     def _update_reminder_labels(self):
-        """리마인더 라벨을 업데이트한다."""
-        try:
-            today_count, tomorrow_count = fetch_after_apply_counts()
-            self.today_apply.setText(f"{today_count}건")
-            self.tomorrow_label.setText(f"{tomorrow_count}건")
-        except Exception:
-            # 오류 발생 시 기본값 설정
-            self.today_apply.setText("0건")
-            self.tomorrow_label.setText("0건")
+        """
+        TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+        리마인더 라벨을 업데이트한다.
+        """
+        # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+        # 아무것도 표시하지 않도록 0건으로 설정
+        self.today_apply.setText("0건")
+        self.tomorrow_label.setText("0건")
     
     def get_worker_name(self) -> str:
         """입력된 작업자 이름을 반환한다."""

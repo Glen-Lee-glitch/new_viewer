@@ -212,34 +212,16 @@ class AlarmWidget(QWidget):
         parent_layout.addWidget(self._ev_buttons_scroll_area)
     
     def _load_completed_regions(self):
-        """오늘 완료된 지역 목록을 로드한다."""
+        """
+        TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+        오늘 완료된 지역 목록을 로드한다.
+        """
         if not hasattr(self, '_finished_list'):
             return
         
-        try:
-            # 현재 로그인한 작업자 정보와 함께 완료된 지역 및 시간 목록 조회
-            completed_items = get_today_completed_subsidies(self._worker_name)
-            
-            # 리스트 클리어 후 새 데이터 추가
-            self._finished_list.clear()
-            
-            if completed_items:
-                for region, completed_at in completed_items:
-                    # 시간 포맷팅: HH_MM (예: 15_57)
-                    time_str = completed_at.strftime('%H_%M')
-                    item_text = f"✅ {region}_{time_str}"
-                    self._finished_list.addItem(item_text)
-            else:
-                if self._worker_name:
-                    self._finished_list.addItem(f"오늘 {self._worker_name}님이 완료한 지원 건이 없습니다.")
-                else:
-                    self._finished_list.addItem("오늘 완료된 지원 건이 없습니다.")
-                
-        except Exception as e:
-            print(f"완료된 지역 로드 중 오류: {e}")
-            if hasattr(self, '_finished_list'):
-                self._finished_list.clear()
-                self._finished_list.addItem("데이터 로드 실패")
+        # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+        # 아무것도 표시하지 않도록 리스트만 클리어
+        self._finished_list.clear()
     
     def refresh_data(self):
         """데이터를 수동으로 새로고침한다."""

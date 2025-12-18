@@ -479,6 +479,7 @@ def get_daily_worker_payment_progress():
 
 def get_today_completed_subsidies(worker: str = None) -> list:
     """
+    TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
     오늘 '지원' 처리된 지원금 신청 목록 (지역, 신청날짜)을 반환한다.
     daily_application 테이블에서 조회한다.
     
@@ -488,43 +489,8 @@ def get_today_completed_subsidies(worker: str = None) -> list:
     Returns:
         오늘 완료된 (지역, 신청날짜) 튜플의 리스트
     """
-    try:
-        # 한국 시간 (KST) 생성
-        kst = pytz.timezone('Asia/Seoul')
-        today = datetime.now(kst).date()
-        
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            # worker 파라미터에 따른 쿼리 분기
-            if worker:
-                query = """
-                    SELECT region, apply_date
-                    FROM daily_application 
-                    WHERE type = '지원' 
-                    AND DATE(apply_date) = %s
-                    AND worker = %s
-                    AND region IS NOT NULL
-                    ORDER BY apply_date DESC, rn DESC
-                """
-                params = (today, worker)
-            else:
-                query = """
-                    SELECT region, apply_date
-                    FROM daily_application 
-                    WHERE type = '지원' 
-                    AND DATE(apply_date) = %s
-                    AND region IS NOT NULL
-                    ORDER BY apply_date DESC, rn DESC
-                """
-                params = (today,)
-            
-            with connection.cursor() as cursor:
-                cursor.execute(query, params)
-                rows = cursor.fetchall()
-                return rows
-                
-    except Exception:
-        traceback.print_exc()
-        return []
+    # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+    return []
 
 def fetch_gemini_contract_results(rn: str) -> dict:
     """
@@ -1475,22 +1441,12 @@ def get_previous_business_day_after_18h() -> datetime:
 
 def fetch_give_works() -> pd.DataFrame:
     """
+    TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
     give_works 테이블에서 작업상태가 '완료'가 아닌 데이터를 조회한다.
     ['RN', '신청자', '지역', '메모'] 컬럼을 반환한다.
     """
-    try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            query = """
-                SELECT RN, 신청자, 지역, 메모
-                FROM give_works
-                WHERE 작업상태 != '완료' OR 작업상태 IS NULL
-                ORDER BY RN DESC
-            """
-            df = pd.read_sql(query, connection)
-            return df
-    except Exception:
-        traceback.print_exc()
-        return pd.DataFrame()
+    # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+    return pd.DataFrame()
 
 def update_rns_worker_id(rn: str, worker_id: int) -> bool:
     """
@@ -1818,41 +1774,14 @@ def update_subsidy_status(rn: str, status: str) -> bool:
 
 def fetch_after_apply_counts() -> tuple[int, int]:
     """
+    TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
     after_apply 테이블에서 오늘과 내일의 신청 건수를 조회한다.
     
     Returns:
         (오늘 건수, 내일 건수) 튜플
     """
-    try:
-        kst = pytz.timezone('Asia/Seoul')
-        today = datetime.now(kst).date()
-        tomorrow = today + timedelta(days=1)
-        
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            # 오늘 건수 조회
-            today_query = """
-                SELECT COUNT(*) 
-                FROM after_apply 
-                WHERE DATE(after_date) = %s
-            """
-            # 내일 건수 조회
-            tomorrow_query = """
-                SELECT COUNT(*) 
-                FROM after_apply 
-                WHERE DATE(after_date) = %s
-            """
-            
-            with connection.cursor() as cursor:
-                cursor.execute(today_query, (today,))
-                today_count = cursor.fetchone()[0] or 0
-                
-                cursor.execute(tomorrow_query, (tomorrow,))
-                tomorrow_count = cursor.fetchone()[0] or 0
-                
-                return (today_count, tomorrow_count)
-    except Exception:
-        traceback.print_exc()
-        return (0, 0)
+    # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
+    return (0, 0)
 
 def fetch_scheduled_regions() -> pd.DataFrame:
     """
