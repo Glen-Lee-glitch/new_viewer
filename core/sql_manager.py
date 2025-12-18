@@ -1575,8 +1575,8 @@ def insert_delivery_day_gap(region: str, day_gap: int) -> bool:
 
 def fetch_ev_required_rns(worker_name: str) -> list[str]:
     """
-    ev_required 테이블에서 조건에 맞는 RN 목록을 조회한다.
-    조건: status='신규', step!='지급보완', worker=worker_name
+    rns 테이블에서 조건에 맞는 RN 목록을 조회한다.
+    조건: worker_id가 현재 작업자의 worker_id와 일치하고, status='서류미비 요청'
     
     Args:
         worker_name: 작업자 이름
@@ -1588,14 +1588,19 @@ def fetch_ev_required_rns(worker_name: str) -> list[str]:
         return []
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        # worker_name으로 worker_id 조회
+        worker_id = get_worker_id_by_name(worker_name)
+        if worker_id is None:
+            return []
+        
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = """
-                SELECT RN
-                FROM ev_required
-                WHERE status = '신규' AND step != '지급보완' AND worker = %s
+                SELECT "RN"
+                FROM rns
+                WHERE worker_id = %s AND status = '서류미비 요청'
             """
             with connection.cursor() as cursor:
-                cursor.execute(query, (worker_name,))
+                cursor.execute(query, (worker_id,))
                 rows = cursor.fetchall()
                 # 튜플의 첫 번째 요소인 RN만 추출하여 리스트로 반환
                 return [row[0] for row in rows]
