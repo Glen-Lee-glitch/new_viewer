@@ -812,6 +812,14 @@ class MainWindow(QMainWindow):
 
     def _save_document(self):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
+        # 현재 작업 중인 작업건의 thread_id 조회 및 디버그 출력
+        from core.sql_manager import get_recent_thread_id_by_rn
+        current_rn = self._current_rn or self._give_works_rn
+        thread_id = None
+        if current_rn:
+            thread_id = get_recent_thread_id_by_rn(current_rn)
+        print(f"[_save_document 호출] 현재 작업건 thread_id: {thread_id}")
+        
         if self.renderer:
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
             print(f"[_save_document 호출] is_give_works={self._is_give_works_started}, rn={self._give_works_rn}")
