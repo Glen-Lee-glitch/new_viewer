@@ -1741,38 +1741,42 @@ def fetch_chained_emails_rns(worker_name: str) -> list[str]:
         traceback.print_exc()
         return []
 
-def fetch_all_ev_required_rns(worker_name: str) -> list[str]:
+def fetch_all_ev_required_rns(worker_name: str) -> list[tuple[str, str]]:
     """
     세 가지 소스에서 RN 목록을 조회하여 중복 제거 후 반환한다.
-    1. rns 테이블 (status='서류미비 도착')
-    2. ev_complement 테이블 (rns와 조인하여 worker_id 매칭)
-    3. chained_emails 테이블 (rns와 조인)
+    우선순위: ev_complement > chained_emails = rns
     
     Args:
         worker_name: 작업자 이름
         
     Returns:
-        중복 제거된 RN 목록 리스트 (정렬됨)
+        (RN, source_type) 튜플 리스트 (정렬됨)
+        source_type: 'ev_complement', 'chained_emails', 'rns' 중 하나
     """
     if not worker_name:
         return []
         
-    rns_set = set()
+    # RN -> source_type 매핑 (우선순위: ev_complement > chained_emails > rns)
+    rn_source_map = {}
     
-    # 1. rns 테이블 조회
+    # 1. rns 테이블 조회 (가장 낮은 우선순위)
     rns_list = fetch_ev_required_rns(worker_name)
-    rns_set.update(rns_list)
+    for rn in rns_list:
+        if rn not in rn_source_map:
+            rn_source_map[rn] = 'rns'
     
-    # 2. ev_complement 테이블 조회
-    ev_comp_list = fetch_ev_complement_rns(worker_name)
-    rns_set.update(ev_comp_list)
-    
-    # 3. chained_emails 테이블 조회
+    # 2. chained_emails 테이블 조회 (중간 우선순위)
     chained_list = fetch_chained_emails_rns(worker_name)
-    rns_set.update(chained_list)
+    for rn in chained_list:
+        rn_source_map[rn] = 'chained_emails'  # chained_emails가 rns보다 우선
+    
+    # 3. ev_complement 테이블 조회 (가장 높은 우선순위)
+    ev_comp_list = fetch_ev_complement_rns(worker_name)
+    for rn in ev_comp_list:
+        rn_source_map[rn] = 'ev_complement'  # ev_complement가 최우선
     
     # 정렬하여 반환
-    return sorted(list(rns_set))
+    return sorted([(rn, source_type) for rn, source_type in rn_source_map.items()])
 
 def fetch_duplicate_mail_rns(worker_name: str) -> list[str]:
     """

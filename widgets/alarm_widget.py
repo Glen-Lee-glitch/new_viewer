@@ -103,7 +103,7 @@ class AlarmWidget(QWidget):
             return
         
         from core.sql_manager import fetch_all_ev_required_rns
-        rn_list = fetch_all_ev_required_rns(self._worker_name)
+        rn_data_list = fetch_all_ev_required_rns(self._worker_name)
         
         # groupBox_2의 레이아웃 가져오기
         parent_layout = self.groupBox_2.layout()
@@ -121,7 +121,7 @@ class AlarmWidget(QWidget):
             self._ev_buttons_container.deleteLater()
             self._ev_buttons_container = None
         
-        if not rn_list:
+        if not rn_data_list:
             return
         
         # 스크롤 영역 생성
@@ -144,31 +144,48 @@ class AlarmWidget(QWidget):
         # QSizePolicy 임포트 확인
         from PyQt6.QtWidgets import QSizePolicy
         
-        for i, rn in enumerate(rn_list):
+        for rn, source_type in rn_data_list:
             btn = QPushButton(rn)
             
             # 사이즈 정책 및 높이 강제 고정
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             btn.setFixedHeight(22)  # 높이를 강제로 22px로 고정
             
+            # 소스 타입에 따른 배경색 설정 (qt-material 다크 테마 고려)
+            if source_type == 'ev_complement':
+                # ev_complement: 주황색 계열 배경 (보완 필요)
+                bg_color = "rgba(255, 152, 0, 0.3)"  # 주황색 반투명
+                hover_bg = "rgba(255, 152, 0, 0.5)"
+                border_color = "#FF9800"
+            elif source_type == 'chained_emails':
+                # chained_emails: 파란색 계열 배경 (연결된 메일)
+                bg_color = "rgba(33, 150, 243, 0.3)"  # 파란색 반투명
+                hover_bg = "rgba(33, 150, 243, 0.5)"
+                border_color = "#2196F3"
+            else:  # 'rns'
+                # rns: 기본 배경색 (일반 서류 미비)
+                bg_color = "rgba(255, 255, 255, 0.05)"
+                hover_bg = "rgba(255, 255, 255, 0.15)"
+                border_color = "#555"
+            
             # 스타일 설정
-            btn.setStyleSheet("""
-                QPushButton {
+            btn.setStyleSheet(f"""
+                QPushButton {{
                     font-size: 11px;
                     padding: 0px;
                     margin: 0px;
-                    border: 1px solid #555;
+                    border: 1px solid {border_color};
                     border-radius: 2px;
-                    background-color: rgba(255, 255, 255, 0.05);
+                    background-color: {bg_color};
                     text-align: center;
-                }
-                QPushButton:hover {
-                    background-color: rgba(255, 255, 255, 0.15);
-                    border: 1px solid #777;
-                }
-                QPushButton:pressed {
-                    background-color: rgba(255, 255, 255, 0.25);
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {hover_bg};
+                    border: 1px solid {border_color};
+                }}
+                QPushButton:pressed {{
+                    background-color: {hover_bg};
+                }}
             """)
             
             # 버튼 클릭 시 RN 작업 요청 시그널 발생
@@ -180,23 +197,10 @@ class AlarmWidget(QWidget):
         item_height = 25
         
         # 5개 이하일 때는 스크롤 없이 모두 표시
-        if len(rn_list) <= 5:
-            # 내용물 크기에 맞춤 (스크롤 필요 없음)
-            # 여유분 10px 추가 (테마 패딩 등 고려하여 넉넉하게)
-            needed_h = len(rn_list) * item_height + 10
-            self._ev_buttons_scroll_area.setFixedHeight(needed_h)
-            self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        else:
-            # 5개 초과 시 최대 5개 높이로 제한하고 스크롤 활성화
-            max_h = 5 * item_height + 10
-            self._ev_buttons_scroll_area.setFixedHeight(max_h)
-            self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        
-        # 5개 이하일 때는 스크롤 없이 모두 표시
-        if len(rn_list) <= 5:
+        if len(rn_data_list) <= 5:
             # 내용물 크기에 맞춤 (스크롤 필요 없음)
             # 여유분 5px 추가
-            needed_h = len(rn_list) * item_height + 5
+            needed_h = len(rn_data_list) * item_height + 5
             self._ev_buttons_scroll_area.setFixedHeight(needed_h)
             self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         else:
