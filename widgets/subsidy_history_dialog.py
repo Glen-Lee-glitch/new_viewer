@@ -1,6 +1,6 @@
 import math
 import pandas as pd
-import pymysql
+import psycopg2
 from contextlib import closing
 
 from PyQt6.QtWidgets import (
@@ -161,7 +161,7 @@ class SubsidyHistoryDialog(QDialog):
         # 그 외의 경우 original_filepath 사용
         else:
             if original_file_path:
-                file_path = self._normalize_file_path(original_file_path)
+                file_path = original_file_path
 
         if not file_path:
             QMessageBox.warning(self, "파일 없음", "연결된 파일 경로가 없습니다.")
@@ -190,22 +190,22 @@ class SubsidyHistoryDialog(QDialog):
         self.accept()
 
     def fetch_data(self):
-        """데이터베이스에서 페이징 처리하여 데이터를 조회합니다."""
+        """데이터베이스에서 페이징 처리하여 데이터를 조회합니다. (PostgreSQL 버전)"""
         try:
-            with closing(pymysql.connect(**DB_CONFIG)) as connection:
+            with closing(psycopg2.connect(**DB_CONFIG)) as connection:
                 # 기본 쿼리 가져오기
                 base_query = _build_subsidy_query_base()
                 
                 # 페이지네이션을 위한 OFFSET 계산
                 offset = self.current_page * self.page_size
                 
-                # LIMIT과 OFFSET을 사용하여 쿼리 완성
+                # LIMIT과 OFFSET을 사용하여 쿼리 완성 (PostgreSQL 형식)
                 query = base_query + (
-                    "WHERE sa.recent_received_date >= %s "
-                    "ORDER BY sa.recent_received_date DESC "
-                    f"LIMIT {self.page_size} OFFSET {offset}"
+                    'WHERE r.last_received_date >= %s '
+                    'ORDER BY r.last_received_date DESC '
+                    f'LIMIT {self.page_size} OFFSET {offset}'
                 )
-                params = ('2025-01-01 00:00',) # 날짜 조건은 넉넉하게 설정
+                params = ('2025-01-01 00:00:00',) # 날짜 조건은 넉넉하게 설정
                 
                 df = pd.read_sql(query, connection, params=params)
                 
