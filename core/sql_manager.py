@@ -110,7 +110,7 @@ def _build_subsidy_query_base():
         '  0 AS is_법인, '
         '  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, '
         '  \'\' AS outlier, '
-        '  \'\' AS result '
+        '  COALESCE(r.status, \'\') AS result '
         'FROM rns r '
         'LEFT JOIN emails e ON r.recent_thread_id = e.thread_id '
         'LEFT JOIN workers w ON r.worker_id = w.worker_id '

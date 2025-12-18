@@ -486,7 +486,6 @@ class PdfLoadWidget(QWidget):
         if self._is_first_load:
             self._is_first_load = False
 
-
     def show_context_menu(self, pos: QPoint):
         """테이블 컨텍스트 메뉴 표시"""
         table = self.complement_table_widget
