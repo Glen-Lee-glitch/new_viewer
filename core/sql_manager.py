@@ -1597,7 +1597,7 @@ def fetch_ev_required_rns(worker_name: str) -> list[str]:
             query = """
                 SELECT "RN"
                 FROM rns
-                WHERE worker_id = %s AND status = '서류미비 요청'
+                WHERE worker_id = %s AND status = '서류미비 도착'
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (worker_id,))
