@@ -66,7 +66,7 @@ class HighlightDelegate(QStyledItemDelegate):
 
 class ButtonDelegate(QStyledItemDelegate):
     """버튼 모양을 그리는 델리게이트 (최적화용)"""
-    def __init__(self, parent=None, text="보기"):
+    def __init__(self, parent=None, text="PDF열기"):
         super().__init__(parent)
         self.text = text
 
@@ -143,7 +143,7 @@ class PdfLoadWidget(QWidget):
         
         # AI 컬럼(4번)에 '보기' 버튼, 마지막 컬럼(5번)에 '시작' 버튼 델리게이트 적용
         # setItemDelegateForColumn은 전체 델리게이트보다 우선순위가 높음
-        table.setItemDelegateForColumn(4, ButtonDelegate(table, "보기"))
+        table.setItemDelegateForColumn(4, ButtonDelegate(table, "PDF열기"))
         table.setItemDelegateForColumn(5, ButtonDelegate(table, "시작"))
 
         self.populate_recent_subsidy_rows()
@@ -239,7 +239,7 @@ class PdfLoadWidget(QWidget):
         
         # 컬럼 수 6개로 증가 (기존 5개 + 버튼 컬럼)
         table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(['RN', '작업자', '지역', '상태', '메모', '보기'])
+        table.setHorizontalHeaderLabels(['RN', '작업자', '지역', '상태', '메모', 'PDF열기'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
