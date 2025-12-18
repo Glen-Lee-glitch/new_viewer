@@ -33,7 +33,8 @@ from core.sql_manager import (
     get_email_by_thread_id,
     check_gemini_flags,
     update_give_works_worker,
-    update_rns_worker_id
+    update_rns_worker_id,
+    update_subsidy_status_if_new
 )
 from core.utility import get_converted_path
 from widgets.email_view_dialog import EmailViewDialog
@@ -655,6 +656,17 @@ class PdfLoadWidget(QWidget):
                 print(f"[지원 시작] 작업자 ID가 설정되지 않았습니다.")
         else:
             print(f"[지원 시작] 작업자 업데이트 건너뜀: 이미 '{worker}'로 할당됨")
+
+        # status가 '신규'일 때만 '처리중'으로 업데이트
+        status_updated = update_subsidy_status_if_new(rn, '처리중')
+        if status_updated:
+            print(f"[지원 시작] status 업데이트 완료: '신규' -> '처리중' (RN: {rn})")
+            # 테이블의 '결과' 컬럼(3번)도 업데이트
+            result_item = table.item(row, 3)
+            if result_item:
+                result_item.setText('처리중')
+        else:
+            print(f"[지원 시작] status 업데이트 건너뜀: 기존 status가 '신규'가 아님 (RN: {rn})")
 
         file_path = ""
         # 작업자가 할당된 경우, finished_file_path 우선 사용

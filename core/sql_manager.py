@@ -1879,6 +1879,43 @@ def update_subsidy_status(rn: str, status: str) -> bool:
         traceback.print_exc()
         return False
 
+def update_subsidy_status_if_new(rn: str, new_status: str) -> bool:
+    """
+    rns 테이블에서 해당 RN의 status가 '신규'일 때만 '처리중'으로 업데이트한다. (PostgreSQL 버전)
+    
+    Args:
+        rn: RN 번호
+        new_status: 업데이트할 새로운 status 값
+        
+    Returns:
+        업데이트 성공 여부 (기존 status가 '신규'가 아니면 False)
+    """
+    if not rn:
+        return False
+        
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # 먼저 현재 status 확인
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT status FROM rns WHERE "RN" = %s', (rn,))
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                
+                current_status = row[0]
+                
+                # 기존 status가 '신규'일 때만 업데이트
+                if current_status == '신규':
+                    update_query = 'UPDATE rns SET status = %s WHERE "RN" = %s'
+                    cursor.execute(update_query, (new_status, rn))
+                    connection.commit()
+                    return True
+                else:
+                    return False
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def fetch_after_apply_counts() -> tuple[int, int]:
     """
     TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
