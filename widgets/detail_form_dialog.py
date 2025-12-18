@@ -440,15 +440,18 @@ class DetailFormDialog(QDialog):
         # 8. 다자녀 데이터 로드
         has_multichild = False
         if flags.get('다자녀', False):
+            # 플래그가 있으면 무조건 표시
+            has_multichild = True
+            
             multichild_data = fetch_gemini_multichild_results(rn)
             child_birth_dates = multichild_data.get('child_birth_date', [])
             
             if child_birth_dates:
                 count = len(child_birth_dates)
                 self.label_children.setText(f"{count}자녀")
-                has_multichild = True
             else:
-                self.label_children.setText("")
+                # 데이터가 없으면 "이상!" 표시
+                self.label_children.setText("이상!")
         else:
             self.label_children.setText("")
             
