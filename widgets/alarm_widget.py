@@ -1,6 +1,6 @@
 from pathlib import Path
 from PyQt6.QtWidgets import QWidget, QListWidget, QVBoxLayout, QLabel, QPushButton, QGridLayout, QScrollArea, QDialog
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import QTimer, Qt, pyqtSignal
 from PyQt6 import uic
 
 from core.sql_manager import get_today_completed_subsidies
@@ -9,6 +9,9 @@ from widgets.special_note_dialog import SpecialNoteDialog
 
 class AlarmWidget(QWidget):
     """알림 위젯 - PDF 불러오기 전 표시되는 위젯"""
+    
+    # RN 작업 요청 시그널
+    rn_work_requested = pyqtSignal(str)  # RN 번호를 인자로 전달
     
     def __init__(self, worker_name: str = None, parent=None):
         super().__init__(parent)
@@ -167,6 +170,9 @@ class AlarmWidget(QWidget):
                     background-color: rgba(255, 255, 255, 0.25);
                 }
             """)
+            
+            # 버튼 클릭 시 RN 작업 요청 시그널 발생
+            btn.clicked.connect(lambda checked, r=rn: self.rn_work_requested.emit(r))
             
             container_layout.addWidget(btn)
         

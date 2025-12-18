@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
         self._is_current_file_processed: bool = False # 현재 파일이 전처리된 파일인지 여부
         self._is_give_works_started: bool = False  # 지급 테이블에서 시작 여부
         self._give_works_rn: str = ""  # 지급 테이블 시작 시 RN 번호
+        self._is_alarm_rn_work: bool = False  # 알람 위젯에서 시작한 작업 여부
         
         # --- 위젯 인스턴스 생성 ---
         self._thumbnail_viewer = ThumbnailViewWidget()
@@ -304,6 +305,9 @@ class MainWindow(QMainWindow):
         self._pdf_load_widget.ai_review_requested.connect(self._handle_ai_review_requested)
         # 데이터 새로고침 시 시간 업데이트 및 알람 위젯 갱신
         self._pdf_load_widget.data_refreshed.connect(self._on_data_refreshed)
+        
+        # 알람 위젯 RN 작업 요청 시그널 연결
+        self._alarm_widget.rn_work_requested.connect(self._handle_alarm_rn_clicked)
         
         # 정보 패널 업데이트 연결
         self._pdf_view_widget.pdf_loaded.connect(self._info_panel.update_file_info)
@@ -691,6 +695,162 @@ class MainWindow(QMainWindow):
             self.menu_additional_documents.menuAction().setEnabled(False)
         self.load_document(pdf_paths)
 
+    def _handle_alarm_rn_clicked(self, rn: str):
+        """알람 위젯에서 RN 버튼 클릭 시 호출되는 핸들러.
+        
+        RN의 rns.file_path와 chained_emails.chained_file_path를 병합하여 작업을 시작한다.
+        """
+        if not rn:
+            return
+        
+        from core.sql_manager import (
+            get_recent_thread_id_by_rn, 
+            get_chained_emails_file_path_by_thread_id,
+            get_original_pdf_path_by_rn,
+            claim_subsidy_work
+        )
+        from core.utility import get_converted_path, normalize_basic_info
+        from pathlib import Path
+        
+        try:
+            # 1. RN으로부터 recent_thread_id 조회
+            thread_id = get_recent_thread_id_by_rn(rn)
+            
+            # 2. thread_id로 chained_file_path 조회
+            chained_file_path = None
+            if thread_id:
+                chained_file_path = get_chained_emails_file_path_by_thread_id(thread_id)
+                if chained_file_path:
+                    chained_file_path = get_converted_path(chained_file_path)
+                    # 파일 존재 여부 확인
+                    if not Path(chained_file_path).exists():
+                        chained_file_path = None
+            
+            # 3. RN으로부터 rns 테이블의 file_path 조회
+            rns_file_path = get_original_pdf_path_by_rn(rn)
+            if rns_file_path:
+                rns_file_path = get_converted_path(rns_file_path)
+                # 파일 존재 여부 확인
+                if not Path(rns_file_path).exists():
+                    rns_file_path = None
+            
+            # 4. 파일 경로 리스트 구성
+            pdf_paths = []
+            if rns_file_path:
+                pdf_paths.append(rns_file_path)
+            if chained_file_path:
+                pdf_paths.append(chained_file_path)
+            
+            if not pdf_paths:
+                QMessageBox.warning(
+                    self, 
+                    "파일 없음", 
+                    f"RN {rn}에 연결된 PDF 파일을 찾을 수 없습니다."
+                )
+                return
+            
+            # 5. RN으로부터 메타데이터 조회 (PostgreSQL 쿼리)
+            from contextlib import closing
+            import psycopg2
+            import psycopg2.extras
+            from core.sql_manager import DB_CONFIG
+            
+            metadata = {
+                'rn': rn,
+                'name': "",
+                'region': "",
+                'worker': "",
+                'special_note': "",
+                'recent_thread_id': thread_id or "",
+                'file_rendered': 0,
+                'urgent': 0,
+                'mail_count': 0,
+                'outlier': "",
+                'original_filepath': rns_file_path or "",
+                'finished_file_path': rns_file_path or "",
+                'is_from_rns_filepath': True,
+                'is_context_menu_work': False,
+                '구매계약서': 0,
+                '초본': 0,
+                '공동명의': 0,
+                '다자녀': 0,
+                'ai_계약일자': None,
+                'ai_이름': None,
+                '전화번호': None,
+                '이메일': None,
+                '차종': None,
+                'page_number': None,
+                'chobon_name': None,
+                'chobon_birth_date': None,
+                'chobon_address_1': None,
+                'chobon': 0,
+                'is_법인': 0,
+                'child_birth_date': None,
+                'issue_date': None,
+                'birth_date': None,
+                'address_1': None
+            }
+            
+            # DB에서 메타데이터 조회
+            try:
+                with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+                    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                        query = """
+                            SELECT 
+                                r."RN",
+                                r.region,
+                                w.worker_name AS worker,
+                                r.customer AS name,
+                                array_to_string(r.special, ', ') AS special_note,
+                                r.file_path AS finished_file_path,
+                                e.original_pdf_path AS original_filepath,
+                                r.recent_thread_id,
+                                CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent,
+                                r.mail_count,
+                                r.model AS 차종
+                            FROM rns r
+                            LEFT JOIN emails e ON r.recent_thread_id = e.thread_id
+                            LEFT JOIN workers w ON r.worker_id = w.worker_id
+                            WHERE r."RN" = %s
+                        """
+                        cursor.execute(query, (rn,))
+                        row = cursor.fetchone()
+                        
+                        if row:
+                            metadata.update({
+                                'rn': row.get('RN', rn),
+                                'region': row.get('region', '') or '',
+                                'worker': row.get('worker', '') or '',
+                                'name': row.get('name', '') or '',
+                                'special_note': row.get('special_note', '') or '',
+                                'recent_thread_id': row.get('recent_thread_id', '') or '',
+                                'urgent': row.get('urgent', 0) or 0,
+                                'mail_count': row.get('mail_count', 0) or 0,
+                                '차종': row.get('차종', None),
+                                'original_filepath': row.get('original_filepath', '') or (rns_file_path or ''),
+                                'finished_file_path': row.get('finished_file_path', '') or (rns_file_path or '')
+                            })
+            except Exception as e:
+                print(f"메타데이터 조회 중 오류: {e}")
+                import traceback
+                traceback.print_exc()
+            
+            # 6. 알람 위젯에서 시작한 작업임을 표시하는 플래그 설정
+            self._is_alarm_rn_work = True
+            
+            # 7. 작업 시작
+            self._handle_work_started(pdf_paths, metadata)
+            
+        except Exception as e:
+            print(f"알람 RN 클릭 처리 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(
+                self,
+                "오류",
+                f"작업을 시작하는 중 오류가 발생했습니다.\n{e}"
+            )
+
     def _handle_work_started(self, pdf_paths: list, metadata: dict):
         # 컨텍스트 메뉴를 통한 작업 시작 여부 확인 및 저장
         self._is_context_menu_work = metadata.get('is_context_menu_work', False)
@@ -898,10 +1058,15 @@ class MainWindow(QMainWindow):
 
     def _save_document(self):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
-        # 현재 작업 중인 작업건의 thread_id 조회 및 chained_emails 확인
-        if not self.check_chained_emails():
-            print("[_save_document] check_chained_emails 결과에 따라 저장 프로세스를 중단합니다.")
-            return
+        # 알람 위젯에서 시작한 작업인 경우 chained_emails 검토 건너뛰기
+        if self._is_alarm_rn_work:
+            print("[_save_document] 알람 위젯에서 시작한 작업이므로 chained_emails 검토를 건너뜁니다.")
+            self._is_alarm_rn_work = False  # 플래그 초기화
+        else:
+            # 현재 작업 중인 작업건의 thread_id 조회 및 chained_emails 확인
+            if not self.check_chained_emails():
+                print("[_save_document] check_chained_emails 결과에 따라 저장 프로세스를 중단합니다.")
+                return
         
         if self.renderer:
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
@@ -958,6 +1123,7 @@ class MainWindow(QMainWindow):
         self.current_page = -1
         self._current_rn = ""  # 현재 RN 초기화
         self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
+        self._is_alarm_rn_work = False  # 알람 위젯 작업 플래그 리셋
         self._pending_outlier_check = False  # 이상치 체크 플래그 리셋
         self._pending_outlier_metadata = None  # 이상치 메타데이터 리셋
         self._pdf_view_widget.set_current_rn("") # PdfViewWidget의 RN도 초기화
