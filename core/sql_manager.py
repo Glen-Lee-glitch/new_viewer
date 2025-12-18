@@ -581,7 +581,8 @@ def check_gemini_flags(rn: str) -> dict:
                     (a."다자녀" IS NOT NULL OR '다자녀' = ANY(r.special)) AS "다자녀",
                     ('공동명의' = ANY(r.special) OR (a."초본" IS NOT NULL AND a."초본"->>'second_person' IS NOT NULL)) AS "공동명의",
                     a."초본" IS NOT NULL AS "초본",
-                    ('개인사업자' = ANY(r.special)) AS "개인사업자"
+                    ('개인사업자' = ANY(r.special)) AS "개인사업자",
+                    ('법인' = ANY(r.special) OR a."법인" IS NOT NULL) AS "법인"
                 FROM analysis_results a
                 JOIN rns r ON a."RN" = r."RN"
                 WHERE a."RN" = %s
@@ -596,7 +597,8 @@ def check_gemini_flags(rn: str) -> dict:
                         '다자녀': bool(row[2]),
                         '공동명의': bool(row[3]),
                         '초본': bool(row[4]),
-                        '개인사업자': bool(row[5])
+                        '개인사업자': bool(row[5]),
+                        '법인': bool(row[6])
                     }
                 return {}
     except Exception:
@@ -762,6 +764,37 @@ def fetch_gemini_business_results(rn: str) -> dict:
                         '사업자등록번호': 사업자등록번호,
                         '개인사업자명': 사업자명,  # 사업자명을 개인사업자명으로 매핑
                         '법인주소': 사업장주소  # 사업장주소를 법인주소로 매핑
+                    }
+                return {}
+    except Exception:
+        traceback.print_exc()
+        return {}
+
+def fetch_gemini_corporation_results(rn: str) -> dict:
+    """
+    analysis_results 테이블의 '법인' JSONB 컬럼에서 RN으로 데이터를 조회한다. (PostgreSQL 버전)
+    """
+    if not rn:
+        return {}
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT 
+                    "법인"->>'법인명',
+                    "법인"->>'등록번호',
+                    "법인"->>'법인주소'
+                FROM analysis_results
+                WHERE "RN" = %s AND "법인" IS NOT NULL
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        '법인명': row[0] if row[0] else '',
+                        '등록번호': row[1] if row[1] else '',
+                        '법인주소': row[2] if row[2] else ''
                     }
                 return {}
     except Exception:

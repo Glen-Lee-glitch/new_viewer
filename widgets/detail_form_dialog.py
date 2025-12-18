@@ -5,7 +5,8 @@ from PyQt6.QtCore import Qt, QEvent
 
 from core.sql_manager import (fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_chobon_results, 
                               fetch_subsidy_model, fetch_gemini_multichild_results, fetch_subsidy_region, 
-                              calculate_delivery_date, fetch_gemini_business_results, fetch_gemini_joint_results)
+                              calculate_delivery_date, fetch_gemini_business_results, fetch_gemini_joint_results,
+                              fetch_gemini_corporation_results)
 from core.ui_helpers import ReverseToolHandler
 
 class DetailFormDialog(QDialog):
@@ -201,11 +202,20 @@ class DetailFormDialog(QDialog):
         self.label_contract_date.setText(str(contract_data.get('ai_계약일자', '')))
         
         # 2. 법인 여부 확인 및 UI 처리
-        biz_data = fetch_gemini_business_results(rn)
-        is_corporation = biz_data.get('is_법인', False)
-        
-        # 플래그 확인 (개인사업자 플래그 우선 확인)
+        # 플래그 확인 (법인 플래그 우선 확인)
         flags = check_gemini_flags(rn)
+        is_corporation_flag = flags.get('법인', False)
+        
+        # rns.special에 '법인'이 포함되어 있으면 무조건 법인으로 판단
+        is_corporation = is_corporation_flag
+        
+        # 법인 데이터 조회 (analysis_results.법인)
+        corp_data = {}
+        if is_corporation:
+            corp_data = fetch_gemini_corporation_results(rn)
+        
+        # 기존 biz_data는 개인사업자 판단용으로만 사용
+        biz_data = fetch_gemini_business_results(rn)
         is_individual_business_flag = flags.get('개인사업자', False)
         
         # 개인사업자 여부 확인
@@ -236,10 +246,10 @@ class DetailFormDialog(QDialog):
             # 법인 필드 표시 (모든 필드 표시)
             self._show_enterprise_fields(is_individual_business=False)
             
-            # 데이터 채우기
-            self.label_17.setText(str(biz_data.get('기관명', '')))
+            # 데이터 채우기 (analysis_results.법인 데이터 우선 사용)
+            self.label_17.setText(str(corp_data.get('법인명', '') or biz_data.get('기관명', '')))
             self.label_19.setText(str(biz_data.get('대표자', '')))
-            self.label_21.setText(str(biz_data.get('법인등록번호', '')))
+            self.label_21.setText(str(corp_data.get('등록번호', '') or biz_data.get('법인등록번호', '')))
             self.label_23.setText(str(biz_data.get('사업자등록번호', '')))
             self.label_25.setText(str(biz_data.get('개인사업자명', '')))
             
@@ -294,8 +304,8 @@ class DetailFormDialog(QDialog):
 
         # 3. 주소 처리 (법인인 경우 법인주소, 개인사업자/개인인 경우 초본 주소)
         if is_corporation:
-            # 법인인 경우: 법인주소 사용
-            법인주소 = biz_data.get('법인주소', '')
+            # 법인인 경우: 법인주소 사용 (analysis_results.법인 데이터 우선)
+            법인주소 = corp_data.get('법인주소', '') or biz_data.get('법인주소', '')
             if 법인주소:
                 # 첫 번째 쉼표를 기준으로 split
                 법인주소_str = str(법인주소)
