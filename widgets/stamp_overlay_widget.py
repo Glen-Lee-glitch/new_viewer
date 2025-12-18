@@ -109,6 +109,13 @@ class StampOverlayWidget(QWidget):
         self.setFocus()
         self.grabKeyboard()
 
+    def hide(self):
+        """오버레이를 숨길 때 키보드를 해제한다."""
+        try:
+            self.releaseKeyboard()
+        finally:
+            super().hide()
+
     def mousePressEvent(self, event):
         # content_frame 밖을 클릭하면 닫기
         if hasattr(self, 'content_frame'):
