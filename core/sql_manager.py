@@ -1077,6 +1077,31 @@ def get_recent_thread_id_by_rn(rn: str) -> str | None:
         traceback.print_exc()
         return None
 
+def check_thread_id_in_chained_emails(thread_id: str) -> bool:
+    """
+    chained_emails 테이블에서 thread_id 존재 여부를 확인한다. (PostgreSQL 버전)
+    
+    Args:
+        thread_id: 확인할 thread_id
+        
+    Returns:
+        True: thread_id가 존재하는 경우
+        False: thread_id가 존재하지 않거나 오류 발생 시
+    """
+    if not thread_id:
+        return False
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT 1 FROM chained_emails WHERE thread_id = %s LIMIT 1"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (thread_id,))
+                row = cursor.fetchone()
+                return row is not None
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def insert_reply_email(
     thread_id: str | None,
     rn: str,

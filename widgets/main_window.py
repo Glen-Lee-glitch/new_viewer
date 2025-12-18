@@ -810,15 +810,23 @@ class MainWindow(QMainWindow):
         if mail_content:
             self._pdf_view_widget.set_mail_content(mail_content)
 
-    def _save_document(self):
-        """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
-        # 현재 작업 중인 작업건의 thread_id 조회 및 디버그 출력
-        from core.sql_manager import get_recent_thread_id_by_rn
+    def check_chained_emails(self):
+        """현재 작업 중인 작업건의 thread_id를 조회하고 chained_emails 테이블에서 존재 여부를 확인한다."""
+        from core.sql_manager import get_recent_thread_id_by_rn, check_thread_id_in_chained_emails
         current_rn = self._current_rn or self._give_works_rn
         thread_id = None
         if current_rn:
             thread_id = get_recent_thread_id_by_rn(current_rn)
         print(f"[_save_document 호출] 현재 작업건 thread_id: {thread_id}")
+        
+        # chained_emails 테이블에서 thread_id 존재 여부 확인
+        if thread_id and check_thread_id_in_chained_emails(thread_id):
+            print(f"[_save_document 호출] chained_emails 테이블에 thread_id 존재: {thread_id}")
+    
+    def _save_document(self):
+        """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
+        # 현재 작업 중인 작업건의 thread_id 조회 및 chained_emails 확인
+        self.check_chained_emails()
         
         if self.renderer:
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
