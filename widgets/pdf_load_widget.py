@@ -2,6 +2,7 @@ from pathlib import Path
 import math
 import pandas as pd
 from datetime import datetime
+import pytz
 
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, QPoint, Qt, QSettings
@@ -445,11 +446,14 @@ class PdfLoadWidget(QWidget):
 
     def _check_unassigned_subsidies(self, df: pd.DataFrame):
         """
-        5분 이상 할당되지 않은 보조금에 대해 확인하고 알림을 표시합니다.
+        10분 이상 할당되지 않은 보조금에 대해 확인하고 알림을 표시합니다.
         미할당 상태가 지속되면 한 주기를 건너뛰고 다시 알림을 보냅니다.
         """
         if df is None or df.empty:
             return
+
+        # KST timezone 설정
+        kst = pytz.timezone('Asia/Seoul')
 
         for _, row in df.iterrows():
             try:
@@ -475,9 +479,21 @@ class PdfLoadWidget(QWidget):
 
                         # received_time이 datetime 객체인 경우에만 계산
                         if isinstance(received_time, datetime):
-                            now = datetime.now()
-                            # 5분 이상 미할당된 경우
-                            if (now - received_time).total_seconds() >= 300:
+                            # timezone-aware datetime으로 통일
+                            now = datetime.now(kst)
+                            
+                            # received_time이 naive인 경우 timezone-aware로 변환
+                            # PostgreSQL의 timestampz는 timezone-aware이지만, 
+                            # pandas나 문자열 파싱 결과는 naive일 수 있음
+                            if received_time.tzinfo is None:
+                                # naive datetime을 KST로 가정하고 변환
+                                received_time = kst.localize(received_time)
+                            else:
+                                # 이미 timezone-aware인 경우 KST로 변환
+                                received_time = received_time.astimezone(kst)
+                            
+                            # 10분 이상 미할당된 경우 (600초)
+                            if (now - received_time).total_seconds() >= 600:
                                 
                                 # 첫 로드 시에는 알림을 보내지 않음
                                 if self._is_first_load:
@@ -487,14 +503,14 @@ class PdfLoadWidget(QWidget):
                                 if not QApplication.activeWindow() == self.window():
                                     alert_state = self._alert_tracker.get(rn_val, 0)
                                     alert_message = (
-                                        f"5분 이상 작업자가 배정되지 않았습니다.\n"
+                                        f"10분 이상 작업자가 배정되지 않았습니다.\n"
                                         f"RN: {rn_val}\n"
                                         f"접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')}"
                                     )
                                     
                                     if alert_state == 0:
                                         # 상태 0: 첫 알림
-                                        print(f"[알림] 5분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
+                                        print(f"[알림] 10분 이상 미할당: {rn_val} (접수시간: {received_time.strftime('%Y-%m-%d %H:%M:%S')})")
                                         show_toast("미배정 알림", alert_message, self, received_time)
                                         self._alert_tracker[rn_val] = 1
                                     
