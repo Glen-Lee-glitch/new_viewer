@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QApplication, QHeaderView
 )
 from PyQt6.QtCore import Qt
+import json
 
 # 프로젝트 루트 경로 추가 (core 모듈 임포트용)
 sys.path.append(str(Path(__file__).parent.parent))
@@ -34,12 +35,22 @@ class RegionManagerDialog(QDialog):
         # 검색 기능 연결
         self.lineEdit_search.textChanged.connect(self.filter_table)
         
+        # 테이블 헤더 설정 (tab_3)
+        self.tableWidget_documents.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.tableWidget_documents.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.tableWidget_documents.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        
+        # tab_3 더블 클릭 이벤트 연결
+        self.tableWidget_documents.itemDoubleClicked.connect(self._on_document_item_double_clicked)
+        
         # 데이터 저장소
         self.original_data = {} # {region: is_apply_sealed}
         self.checkbox_map = {} # {region: QCheckBox}
+        self.document_data = {} # {region_id: notification_apply dict}
         
         # 데이터 로드
         self.load_data()
+        self.load_tab3_data()
         
     def load_data(self):
         """MCP를 통해 region_metadata 테이블에서 데이터를 로드합니다."""
@@ -190,6 +201,127 @@ class RegionManagerDialog(QDialog):
             )
             
             self.tableWidget_sealed.setRowHidden(row, not matches)
+
+    def _format_document_summary(self, items):
+        """서류 목록을 요약 텍스트로 변환 (예: "초본 외 2건")"""
+        if not items or len(items) == 0:
+            return "(없음)"
+        if len(items) == 1:
+            return items[0]
+        return f"{items[0]} 외 {len(items)-1}건"
+
+    def load_tab3_data(self):
+        """tab_3의 서류 데이터를 로드합니다."""
+        try:
+            from core.sql_manager import DB_CONFIG
+            import psycopg2
+            from contextlib import closing
+            
+            with closing(psycopg2.connect(**DB_CONFIG)) as conn:
+                with conn.cursor() as cursor:
+                    query = """
+                        SELECT rm.region_id, rm.region, g.notification_apply 
+                        FROM region_metadata rm 
+                        LEFT JOIN "공고문" g ON rm.region_id = g.region_id 
+                        ORDER BY rm.region
+                    """
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+            
+            if not rows:
+                self.tableWidget_documents.setRowCount(0)
+                return
+            
+            self.tableWidget_documents.setRowCount(len(rows))
+            self.document_data = {}
+            
+            for row_idx, (region_id, region, notification_apply) in enumerate(rows):
+                # region_id를 UserRole로 저장
+                region_item = QTableWidgetItem(region)
+                region_item.setData(Qt.ItemDataRole.UserRole, region_id)
+                region_item.setFlags(region_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                self.tableWidget_documents.setItem(row_idx, 0, region_item)
+                
+                # notification_apply 파싱
+                if notification_apply:
+                    if isinstance(notification_apply, str):
+                        data = json.loads(notification_apply)
+                    else:
+                        data = notification_apply
+                else:
+                    data = {"general_documents": [], "additional_documents": []}
+                
+                # 데이터 저장
+                self.document_data[region_id] = data
+                
+                # 일반서류 요약
+                general_items = data.get("general_documents", [])
+                general_summary = self._format_document_summary(general_items)
+                general_item = QTableWidgetItem(general_summary)
+                general_item.setFlags(general_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                self.tableWidget_documents.setItem(row_idx, 1, general_item)
+                
+                # 추가서류 요약
+                additional_items = data.get("additional_documents", [])
+                additional_summary = self._format_document_summary(additional_items)
+                additional_item = QTableWidgetItem(additional_summary)
+                additional_item.setFlags(additional_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                self.tableWidget_documents.setItem(row_idx, 2, additional_item)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"서류 데이터를 로드하는 중 오류가 발생했습니다: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def _on_document_item_double_clicked(self, item):
+        """서류 항목 더블 클릭 시 수정 다이얼로그를 엽니다."""
+        row = item.row()
+        region_item = self.tableWidget_documents.item(row, 0)
+        if not region_item:
+            return
+        
+        region_id = region_item.data(Qt.ItemDataRole.UserRole)
+        region_name = region_item.text()
+        
+        # 현재 데이터 가져오기
+        current_data = self.document_data.get(region_id, {"general_documents": [], "additional_documents": []})
+        
+        # 수정 다이얼로그 열기
+        from widgets.document_edit_dialog import DocumentEditDialog
+        dialog = DocumentEditDialog(region_name, current_data, self)
+        
+        if dialog.exec():
+            # 수정된 데이터 저장
+            updated_data = dialog.get_data()
+            self._save_document_data(region_id, updated_data)
+            # 테이블 새로고침
+            self.load_tab3_data()
+
+    def _save_document_data(self, region_id, data):
+        """서류 데이터를 DB에 저장합니다 (UPSERT)."""
+        try:
+            from core.sql_manager import DB_CONFIG
+            import psycopg2
+            from contextlib import closing
+            import json
+            
+            with closing(psycopg2.connect(**DB_CONFIG)) as conn:
+                with conn.cursor() as cursor:
+                    # UPSERT: 존재하면 UPDATE, 없으면 INSERT
+                    cursor.execute("""
+                        INSERT INTO "공고문" (region_id, notification_apply)
+                        VALUES (%s, %s::jsonb)
+                        ON CONFLICT (region_id) 
+                        DO UPDATE SET notification_apply = EXCLUDED.notification_apply
+                    """, (region_id, json.dumps(data, ensure_ascii=False)))
+                conn.commit()
+                
+            QMessageBox.information(self, "완료", "서류 정보가 저장되었습니다.")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"저장 중 오류가 발생했습니다: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

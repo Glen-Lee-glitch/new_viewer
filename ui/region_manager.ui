@@ -17,7 +17,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab_1">
       <attribute name="title">
@@ -26,11 +26,11 @@
       <layout class="QVBoxLayout" name="tab1_layout">
        <item>
         <widget class="QLabel" name="label_title">
-         <property name="text">
-          <string>지역별 원본대조필 자동 적용 설정</string>
-         </property>
          <property name="styleSheet">
           <string>font-size: 14pt; font-weight: bold; margin-bottom: 10px;</string>
+         </property>
+         <property name="text">
+          <string>지역별 원본대조필 자동 적용 설정</string>
          </property>
         </widget>
        </item>
@@ -78,7 +78,7 @@
          <item>
           <spacer name="horizontalSpacer_1">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -90,11 +90,11 @@
          </item>
          <item>
           <widget class="QPushButton" name="btn_save">
-           <property name="text">
-            <string>저장</string>
-           </property>
            <property name="styleSheet">
             <string>background-color: #4CAF50; color: white; font-weight: bold; padding: 5px 15px;</string>
+           </property>
+           <property name="text">
+            <string>저장</string>
            </property>
           </widget>
          </item>
@@ -109,6 +109,42 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="tab_3">
+      <attribute name="title">
+       <string>지원_서류</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="tab3_layout">
+       <item>
+        <widget class="QLabel" name="label_title_docs">
+         <property name="styleSheet">
+          <string>font-size: 14pt; font-weight: bold; margin-bottom: 10px;</string>
+         </property>
+         <property name="text">
+          <string>지자체별 제출 서류 관리 (더블 클릭하여 수정)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="tableWidget_documents">
+         <column>
+          <property name="text">
+           <string>지역명</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>일반서류</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>추가서류</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+      </layout>
+     </widget>
      <widget class="QWidget" name="tab_2">
       <attribute name="title">
        <string>보조금</string>
@@ -120,7 +156,7 @@
           <string>보조금 관리 탭 (추후 구현 예정)</string>
          </property>
          <property name="alignment">
-          <set>Qt::AlignCenter</set>
+          <set>Qt::AlignmentFlag::AlignCenter</set>
          </property>
         </widget>
        </item>
