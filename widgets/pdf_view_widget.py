@@ -672,17 +672,31 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             try:
                 from datetime import datetime
                 from pathlib import Path as PathLib
+                import re # re 모듈 임포트
                 
                 pdf_copy = bytes(pdf_bytes)
                 base_path = self.get_current_pdf_path()
                 base_name = PathLib(base_path).stem if base_path else "untitled"
                 
-                # 작업자 폴더/날짜 구조로 저장 경로 구성
-                base_dir = get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\2025_4Q_deleted')
-                today = datetime.now().strftime('%Y-%m-%d')
-                worker_folder = worker_name if worker_name else "미지정"
+                # base_name에서 RN 정보 추출 (예: "RN123456_document" -> "RN123456")
+                rn_match = re.match(r"(RN\d+)", base_name)
+                rn_info = rn_match.group(1) if rn_match else None
                 
-                output_dir = PathLib(base_dir) / worker_folder / today
+                # 작업자 폴더/날짜 구조 제거하고 delete_info['reason']에 따라 폴더 결정
+                base_dir = get_converted_path(r'\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\25q4_test\deleted_file')
+                
+                reason_folder_map = {
+                    "필요없음": "필요없음",
+                    "추가서류": "추가서류",
+                    "기타": "기타",
+                    "기타 사유 (직접 입력)": "기타" # 기타 사유는 "기타" 폴더로 분류
+                }
+                
+                # delete_info에서 reason 값을 가져와 적절한 폴더 이름을 선택
+                # delete_info가 없거나 reason이 매핑에 없으면 "기타" 폴더로 기본값 설정
+                reason_key = delete_info.get('reason', '기타') if delete_info else '기타'
+                target_folder_name = reason_folder_map.get(reason_key, "기타")
+                output_dir = PathLib(base_dir) / target_folder_name
                 
                 export_deleted_pages(
                     pdf_bytes=pdf_copy,
@@ -690,6 +704,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                     output_dir=output_dir,
                     base_name=base_name,
                     delete_info=delete_info,
+                    rn_info=rn_info, # RN 정보 전달
                 )
             except Exception as save_error:
                 print(f"삭제 페이지 보관 중 오류: {save_error}")

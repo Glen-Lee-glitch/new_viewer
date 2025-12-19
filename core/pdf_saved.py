@@ -352,6 +352,7 @@ def export_deleted_pages(
         output_dir: str | Path,
         base_name: str,
         delete_info: dict = None,
+        rn_info: str = None, # RN 정보를 직접 받을 수 있도록 파라미터 추가
 ) -> list[Path]:
     """삭제된 페이지를 원본 그대로 개별 PDF로 저장한다."""
     if not pdf_bytes:
@@ -369,51 +370,38 @@ def export_deleted_pages(
                 if not (0 <= page_idx < total_pages):
                     continue
 
-                temp_doc = pymupdf.open()
                 try:
+                    temp_doc = pymupdf.open()
                     temp_doc.insert_pdf(src, from_page=page_idx, to_page=page_idx)
                     
-                    # 삭제 사유를 파일명에 적합한 형태로 매핑
-                    reason = ""
-                    if delete_info and delete_info.get("reason"):
-                        reason_text = delete_info["reason"]
-                        
-                        # 텍스트에서 키워드를 찾아서 매핑 (긴 설명이 와도 처리)
-                        if "추가 서류" in reason_text:
-                            reason = "추가서류"
-                        elif "필요 없음" in reason_text:
-                            reason = "필요없음"
-                        elif "기타" in reason_text:
-                            reason = "기타"
-                        else:
-                            reason = "기타"  # 기본값
+                    current_datetime = datetime.now().strftime('%Y%m%d_%H%M%S')
                     
-                    # 기본 파일명 생성: {원본파일명}_{사유}_{페이지번호}
-                    if reason:
-                        base_filename = f"{base_name}_{reason}_{page_idx + 1}"
+                    if rn_info:
+                        filename_base = f"{rn_info}_page_{page_idx + 1}_{current_datetime}"
                     else:
-                        base_filename = f"{base_name}_{page_idx + 1}"
-                    
-                    # 중복 방지를 위한 번호 추가 로직
-                    file_name = f"{base_filename}.pdf"
+                        filename_base = f"{base_name}_page_{page_idx + 1}_{current_datetime}"
+                        
+                    file_name = f"{filename_base}.pdf"
                     dest_path = destination / file_name
                     
                     counter = 1
                     while dest_path.exists():
-                        file_name = f"{base_filename}_{counter}.pdf"
+                        file_name = f"{filename_base}_{counter}.pdf"
                         dest_path = destination / file_name
                         counter += 1
-                        # 무한 루프 방지
                         if counter > 1000:
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                            file_name = f"{base_filename}_{timestamp}.pdf"
+                            timestamp_fallback = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                            file_name = f"{filename_base}_{timestamp_fallback}.pdf"
                             dest_path = destination / file_name
                             break
                     
                     temp_doc.save(str(dest_path), deflate=False, clean=False)
                     exported_files.append(dest_path)
+                except Exception as e:
+                    print(f"Error exporting page {page_idx + 1}: {e}")
                 finally:
-                    temp_doc.close()
+                    if 'temp_doc' in locals() and temp_doc: # temp_doc이 정의되었는지 확인
+                        temp_doc.close()
     except Exception as exc:
         print(f"[export_deleted_pages] 오류: {exc}")
 
