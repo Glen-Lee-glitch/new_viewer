@@ -31,6 +31,9 @@ class RegionManagerDialog(QDialog):
         self.btn_save.clicked.connect(self.save_changes)
         self.btn_close.clicked.connect(self.close)
         
+        # 검색 기능 연결
+        self.lineEdit_search.textChanged.connect(self.filter_table)
+        
         # 데이터 저장소
         self.original_data = {} # {region: is_apply_sealed}
         self.checkbox_map = {} # {region: QCheckBox}
@@ -81,6 +84,9 @@ class RegionManagerDialog(QDialog):
                 # 데이터 저장
                 self.original_data[region] = bool(is_apply_sealed)
                 self.checkbox_map[region] = checkbox
+            
+            # 로드 후 현재 검색어에 맞춰 필터링 적용
+            self.filter_table()
                 
         except Exception as e:
             QMessageBox.critical(self, "오류", f"데이터를 로드하는 중 오류가 발생했습니다: {str(e)}")
@@ -118,6 +124,72 @@ class RegionManagerDialog(QDialog):
             
         except Exception as e:
             QMessageBox.critical(self, "오류", f"저장 중 오류가 발생했습니다: {str(e)}")
+
+    def _extract_chosung(self, text: str) -> str:
+        """
+        한글 문자열에서 초성을 추출합니다.
+        
+        Args:
+            text: 초성을 추출할 한글 문자열
+            
+        Returns:
+            초성 문자열 (예: "서울시" -> "ㅅㅇㅅ")
+        """
+        if not text:
+            return ""
+        
+        chosung_list = []
+        for char in text:
+            if '가' <= char <= '힣':  # 한글 완성형
+                # 유니코드 계산: (char_code - '가') // 588
+                chosung_code = (ord(char) - ord('가')) // 588
+                chosung = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 
+                          'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'][chosung_code]
+                chosung_list.append(chosung)
+            elif 'ㄱ' <= char <= 'ㅎ':  # 이미 초성인 경우
+                chosung_list.append(char)
+            elif char.isalnum() or char.isspace():  # 영문, 숫자, 공백은 그대로
+                chosung_list.append(char.lower())
+        
+        return ''.join(chosung_list)
+
+    def filter_table(self):
+        """검색어에 따라 테이블을 필터링합니다."""
+        search_text = self.lineEdit_search.text().strip()
+        
+        if not search_text:
+            # 검색어가 없으면 모든 행 표시
+            for row in range(self.tableWidget_sealed.rowCount()):
+                self.tableWidget_sealed.setRowHidden(row, False)
+            return
+        
+        # 검색어의 초성 추출
+        search_chosung = self._extract_chosung(search_text)
+        search_lower = search_text.lower()
+        
+        # 각 행에 대해 필터링
+        for row in range(self.tableWidget_sealed.rowCount()):
+            region_item = self.tableWidget_sealed.item(row, 0)
+            if not region_item:
+                self.tableWidget_sealed.setRowHidden(row, True)
+                continue
+            
+            region = region_item.text()
+            region_chosung = self._extract_chosung(region)
+            region_lower = region.lower()
+            
+            # 매칭 조건:
+            # 1. 일반 텍스트 포함 검색
+            # 2. 초성 검색
+            # 3. 부분 일치 (간단하게 검색)
+            matches = (
+                search_lower in region_lower or
+                search_chosung in region_chosung or
+                region_lower.startswith(search_lower) or
+                region_chosung.startswith(search_chosung)
+            )
+            
+            self.tableWidget_sealed.setRowHidden(row, not matches)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
