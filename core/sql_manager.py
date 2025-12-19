@@ -1043,6 +1043,24 @@ def get_recent_thread_id_by_rn(rn: str) -> str | None:
         traceback.print_exc()
         return None
 
+def get_rns_file_path_by_rn(rn: str) -> str | None:
+    """
+    RN으로 rns 테이블에서 file_path를 직접 조회한다. (PostgreSQL 버전)
+    """
+    if not rn:
+        return None
+
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT file_path FROM rns WHERE \"RN\" = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                return row[0] if row and row[0] else None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def check_thread_id_in_chained_emails(thread_id: str) -> bool:
     """
     chained_emails 테이블에서 thread_id 존재 여부를 확인한다. (PostgreSQL 버전)

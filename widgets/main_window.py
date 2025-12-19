@@ -716,7 +716,7 @@ class MainWindow(QMainWindow):
         from core.sql_manager import (
             get_recent_thread_id_by_rn, 
             get_chained_emails_file_path_by_thread_id,
-            get_original_pdf_path_by_rn,
+            get_rns_file_path_by_rn,
             claim_subsidy_work
         )
         from core.utility import get_converted_path, normalize_basic_info
@@ -737,7 +737,7 @@ class MainWindow(QMainWindow):
                         chained_file_path = None
             
             # 3. RN으로부터 rns 테이블의 file_path 조회
-            rns_file_path = get_original_pdf_path_by_rn(rn)
+            rns_file_path = get_rns_file_path_by_rn(rn)
             if rns_file_path:
                 rns_file_path = get_converted_path(rns_file_path)
                 # 파일 존재 여부 확인
