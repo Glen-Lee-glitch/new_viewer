@@ -125,6 +125,24 @@
         </widget>
        </item>
        <item>
+        <layout class="QHBoxLayout" name="search_layout_docs">
+         <item>
+          <widget class="QLabel" name="label_search_docs">
+           <property name="text">
+            <string>지역명 검색:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEdit_search_docs">
+           <property name="placeholderText">
+            <string>지역명을 입력하세요 (초성 검색 가능)</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
         <widget class="QTableWidget" name="tableWidget_documents">
          <column>
           <property name="text">

@@ -34,6 +34,7 @@ class RegionManagerDialog(QDialog):
         
         # 검색 기능 연결
         self.lineEdit_search.textChanged.connect(self.filter_table)
+        self.lineEdit_search_docs.textChanged.connect(self.filter_table_documents)
         
         # 테이블 헤더 설정 (tab_3)
         self.tableWidget_documents.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -202,6 +203,44 @@ class RegionManagerDialog(QDialog):
             
             self.tableWidget_sealed.setRowHidden(row, not matches)
 
+    def filter_table_documents(self):
+        """검색어에 따라 tab_3의 서류 테이블을 필터링합니다."""
+        search_text = self.lineEdit_search_docs.text().strip()
+        
+        if not search_text:
+            # 검색어가 없으면 모든 행 표시
+            for row in range(self.tableWidget_documents.rowCount()):
+                self.tableWidget_documents.setRowHidden(row, False)
+            return
+        
+        # 검색어의 초성 추출
+        search_chosung = self._extract_chosung(search_text)
+        search_lower = search_text.lower()
+        
+        # 각 행에 대해 필터링
+        for row in range(self.tableWidget_documents.rowCount()):
+            region_item = self.tableWidget_documents.item(row, 0)
+            if not region_item:
+                self.tableWidget_documents.setRowHidden(row, True)
+                continue
+            
+            region = region_item.text()
+            region_chosung = self._extract_chosung(region)
+            region_lower = region.lower()
+            
+            # 매칭 조건:
+            # 1. 일반 텍스트 포함 검색
+            # 2. 초성 검색
+            # 3. 부분 일치 (간단하게 검색)
+            matches = (
+                search_lower in region_lower or
+                search_chosung in region_chosung or
+                region_lower.startswith(search_lower) or
+                region_chosung.startswith(search_chosung)
+            )
+            
+            self.tableWidget_documents.setRowHidden(row, not matches)
+
     def _format_document_summary(self, items):
         """서류 목록을 요약 텍스트로 변환 (예: "초본 외 2건")"""
         if not items or len(items) == 0:
@@ -267,6 +306,9 @@ class RegionManagerDialog(QDialog):
                 additional_item = QTableWidgetItem(additional_summary)
                 additional_item.setFlags(additional_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
                 self.tableWidget_documents.setItem(row_idx, 2, additional_item)
+            
+            # 로드 후 현재 검색어에 맞춰 필터링 적용
+            self.filter_table_documents()
                 
         except Exception as e:
             QMessageBox.critical(self, "오류", f"서류 데이터를 로드하는 중 오류가 발생했습니다: {str(e)}")
