@@ -93,6 +93,7 @@
      <string>편집</string>
     </property>
     <addaction name="action_scheduled_local_government"/>
+    <addaction name="action_region_manager"/>
    </widget>
    <widget class="QMenu" name="menu_view">
     <property name="title">
@@ -273,6 +274,11 @@
   <action name="action_scheduled_local_government">
    <property name="text">
     <string>예정 지자체</string>
+   </property>
+  </action>
+  <action name="action_region_manager">
+   <property name="text">
+    <string>지역 관리</string>
    </property>
   </action>
  </widget>

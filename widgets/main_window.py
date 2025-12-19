@@ -36,6 +36,7 @@ from widgets.necessary_widget import NecessaryWidget
 from widgets.multi_child_check_dialog import MultiChildCheckDialog
 from widgets.help_dialog import HelpDialog
 from widgets.scheduled_region_dialog import ScheduledRegionDialog
+from widgets.region_manager_dialog import RegionManagerDialog
 
 
 class MainWindow(QMainWindow):
@@ -239,6 +240,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'action_scheduled_local_government'):
             self.action_scheduled_local_government.setEnabled(False) # 초기에는 비활성화 (로그인 후 권한 체크)
             self.action_scheduled_local_government.triggered.connect(self._open_scheduled_region_dialog)
+        
+        # 지역 관리 액션 (UI 파일에 정의됨)
+        if hasattr(self, 'action_region_manager'):
+            self.action_region_manager.triggered.connect(self._open_region_manager_dialog)
         
         self.menu_edit.addSeparator()
         
@@ -499,6 +504,11 @@ class MainWindow(QMainWindow):
     def _open_scheduled_region_dialog(self):
         """예정 지자체 관리 다이얼로그를 연다."""
         dialog = ScheduledRegionDialog(self)
+        dialog.exec()
+
+    def _open_region_manager_dialog(self):
+        """지역 관리 다이얼로그를 연다."""
+        dialog = RegionManagerDialog(self)
         dialog.exec()
 
     def _open_special_note_dialog(self):
