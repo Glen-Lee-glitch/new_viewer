@@ -123,6 +123,15 @@ class SpecialNoteDialog(QDialog):
         self.rb_group.addButton(self.rb_blurry)
         self.rb_group.addButton(self.rb_necessary)
         
+        # 추가 UI: 지세과 + 누락 시 표시될 라벨
+        self.label_address_needed = QLabel("필요 주소 내역")
+        self.label_address_needed.setStyleSheet("color: #d32f2f; font-weight: bold; margin-top: 10px;")
+        self.label_address_needed.setVisible(False)
+        self.side_panel_layout.addWidget(self.label_address_needed)
+        
+        # Connect signal for radio button
+        self.rb_missing.toggled.connect(self._update_extra_widgets_visibility)
+        
         self.side_panel_layout.addStretch()
         
         # 다이얼로그의 메인 레이아웃을 가로(HBox)로 변경
@@ -200,6 +209,10 @@ class SpecialNoteDialog(QDialog):
             self.REQ_ITEMS, 
             self.req_checkboxes
         )
+        
+        # 지세과 체크박스 이벤트 연결
+        if '지세과' in self.missing_checkboxes:
+            self.missing_checkboxes['지세과']['cb'].toggled.connect(self._update_extra_widgets_visibility)
 
     def _setup_checkbox_grid(self, layout: QGridLayout, label_text: str, items: list, storage: dict):
         """Helper to populate a grid layout with checkboxes and optional 'Other' input."""
@@ -253,6 +266,19 @@ class SpecialNoteDialog(QDialog):
             for item_text in items:
                 if item_text != "기타":
                     storage[item_text]['cb'].toggled.connect(self._update_side_panel_visibility)
+
+    def _update_extra_widgets_visibility(self):
+        """'지세과'가 체크되어 있고, 라디오버튼이 '누락'일 때 추가 위젯을 표시한다."""
+        is_jise_checked = False
+        if '지세과' in self.missing_checkboxes:
+            is_jise_checked = self.missing_checkboxes['지세과']['cb'].isChecked()
+        
+        is_missing_rb_checked = self.rb_missing.isChecked()
+        
+        if is_jise_checked and is_missing_rb_checked:
+            self.label_address_needed.setVisible(True)
+        else:
+            self.label_address_needed.setVisible(False)
 
     def _update_side_panel_visibility(self):
         """Update visibility of the side panel when any 서류미비 checkbox is toggled."""
