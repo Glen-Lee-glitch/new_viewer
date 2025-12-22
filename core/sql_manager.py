@@ -1208,6 +1208,10 @@ def insert_additional_note(
         detail_info: 서류미비 상세 사유 내용 (선택사항)
             - 내용이 있으면 저장, 없으면 NULL 유지
     
+    Note:
+        - rns 테이블에서 RN에 해당하는 recent_thread_id를 자동으로 조회하여
+          additional_note 테이블의 thread_id 컬럼에 저장합니다.
+    
     Returns:
         삽입/업데이트 성공 여부
     """
@@ -1244,6 +1248,11 @@ def insert_additional_note(
             # 특이사항 내용이 하나라도 있는 경우에만 저장
             if missing_docs or requirements or other_detail or detail_info:
                 with connection.cursor() as cursor:
+                    # rns 테이블에서 recent_thread_id 조회
+                    cursor.execute("SELECT recent_thread_id FROM rns WHERE \"RN\" = %s", (rn,))
+                    row = cursor.fetchone()
+                    thread_id = row[0] if row and row[0] else None
+                    
                     # 리스트를 JSON 문자열로 변환 (None이면 NULL)
                     missing_docs_json = json.dumps(missing_docs, ensure_ascii=False) if missing_docs else None
                     requirements_json = json.dumps(requirements, ensure_ascii=False) if requirements else None
@@ -1253,19 +1262,20 @@ def insert_additional_note(
                     # RN 기준으로 Upsert (기존 MySQL ON DUPLICATE KEY UPDATE 대응)
                     query = """
                         INSERT INTO additional_note (
-                            "RN", missing_docs, requirements, other_detail, detail_info
+                            "RN", thread_id, missing_docs, requirements, other_detail, detail_info
                         ) VALUES (
-                            %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s
                         )
                         ON CONFLICT ("RN") DO UPDATE
-                        SET missing_docs = EXCLUDED.missing_docs,
+                        SET thread_id = EXCLUDED.thread_id,
+                            missing_docs = EXCLUDED.missing_docs,
                             requirements = EXCLUDED.requirements,
                             other_detail = EXCLUDED.other_detail,
                             detail_info = EXCLUDED.detail_info,
                             updated_at = CURRENT_TIMESTAMP
                     """
                     cursor.execute(query, (
-                        rn, missing_docs_json, requirements_json, other_detail, detail_info_value
+                        rn, thread_id, missing_docs_json, requirements_json, other_detail, detail_info_value
                     ))
             
             connection.commit()
