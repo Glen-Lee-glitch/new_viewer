@@ -10,6 +10,7 @@ class DocumentItemWidget(QWidget):
     """서류 항목 하나를 표시하고 수정/삭제하는 위젯"""
     def __init__(self, text="", parent=None):
         super().__init__(parent)
+        self.is_deleted = False
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 2, 0, 2)
         
@@ -21,7 +22,12 @@ class DocumentItemWidget(QWidget):
         layout.addWidget(self.line_edit)
         layout.addWidget(self.btn_delete)
         
-        self.btn_delete.clicked.connect(self.deleteLater)
+        self.btn_delete.clicked.connect(self.mark_as_deleted)
+
+    def mark_as_deleted(self):
+        self.is_deleted = True
+        self.hide()
+        self.deleteLater()
 
     def get_text(self):
         return self.line_edit.text().strip()
@@ -59,7 +65,7 @@ class DocumentListEditor(QWidget):
         items = []
         for i in range(self.scroll_layout.count()):
             widget = self.scroll_layout.itemAt(i).widget()
-            if isinstance(widget, DocumentItemWidget) and widget.isVisible():
+            if isinstance(widget, DocumentItemWidget) and not widget.is_deleted:
                 text = widget.get_text()
                 if text:
                     items.append(text)
@@ -77,11 +83,10 @@ class DocumentEditDialog(QDialog):
         self.tab_widget = QTabWidget()
         
         # 데이터 초기화
-        if not data:
-            data = {"general_documents": [], "additional_documents": []}
+        self.original_data = data if data else {"general_documents": [], "additional_documents": []}
         
-        self.general_editor = DocumentListEditor(data.get("general_documents", []))
-        self.additional_editor = DocumentListEditor(data.get("additional_documents", []))
+        self.general_editor = DocumentListEditor(self.original_data.get("general_documents", []))
+        self.additional_editor = DocumentListEditor(self.original_data.get("additional_documents", []))
         
         self.tab_widget.addTab(self.general_editor, "일반서류")
         self.tab_widget.addTab(self.additional_editor, "추가서류")
@@ -105,10 +110,12 @@ class DocumentEditDialog(QDialog):
 
     def get_data(self):
         """수정된 데이터를 dict 형태로 반환"""
-        return {
+        data = self.original_data.copy()
+        data.update({
             "general_documents": self.general_editor.get_items(),
             "additional_documents": self.additional_editor.get_items()
-        }
+        })
+        return data
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
