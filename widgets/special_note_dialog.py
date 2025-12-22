@@ -113,12 +113,15 @@ class SpecialNoteDialog(QDialog):
         # 특이사항 라디오 버튼 추가
         self.rb_missing = QRadioButton("누락")
         self.rb_blurry = QRadioButton("흐릿")
+        self.rb_necessary = QRadioButton("필요")
         self.side_panel_layout.addWidget(self.rb_missing)
         self.side_panel_layout.addWidget(self.rb_blurry)
+        self.side_panel_layout.addWidget(self.rb_necessary)
         
         self.rb_group = QButtonGroup(self)
         self.rb_group.addButton(self.rb_missing)
         self.rb_group.addButton(self.rb_blurry)
+        self.rb_group.addButton(self.rb_necessary)
         
         self.side_panel_layout.addStretch()
         
