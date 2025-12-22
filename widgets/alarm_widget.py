@@ -122,6 +122,9 @@ class AlarmWidget(QWidget):
             self._ev_buttons_container = None
         
         if not rn_data_list:
+            # 데이터가 없을 때도 빈 컨테이너 생성 (다음 새로고침을 위해)
+            self._ev_buttons_container = QWidget()
+            parent_layout.addWidget(self._ev_buttons_container)
             return
         
         # 스크롤 영역 생성
