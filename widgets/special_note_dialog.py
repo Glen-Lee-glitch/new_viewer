@@ -2,8 +2,10 @@ import sys
 import os
 import re
 from PyQt6.QtWidgets import (
-    QDialog, QApplication, QCheckBox, QLineEdit, QGridLayout, QLabel, QMessageBox, QInputDialog
+    QDialog, QApplication, QCheckBox, QLineEdit, QGridLayout, QLabel, QMessageBox, QInputDialog,
+    QFrame, QHBoxLayout, QWidget, QVBoxLayout, QSizePolicy
 )
+from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, Qt
 from PyQt6.uic import loadUi
 
 # Ensure we can import from core/widgets if needed in the future
@@ -29,6 +31,9 @@ class SpecialNoteDialog(QDialog):
         ui_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ui", "special_note_dialog.ui")
         loadUi(ui_path, self)
         
+        # Initialize slide panel (must be before other UI initialization)
+        self._init_slide_panel()
+        
         # Dynamic Widget Storage
         self.missing_checkboxes = {}  # {name: {'cb': QCheckBox, 'le': QLineEdit|None, 'label': QLabel|None}}
         self.req_checkboxes = {}      # {name: {'cb': QCheckBox, 'le': QLineEdit|None}}
@@ -49,6 +54,88 @@ class SpecialNoteDialog(QDialog):
 
         # Connect Send button
         self.pushButton.clicked.connect(self.on_send_clicked)
+
+    def _init_slide_panel(self):
+        """기존 UI를 감싸고 우측에 슬라이드 패널을 추가하는 레이아웃 재구성"""
+        # 다이얼로그의 현재 크기 저장
+        current_size = self.size()
+        if current_size.width() < 500: current_size.setWidth(500)
+        if current_size.height() < 300: current_size.setHeight(300)
+
+        # 기존 레이아웃 가져오기
+        old_layout = self.layout()
+        if not old_layout:
+            return
+        
+        # 기존 내용을 담을 컨테이너 위젯 생성
+        self.original_content_widget = QWidget()
+        self.original_content_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
+        # 새 VBox 레이아웃 생성 및 기존 아이템들을 모두 이동
+        new_vbox = QVBoxLayout(self.original_content_widget)
+        new_vbox.setContentsMargins(9, 9, 9, 9)
+        new_vbox.setSpacing(6)
+        
+        while old_layout.count():
+            item = old_layout.takeAt(0)
+            if item.widget():
+                new_vbox.addWidget(item.widget())
+            elif item.layout():
+                new_vbox.addLayout(item.layout())
+            elif item.spacerItem():
+                new_vbox.addItem(item.spacerItem())
+        
+        # 기존 레이아웃 안전하게 분리 (중복 레이아웃 경고 방지 핵심 트릭)
+        QWidget().setLayout(old_layout)
+        
+        # 우측 슬라이드 패널 생성
+        self.side_panel = QFrame()
+        self.side_panel.setFrameShape(QFrame.Shape.StyledPanel)
+        self.side_panel.setStyleSheet("""
+            QFrame {
+                background-color: #f9f9f9;
+                border-left: 1px solid #d0d0d0;
+            }
+        """)
+        self.side_panel.setFixedWidth(0)
+        self.side_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        
+        # 패널 내부 레이아웃
+        self.side_panel_layout = QVBoxLayout(self.side_panel)
+        self.side_panel_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # 다이얼로그의 메인 레이아웃을 가로(HBox)로 변경
+        main_hbox_layout = QHBoxLayout(self)
+        main_hbox_layout.setContentsMargins(0, 0, 0, 0)
+        main_hbox_layout.setSpacing(0)
+        
+        # 좌측(기존 내용) + 우측(패널) 추가
+        main_hbox_layout.addWidget(self.original_content_widget)
+        main_hbox_layout.addWidget(self.side_panel)
+        
+        # 애니메이션 객체 생성 (maximumWidth 사용이 가장 안정적입니다)
+        self.side_panel_animation = QPropertyAnimation(self.side_panel, b"maximumWidth")
+        self.side_panel_animation.setDuration(300)
+        self.side_panel_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        
+        # 다이얼로그 크기 설정
+        self.setMinimumSize(500, 300)
+        self.resize(current_size)
+
+    def _animate_side_panel(self, show: bool):
+        """패널 열기/닫기 애니메이션"""
+        target_width = 300 if show else 0
+        
+        if self.side_panel_animation.state() == QPropertyAnimation.State.Running:
+            self.side_panel_animation.stop()
+        
+        current_width = self.side_panel.width()
+        if current_width == target_width:
+            return
+        
+        self.side_panel_animation.setStartValue(current_width)
+        self.side_panel_animation.setEndValue(target_width)
+        self.side_panel_animation.start()
 
     def on_cancel_clicked(self):
         """Handle cancel button click: update status to 'pdf 전처리' and close."""
@@ -185,6 +272,10 @@ class SpecialNoteDialog(QDialog):
             self.missing_docs_separator_label.setVisible(any_checked)
         if hasattr(self, 'missing_docs_line_edit'):
             self.missing_docs_line_edit.setVisible(any_checked)
+        
+        # 우측 패널 열기/닫기 애니메이션
+        if hasattr(self, '_animate_side_panel'):
+            self._animate_side_panel(any_checked)
 
     def update_ui_state(self):
         """Show/Hide sub-frames based on main checkbox state and adjust size."""
@@ -192,9 +283,14 @@ class SpecialNoteDialog(QDialog):
         self.sub_frame_req.setVisible(self.checkBox.isChecked())
         self.sub_frame_other.setVisible(self.checkBox_3.isChecked())
         
-        # Adjust size to fit content tightly
+        # Adjust size to fit content tightly, but maintain minimum size
         QApplication.processEvents()
         self.adjustSize()
+        # 최소 크기 보장
+        if self.width() < 500:
+            self.resize(500, self.height())
+        if self.height() < 200:
+            self.resize(self.width(), 200)
     
     def _is_valid_rn(self, rn_text):
         """Check if RN format matches 'RN' followed by 9 digits."""
