@@ -136,6 +136,10 @@ class PdfLoadWidget(QWidget):
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
+        # 단일 행 선택 모드 설정
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        
         # 커스텀 배경색이 alternatingRowColors에 의해 덮어씌워지는 것을 방지
         table.setAlternatingRowColors(False)
         
