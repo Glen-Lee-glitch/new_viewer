@@ -3,7 +3,7 @@ import os
 import re
 from PyQt6.QtWidgets import (
     QDialog, QApplication, QCheckBox, QLineEdit, QGridLayout, QLabel, QMessageBox, QInputDialog,
-    QFrame, QHBoxLayout, QWidget, QVBoxLayout, QSizePolicy
+    QFrame, QHBoxLayout, QWidget, QVBoxLayout, QSizePolicy, QRadioButton, QButtonGroup
 )
 from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, Qt
 from PyQt6.uic import loadUi
@@ -90,11 +90,17 @@ class SpecialNoteDialog(QDialog):
         
         # 우측 슬라이드 패널 생성
         self.side_panel = QFrame()
+        self.side_panel.setObjectName("side_panel")
         self.side_panel.setFrameShape(QFrame.Shape.StyledPanel)
         self.side_panel.setStyleSheet("""
-            QFrame {
+            QFrame#side_panel {
                 background-color: #f9f9f9;
                 border-left: 1px solid #d0d0d0;
+            }
+            QRadioButton {
+                color: #212121;
+                font-size: 10pt;
+                padding: 5px;
             }
         """)
         self.side_panel.setFixedWidth(0)
@@ -103,6 +109,18 @@ class SpecialNoteDialog(QDialog):
         # 패널 내부 레이아웃
         self.side_panel_layout = QVBoxLayout(self.side_panel)
         self.side_panel_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # 특이사항 라디오 버튼 추가
+        self.rb_missing = QRadioButton("누락")
+        self.rb_blurry = QRadioButton("흐릿")
+        self.side_panel_layout.addWidget(self.rb_missing)
+        self.side_panel_layout.addWidget(self.rb_blurry)
+        
+        self.rb_group = QButtonGroup(self)
+        self.rb_group.addButton(self.rb_missing)
+        self.rb_group.addButton(self.rb_blurry)
+        
+        self.side_panel_layout.addStretch()
         
         # 다이얼로그의 메인 레이아웃을 가로(HBox)로 변경
         main_hbox_layout = QHBoxLayout(self)
@@ -124,7 +142,7 @@ class SpecialNoteDialog(QDialog):
 
     def _animate_side_panel(self, show: bool):
         """패널 열기/닫기 애니메이션"""
-        target_width = 300 if show else 0
+        target_width = 650 if show else 0
         
         if self.side_panel_animation.state() == QPropertyAnimation.State.Running:
             self.side_panel_animation.stop()
