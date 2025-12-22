@@ -167,12 +167,6 @@ class SpecialNoteDialog(QDialog):
             self.close()
             return
 
-        # 취소 확인 (선택사항, 여기서는 즉시 실행)
-        # reply = QMessageBox.question(self, '취소', '취소하시겠습니까? 상태가 "pdf 전처리"로 변경됩니다.',
-        #                              QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
-        # if reply == QMessageBox.StandardButton.No:
-        #     return
-
         # 데이터베이스 상태 업데이트 (특이사항 내용은 저장하지 않음)
         success = insert_additional_note(
             rn=rn,
@@ -254,45 +248,19 @@ class SpecialNoteDialog(QDialog):
                 col = 0
                 row += 1
         
-        # Second pass: For 서류미비, add a single LineEdit for all items
+        # Connect all checkboxes (except "기타") to update side panel visibility for missing docs
         if is_missing_docs:
-            # Find the last row used for checkboxes
-            last_checkbox_row = row
-            
-            # Add a separator label
-            separator_row = last_checkbox_row + 1
-            separator_label = QLabel("해당 서류 내용:")
-            separator_label.setStyleSheet("color: gray; font-size: 9pt;")
-            separator_label.setVisible(False)
-            layout.addWidget(separator_label, separator_row, 0, 1, 1)
-            self.missing_docs_separator_label = separator_label
-            
-            # Add a single LineEdit for all 서류미비 items
-            line_edit_row = separator_row
-            le = QLineEdit()
-            le.setPlaceholderText("상세 사유 입력")
-            le.setVisible(False) # Initially hidden
-            layout.addWidget(le, line_edit_row, 1, 1, 3)
-            self.missing_docs_line_edit = le
-            
-            # Connect all checkboxes (except "기타") to update line edit visibility
             for item_text in items:
                 if item_text != "기타":
-                    storage[item_text]['cb'].toggled.connect(self._update_missing_docs_line_edits)
+                    storage[item_text]['cb'].toggled.connect(self._update_side_panel_visibility)
 
-    def _update_missing_docs_line_edits(self):
-        """Update visibility of the single line edit when any 서류미비 checkbox is toggled."""
+    def _update_side_panel_visibility(self):
+        """Update visibility of the side panel when any 서류미비 checkbox is toggled."""
         # Check if any checkbox is checked (excluding "기타" which has its own logic)
         any_checked = any(
             widgets['cb'].isChecked() and name != '기타' 
             for name, widgets in self.missing_checkboxes.items()
         )
-        
-        # Show/hide separator label and line edit
-        if hasattr(self, 'missing_docs_separator_label'):
-            self.missing_docs_separator_label.setVisible(any_checked)
-        if hasattr(self, 'missing_docs_line_edit'):
-            self.missing_docs_line_edit.setVisible(any_checked)
         
         # 우측 패널 열기/닫기 애니메이션
         if hasattr(self, '_animate_side_panel'):
@@ -403,12 +371,13 @@ class SpecialNoteDialog(QDialog):
         results = self.get_selected_data()
         rn = self.RN_lineEdit.text().strip()
         
-        # 상세 사유 가져오기 (서류미비 대분류가 선택된 경우)
+        # 사이드 패널의 라디오 버튼 값 가져오기 (detail_info로 저장)
         detail_info = None
-        if self.checkBox_2.isChecked() and hasattr(self, 'missing_docs_line_edit'):
-            detail_info = self.missing_docs_line_edit.text().strip()
+        checked_button = self.rb_group.checkedButton()
+        if checked_button:
+            detail_info = checked_button.text()
 
-        # 데이터베이스에 저장 (status='작업자 확인'으로 변경)
+        # 데이터베이스에 저장 (status='서류미비 요청'으로 변경)
         success = insert_additional_note(
             rn=rn,
             missing_docs=results['missing'] if results['missing'] else None,
