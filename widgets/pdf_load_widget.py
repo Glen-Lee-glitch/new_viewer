@@ -990,3 +990,27 @@ class PdfLoadWidget(QWidget):
                 rn_item = self.complement_table_widget.item(row, 1) # RN은 1번 컬럼
                 if rn_item:
                     self.ai_review_requested.emit(rn_item.text())
+
+    def get_selected_rn(self) -> str | None:
+        """현재 선택된 행의 RN을 반환한다."""
+        if not hasattr(self, 'complement_table_widget'):
+            return None
+            
+        table = self.complement_table_widget
+        # 선택된 범위(SelectionRange)를 확인
+        ranges = table.selectedRanges()
+        if not ranges:
+            # 선택된 아이템으로 대체 확인
+            selected_items = table.selectedItems()
+            if not selected_items:
+                return None
+            row = selected_items[0].row()
+        else:
+            # 첫 번째 선택 영역의 첫 번째 행 사용
+            row = ranges[0].topRow()
+        
+        # RN 컬럼은 1번
+        rn_item = table.item(row, 1)
+        if rn_item:
+            return rn_item.text().strip()
+        return None

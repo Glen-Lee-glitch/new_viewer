@@ -397,11 +397,21 @@ class SpecialNoteDialog(QDialog):
         results = self.get_selected_data()
         rn = self.RN_lineEdit.text().strip()
         
+        # 사이드 패널 활성화 여부 확인
+        # 서류미비가 체크되어 있고, '기타'를 제외한 상세 항목이 하나라도 체크되어 있어야 함
+        is_side_panel_active = False
+        if self.checkBox_2.isChecked():
+            is_side_panel_active = any(
+                widgets['cb'].isChecked() and name != '기타' 
+                for name, widgets in self.missing_checkboxes.items()
+            )
+        
         # 사이드 패널의 라디오 버튼 값 가져오기 (detail_info로 저장)
         detail_info = None
-        checked_button = self.rb_group.checkedButton()
-        if checked_button:
-            detail_info = checked_button.text()
+        if is_side_panel_active:
+            checked_button = self.rb_group.checkedButton()
+            if checked_button:
+                detail_info = checked_button.text()
 
         # 데이터베이스에 저장 (status='서류미비 요청'으로 변경)
         success = insert_additional_note(
