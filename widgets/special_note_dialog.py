@@ -286,13 +286,19 @@ class SpecialNoteDialog(QDialog):
         results = self.get_selected_data()
         rn = self.RN_lineEdit.text().strip()
         
+        # 상세 사유 가져오기 (서류미비 대분류가 선택된 경우)
+        detail_info = None
+        if self.checkBox_2.isChecked() and hasattr(self, 'missing_docs_line_edit'):
+            detail_info = self.missing_docs_line_edit.text().strip()
+
         # 데이터베이스에 저장 (status='작업자 확인'으로 변경)
         success = insert_additional_note(
             rn=rn,
             missing_docs=results['missing'] if results['missing'] else None,
             requirements=results['requirements'] if results['requirements'] else None,
             other_detail=results['other'],
-            target_status='서류미비 요청'
+            target_status='서류미비 요청',
+            detail_info=detail_info
         )
         
         if success:
