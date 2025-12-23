@@ -193,8 +193,8 @@ class AlarmWidget(QWidget):
             
             # 버튼 클릭 핸들러 설정
             if source_type == 'ev_complement':
-                # ev_complement 타입은 아무 작동도 하지 않음 (추후 구현 예정)
-                btn.clicked.connect(lambda checked: self._handle_ev_complement_click())
+                # ev_complement 타입도 작업 시작이 가능하도록 시그널 발생 (PdfLoadWidget의 기능과 연결)
+                btn.clicked.connect(lambda checked, r=rn: self.rn_work_requested.emit(r))
             else:
                 # 기존 RN 작업 요청 시그널 발생
                 btn.clicked.connect(lambda checked, r=rn: self.rn_work_requested.emit(r))
