@@ -205,7 +205,7 @@
          </column>
          <column>
           <property name="text">
-           <string>오픈 예정일 (YYYY-MM-DD HH:MM:SS)</string>
+           <string>오픈 예정 시간 (시)</string>
           </property>
          </column>
         </widget>

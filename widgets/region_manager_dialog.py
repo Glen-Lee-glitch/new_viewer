@@ -4,9 +4,9 @@ from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtWidgets import (
     QDialog, QTableWidgetItem, QCheckBox, QHBoxLayout, QWidget, 
-    QMessageBox, QApplication, QHeaderView
+    QMessageBox, QApplication, QHeaderView, QDateTimeEdit
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QDateTime, QDate, QTime
 import json
 from datetime import datetime
 
@@ -396,6 +396,7 @@ class RegionManagerDialog(QDialog):
             
             self.tableWidget_after_open.setRowCount(len(rows))
             self.original_after_data = {}
+            self.after_date_widgets = {} # 위젯 참조 초기화
             
             for row_idx, (region, after_date) in enumerate(rows):
                 # 1. 지역 (Read-only)
@@ -403,19 +404,51 @@ class RegionManagerDialog(QDialog):
                 region_item.setFlags(region_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
                 self.tableWidget_after_open.setItem(row_idx, 0, region_item)
                 
-                # 2. 오픈 예정일 (Editable text)
-                date_str = ""
+                # 2. 오픈 예정일 (CheckBox + QDateTimeEdit)
+                container = QWidget()
+                layout = QHBoxLayout(container)
+                layout.setContentsMargins(5, 0, 5, 0)
+                layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                
+                chk_enable = QCheckBox()
+                dt_edit = QDateTimeEdit()
+                dt_edit.setDisplayFormat("yyyy-MM-dd HH")
+                dt_edit.setCalendarPopup(True)
+                
                 if after_date:
-                    # datetime 객체인 경우 포맷팅
+                    chk_enable.setChecked(True)
+                    dt_edit.setEnabled(True)
+                    # datetime 객체를 QDateTime으로 변환
                     if isinstance(after_date, datetime):
-                        date_str = after_date.strftime("%Y-%m-%d %H:%M:%S")
+                        qdt = QDateTime(
+                            after_date.year, after_date.month, after_date.day,
+                            after_date.hour, 0, 0 # 분, 초는 0으로 초기화
+                        )
+                        dt_edit.setDateTime(qdt)
                     else:
-                        date_str = str(after_date)
+                        # 폴백: 현재 날짜의 오전 9시
+                        qdt = QDateTime.currentDateTime()
+                        qdt.setTime(QTime(9, 0, 0))
+                        dt_edit.setDateTime(qdt)
+                else:
+                    chk_enable.setChecked(False)
+                    dt_edit.setEnabled(False)
+                    # 날짜가 없을 경우 기본값을 내일 오전 9시로 설정
+                    qdt = QDateTime.currentDateTime().addDays(1)
+                    qdt.setTime(QTime(9, 0, 0))
+                    dt_edit.setDateTime(qdt)
                 
-                date_item = QTableWidgetItem(date_str)
-                self.tableWidget_after_open.setItem(row_idx, 1, date_item)
+                # 체크박스 상태 변경 시 DateTimeEdit 활성/비활성 토글
+                chk_enable.stateChanged.connect(lambda state, de=dt_edit: de.setEnabled(state == Qt.CheckState.Checked.value))
                 
-                self.original_after_data[region] = date_str
+                layout.addWidget(chk_enable)
+                layout.addWidget(dt_edit)
+                
+                self.tableWidget_after_open.setCellWidget(row_idx, 1, container)
+                
+                # 데이터 저장 (위젯 참조 및 원본 데이터)
+                self.after_date_widgets[region] = (chk_enable, dt_edit)
+                self.original_after_data[region] = after_date # datetime object or None
             
             self.filter_table_after_open()
                 
@@ -458,22 +491,43 @@ class RegionManagerDialog(QDialog):
     def save_after_open_data(self):
         """오픈 예정일 변경사항을 저장합니다."""
         changed_data = []
+        today = datetime.now().date()
         
-        for row in range(self.tableWidget_after_open.rowCount()):
-            region_item = self.tableWidget_after_open.item(row, 0)
-            date_item = self.tableWidget_after_open.item(row, 1)
+        for region, (chk, dt_edit) in self.after_date_widgets.items():
+            original_val = self.original_after_data.get(region)
             
-            if not region_item or not date_item:
-                continue
+            new_val = None
+            if chk.isChecked():
+                # QDateTime -> python datetime
+                qdt = dt_edit.dateTime()
+                new_val = datetime(
+                    qdt.date().year(), qdt.date().month(), qdt.date().day(),
+                    qdt.time().hour(), 0, 0 # 분, 초는 무조건 0으로 저장
+                )
+            
+            # 값 비교 (None vs None, datetime vs datetime)
+            is_changed = False
+            if original_val is None and new_val is not None:
+                is_changed = True
+            elif original_val is not None and new_val is None:
+                is_changed = True
+            elif original_val is not None and new_val is not None:
+                # 초 단위까지만 비교 (microseconds 무시)
+                if original_val.replace(microsecond=0) != new_val.replace(microsecond=0):
+                    is_changed = True
+            
+            if is_changed:
+                # 검증 로직: 금일 포함 이전 날짜는 설정 불가 (내일 이후만 가능)
+                if new_val is not None and new_val.date() <= today:
+                    QMessageBox.warning(
+                        self, 
+                        "검증 오류", 
+                        f"[{region}] 오픈 예정일은 내일 이후 날짜로만 설정 가능합니다.\n"
+                        f"(오늘 날짜: {today.strftime('%Y-%m-%d')})"
+                    )
+                    return # 저장 중단
                 
-            region = region_item.text()
-            new_date_str = date_item.text().strip()
-            original_date_str = self.original_after_data.get(region, "")
-            
-            if new_date_str != original_date_str:
-                # 빈 문자열은 None(NULL)으로 처리
-                val_to_save = new_date_str if new_date_str else None
-                changed_data.append((val_to_save, region))
+                changed_data.append((new_val, region))
         
         if not changed_data:
             QMessageBox.information(self, "알림", "변경된 내용이 없습니다.")
