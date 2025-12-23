@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QHeaderView, QPushButton, QMessageBox, 
     QAbstractItemView, QStyleOptionViewItem, QStyleOptionButton, 
     QStyle, QStyledItemDelegate, QHBoxLayout, QLabel, QApplication,
-    QCheckBox
+    QCheckBox, QRadioButton, QButtonGroup
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush, QPainter
@@ -54,8 +54,9 @@ class SubsidyHistoryDialog(QDialog):
     work_started = pyqtSignal(list, dict)  # 작업 시작 시그널 (파일 경로 리스트, 메타데이터)
     ai_review_requested = pyqtSignal(str) # AI 검토 요청 시그널 (RN)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, worker_id=None):
         super().__init__(parent)
+        self.worker_id = worker_id
         self.setWindowTitle("지원금 신청 전체 목록")
         self.resize(1000, 650)
         
@@ -70,16 +71,35 @@ class SubsidyHistoryDialog(QDialog):
         self.refresh_btn = QPushButton("데이터 새로고침")
         self.refresh_btn.clicked.connect(self.populate_table)
         
+        # 필터 그룹
+        self.filter_group = QButtonGroup(self)
+        
+        self.radio_all = QRadioButton("전체")
+        self.radio_my = QRadioButton("내 작업건")
+        self.radio_unfinished = QRadioButton("미작업건")
+        
+        self.filter_group.addButton(self.radio_all, 0)
+        self.filter_group.addButton(self.radio_my, 1)
+        self.filter_group.addButton(self.radio_unfinished, 2)
+        
+        self.radio_all.setChecked(True)
+        # 필터 변경 시 페이지 리셋 및 갱신 (arguments 무시를 위해 lambda 사용)
+        self.filter_group.buttonClicked.connect(lambda: self._on_filter_changed())
+
         # '추후 신청' 필터 체크박스 추가
         self.filter_checkbox = QCheckBox("'추후 신청'만 보기")
-        self.filter_checkbox.stateChanged.connect(self._on_filter_changed)
+        self.filter_checkbox.stateChanged.connect(lambda: self._on_filter_changed())
         
         self.status_label = QLabel("준비")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
         control_layout.addWidget(self.refresh_btn)
+        control_layout.addWidget(self.radio_all)
+        control_layout.addWidget(self.radio_my)
+        control_layout.addWidget(self.radio_unfinished)
         control_layout.addWidget(self.filter_checkbox)
-        control_layout.addWidget(self.status_label)
         control_layout.addStretch()
+        control_layout.addWidget(self.status_label)
         layout.addLayout(control_layout)
         
         # 테이블 위젯 설정
@@ -208,10 +228,25 @@ class SubsidyHistoryDialog(QDialog):
                 # 기본 쿼리 가져오기
                 base_query = _build_subsidy_query_base()
                 
-                # 필터 조건 추가
+                # 기본 조건 설정 (WHERE 절 시작)
                 where_clause = 'WHERE r.last_received_date >= %s '
                 params = ['2025-01-01 00:00:00']
                 
+                # 라디오 버튼 필터 적용
+                if self.radio_my.isChecked():
+                    if self.worker_id:
+                        where_clause += "AND r.worker_id = %s "
+                        params.append(self.worker_id)
+                    else:
+                        # worker_id가 없으면 결과가 나오지 않도록 처리 (혹은 전체 보기?)
+                        # 여기서는 worker_id IS NOT NULL AND worker_id = -1 같은 불가능한 조건을 추가하거나
+                        # 단순히 빈 결과를 반환하도록 할 수 있음.
+                        # 편의상 worker_id가 없으면 아무것도 안 보이게 함
+                        where_clause += "AND 1=0 " 
+                elif self.radio_unfinished.isChecked():
+                    where_clause += "AND r.worker_id IS NULL "
+                
+                # '추후 신청' 필터 체크박스 적용
                 if self.filter_checkbox.isChecked():
                     where_clause += "AND r.status = '추후 신청' "
                 
