@@ -52,7 +52,9 @@ class InfoPanelWidget(QWidget):
             # 기존 체크박스들 숨기기
             self._set_task_list_visible(False)
             # 텍스트 에디트 보이기 및 내용 설정
-            self._ev_memo_text_edit.setText(ev_memo)
+            # DB에서 가져온 '\\n'을 실제 줄바꿈 문자인 '\n'으로 변환
+            processed_memo = ev_memo.replace('\\n', '\n')
+            self._ev_memo_text_edit.setText(processed_memo)
             self._ev_memo_text_edit.setVisible(True)
             self.groupBox_2.setTitle("보완 요청 사항") # 타이틀 변경
         else:

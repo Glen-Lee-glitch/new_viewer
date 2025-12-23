@@ -1727,6 +1727,7 @@ def fetch_ev_complement_rns(worker_name: str) -> list[str]:
     """
     ev_complement 테이블에서 조건에 맞는 RN 목록을 조회한다.
     조건: ev_complement.RN을 rns 테이블과 조인하여 rns.worker_id가 현재 작업자의 worker_id와 일치
+          또한, is_checked가 true가 아닌 항목만 조회 (false 또는 NULL)
     
     Args:
         worker_name: 작업자 이름
@@ -1748,7 +1749,7 @@ def fetch_ev_complement_rns(worker_name: str) -> list[str]:
                 SELECT DISTINCT ec."RN"
                 FROM ev_complement ec
                 INNER JOIN rns r ON ec."RN" = r."RN"
-                WHERE r.worker_id = %s
+                WHERE r.worker_id = %s AND (ec.is_checked IS NULL OR ec.is_checked = FALSE)
             """
             with connection.cursor() as cursor:
                 cursor.execute(query, (worker_id,))
