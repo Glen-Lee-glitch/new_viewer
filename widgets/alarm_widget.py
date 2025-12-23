@@ -26,8 +26,8 @@ class AlarmWidget(QWidget):
         # 처리완료 리스트 위젯 설정
         self._setup_finished_list()
         
-        # ev_required 버튼 설정 (초기화만, 데이터 로드는 로그인 후)
-        self._setup_ev_required_buttons()
+        # 서류미비 및 확인필요 리스트 설정
+        self._setup_ev_required_list()
         
         # DA 추가요청(수신) 리스트 설정
         self._setup_da_request_list()
@@ -35,17 +35,12 @@ class AlarmWidget(QWidget):
         # 데이터 로드 (worker_name이 있을 때만)
         if self._worker_name:
             self._load_completed_regions()
-            self._update_ev_required_buttons()
+            self._update_ev_required_list()
             self._update_da_request_list()
         
         # 특이사항 입력 버튼 연결
         if hasattr(self, 'open_maildialog'):
             self.open_maildialog.clicked.connect(self._open_special_note_dialog)
-
-        # # 주기적 업데이트 타이머 (5분마다)
-        # self._timer = QTimer()
-        # self._timer.timeout.connect(self._load_completed_regions)
-        # self._timer.start(300000)  # 5분 = 300,000ms
     
     def _setup_finished_list(self):
         """처리완료 그룹박스에 리스트 위젯을 추가한다."""
@@ -75,153 +70,72 @@ class AlarmWidget(QWidget):
 
             layout.addWidget(self._finished_list)
     
-    def _setup_ev_required_buttons(self):
-        """서류미비 및 확인필요 그룹박스에 버튼 컨테이너를 설정한다."""
+    def _setup_ev_required_list(self):
+        """서류미비 및 확인필요 그룹박스에 리스트 위젯을 설정한다."""
         if hasattr(self, 'groupBox_2'):
             # 기존 레이아웃 가져오기
             layout = self.groupBox_2.layout()
             if layout is None:
                 layout = QVBoxLayout(self.groupBox_2)
             
-            # 레이아웃 마진 및 간격 조정 (타이틀 공간 확보를 위해 상단 마진 추가)
+            # 레이아웃 마진 및 간격 조정
             layout.setContentsMargins(2, 15, 2, 2)
             layout.setSpacing(0)
             
-            # 스타일 시트 제거 (기본 테마 스타일 사용)
+            # 스타일 시트 제거
             self.groupBox_2.setStyleSheet("")
             
-            # 버튼 컨테이너 생성 (나중에 업데이트할 때 사용)
-            self._ev_buttons_container = QWidget()
-            layout.addWidget(self._ev_buttons_container)
+            # 리스트 위젯 생성
+            self._ev_required_list = QListWidget()
+            self._ev_required_list.setMaximumHeight(80)
+            
+            # 폰트 크기 조정
+            font = self._ev_required_list.font()
+            font.setPointSize(font.pointSize() - 2)
+            self._ev_required_list.setFont(font)
+            
+            layout.addWidget(self._ev_required_list)
+            
+            # 더블 클릭 시그널 연결
+            self._ev_required_list.itemDoubleClicked.connect(self._on_ev_required_item_double_clicked)
     
-    def _update_ev_required_buttons(self):
-        """ev_required 테이블 정보를 바탕으로 버튼을 갱신한다."""
-        if not self._worker_name:
+    def _update_ev_required_list(self):
+        """ev_required 정보를 리스트 형태로 갱신한다."""
+        if not self._worker_name or not hasattr(self, '_ev_required_list'):
             return
-        
-        if not hasattr(self, 'groupBox_2'):
-            return
-        
+            
         from core.sql_manager import fetch_all_ev_required_rns
-        rn_data_list = fetch_all_ev_required_rns(self._worker_name)
-        
-        # groupBox_2의 레이아웃 가져오기
-        parent_layout = self.groupBox_2.layout()
-        if not parent_layout:
-            return
-        
-        # 기존 컨테이너 제거 (QScrollArea 포함)
-        if hasattr(self, '_ev_buttons_scroll_area') and self._ev_buttons_scroll_area:
-            parent_layout.removeWidget(self._ev_buttons_scroll_area)
-            self._ev_buttons_scroll_area.deleteLater()
-            self._ev_buttons_scroll_area = None
-        elif hasattr(self, '_ev_buttons_container') and self._ev_buttons_container:
-            # 혹시 이전 버전의 컨테이너가 남아있다면 제거
-            parent_layout.removeWidget(self._ev_buttons_container)
-            self._ev_buttons_container.deleteLater()
-            self._ev_buttons_container = None
-        
-        if not rn_data_list:
-            # 데이터가 없을 때도 빈 컨테이너 생성 (다음 새로고침을 위해)
-            self._ev_buttons_container = QWidget()
-            parent_layout.addWidget(self._ev_buttons_container)
-            return
-        
-        # 스크롤 영역 생성
-        self._ev_buttons_scroll_area = QScrollArea()
-        self._ev_buttons_scroll_area.setWidgetResizable(True)
-        self._ev_buttons_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        
-        # 스크롤 영역 내부 컨테이너 위젯
-        scroll_content = QWidget()
-        self._ev_buttons_scroll_area.setWidget(scroll_content)
-        
-        # 세로 정렬 레이아웃 (VBoxLayout)
-        container_layout = QVBoxLayout(scroll_content)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(3)
-        # 위쪽 정렬 (버튼이 위에서부터 쌓이도록)
-        container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
-        # QSizePolicy 임포트 확인
-        from PyQt6.QtWidgets import QSizePolicy
-        
-        for rn, source_type in rn_data_list:
-            btn = QPushButton(rn)
+        try:
+            rn_data_list = fetch_all_ev_required_rns(self._worker_name)
+            self._ev_required_list.clear()
             
-            # 사이즈 정책 및 높이 강제 고정
-            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            btn.setFixedHeight(22)  # 높이를 강제로 22px로 고정
-            
-            # 소스 타입에 따른 배경색 설정 (qt-material 다크 테마 고려)
-            if source_type == 'ev_complement':
-                # ev_complement: 주황색 계열 배경 (보완 필요)
-                bg_color = "rgba(255, 152, 0, 0.3)"  # 주황색 반투명
-                hover_bg = "rgba(255, 152, 0, 0.5)"
-                border_color = "#FF9800"
-            elif source_type == 'chained_emails':
-                # chained_emails: 파란색 계열 배경 (연결된 메일)
-                bg_color = "rgba(33, 150, 243, 0.3)"  # 파란색 반투명
-                hover_bg = "rgba(33, 150, 243, 0.5)"
-                border_color = "#2196F3"
-            else:  # 'rns'
-                # rns: 기본 배경색 (일반 서류 미비)
-                bg_color = "rgba(255, 255, 255, 0.05)"
-                hover_bg = "rgba(255, 255, 255, 0.15)"
-                border_color = "#555"
-            
-            # 스타일 설정
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    font-size: 11px;
-                    padding: 0px;
-                    margin: 0px;
-                    border: 1px solid {border_color};
-                    border-radius: 2px;
-                    background-color: {bg_color};
-                    text-align: center;
-                }}
-                QPushButton:hover {{
-                    background-color: {hover_bg};
-                    border: 1px solid {border_color};
-                }}
-                QPushButton:pressed {{
-                    background-color: {hover_bg};
-                }}
-            """)
-            
-            # 버튼 클릭 핸들러 설정
-            if source_type == 'ev_complement':
-                # ev_complement 타입도 작업 시작이 가능하도록 시그널 발생 (PdfLoadWidget의 기능과 연결)
-                btn.clicked.connect(lambda checked, r=rn: self.rn_work_requested.emit(r))
+            if rn_data_list:
+                for rn, source_type in rn_data_list:
+                    prefix = ""
+                    if source_type == 'ev_complement':
+                        prefix = "(EV) "
+                    elif source_type == 'chained_emails':
+                        prefix = "(요청) "
+                    
+                    self._ev_required_list.addItem(f"{prefix}{rn}")
             else:
-                # 기존 RN 작업 요청 시그널 발생
-                btn.clicked.connect(lambda checked, r=rn: self.rn_work_requested.emit(r))
+                self._ev_required_list.addItem("내역 없음")
+                
+        except Exception as e:
+            print(f"서류미비 목록 로드 중 오류: {e}")
+            self._ev_required_list.clear()
+            self._ev_required_list.addItem("로드 실패")
+
+    def _on_ev_required_item_double_clicked(self, item):
+        """서류미비 리스트 아이템 더블 클릭 시 작업 요청 시그널을 발생시킨다."""
+        text = item.text()
+        if text in ["내역 없음", "로드 실패"]:
+            return
             
-            container_layout.addWidget(btn)
-        
-        # 높이 설정: 버튼 하나당 높이(22) + 간격(3) = 25
-        item_height = 25
-        
-        # 5개 이하일 때는 스크롤 없이 모두 표시
-        if len(rn_data_list) <= 5:
-            # 내용물 크기에 맞춤 (스크롤 필요 없음)
-            # 여유분 5px 추가
-            needed_h = len(rn_data_list) * item_height + 5
-            self._ev_buttons_scroll_area.setFixedHeight(needed_h)
-            self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        else:
-            # 5개 초과 시 최대 5개 높이로 제한하고 스크롤 활성화
-            max_h = 5 * item_height + 5
-            self._ev_buttons_scroll_area.setFixedHeight(max_h)
-            self._ev_buttons_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        
-        # 스크롤 영역 테두리 제거 (깔끔하게 보이도록)
-        self._ev_buttons_scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
-        
-        # 새 스크롤 영역을 groupBox_2에 추가
-        parent_layout.addWidget(self._ev_buttons_scroll_area)
+        # 접두어 제거하고 RN만 추출
+        rn = text.replace("(EV) ", "").replace("(요청) ", "").strip()
+        if rn:
+            self.rn_work_requested.emit(rn)
     
     def _load_completed_regions(self):
         """
@@ -245,7 +159,7 @@ class AlarmWidget(QWidget):
     def refresh_data(self):
         """데이터를 수동으로 새로고침한다."""
         self._load_completed_regions()
-        self._update_ev_required_buttons()
+        self._update_ev_required_list()
         self._update_da_request_list()
 
     def _setup_da_request_list(self):
