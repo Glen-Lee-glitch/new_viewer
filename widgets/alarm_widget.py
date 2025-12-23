@@ -338,12 +338,17 @@ class AlarmWidget(QWidget):
             
             dialog = EmailViewDialog(title=title, content=content, original_worker=original_worker, rn=rn, parent=self)
             
-            # 다이얼로그가 '처리완료'로 닫혔을 때(Accepted) 목록 갱신
-            if dialog.exec() == QDialog.DialogCode.Accepted:
+            # 다이얼로그 결과 처리
+            result = dialog.exec()
+            if result == QDialog.DialogCode.Accepted:
+                # 처리완료 시 목록 갱신
                 self.refresh_data()
                 # 메인 윈도우 새로고침 (데이터 갱신을 위해)
                 if hasattr(self.window(), 'refresh_data'):
                     self.window().refresh_data()
+            elif result == 3:
+                # 처리시작 시 작업 요청 시그널 발생
+                self.rn_work_requested.emit(rn)
             
         except Exception as e:
             print(f"이메일 확인 중 오류 발생: {e}")

@@ -1969,6 +1969,30 @@ def update_subsidy_status_if_new(rn: str, new_status: str) -> bool:
         traceback.print_exc()
         return False
 
+def get_duplicate_rn_file_paths(rn: str) -> list[str]:
+    """
+    duplicated_rn 테이블에서 RN에 해당하는 모든 file_path를 조회한다.
+    
+    Args:
+        rn: RN 번호
+        
+    Returns:
+        file_path 리스트
+    """
+    if not rn:
+        return []
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT file_path FROM duplicated_rn WHERE \"RN\" = %s AND file_path IS NOT NULL"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                rows = cursor.fetchall()
+                return [row[0] for row in rows if row[0]]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 def fetch_after_apply_counts() -> tuple[int, int]:
     """
     TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화

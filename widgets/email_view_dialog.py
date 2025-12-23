@@ -64,8 +64,26 @@ class EmailViewDialog(QDialog):
         # 버튼 영역
         button_layout = QHBoxLayout()
         
-        # 처리완료 버튼 (RN이 있을 때만 표시)
+        # 처리시작 및 처리완료 버튼 (RN이 있을 때만 표시)
         if self.rn:
+            # 처리시작 버튼 추가
+            start_button = QPushButton("처리시작")
+            start_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3; 
+                    color: white; 
+                    font-weight: bold;
+                    padding: 5px 15px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
+            start_button.clicked.connect(self._on_start_clicked)
+            button_layout.addWidget(start_button)
+
+            # 처리완료 버튼
             complete_button = QPushButton("처리완료")
             complete_button.setStyleSheet("""
                 QPushButton {
@@ -107,6 +125,11 @@ class EmailViewDialog(QDialog):
         close_button.clicked.connect(self.reject) # 닫기는 reject로 처리
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
+
+    def _on_start_clicked(self):
+        """처리시작 버튼 클릭 시"""
+        if self.rn:
+            self.done(3) # 3: 처리시작
 
     def _on_complete_clicked(self):
         """처리완료 버튼 클릭 시"""

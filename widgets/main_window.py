@@ -709,6 +709,7 @@ class MainWindow(QMainWindow):
         """알람 위젯에서 RN 버튼 클릭 시 호출되는 핸들러.
         
         RN의 rns.file_path와 chained_emails.chained_file_path를 병합하여 작업을 시작한다.
+        중복 메일(duplicated_rn)이 있는 경우 해당 파일들과 rns 파일을 병합한다.
         """
         if not rn:
             return
@@ -717,7 +718,8 @@ class MainWindow(QMainWindow):
             get_recent_thread_id_by_rn, 
             get_chained_emails_file_path_by_thread_id,
             get_rns_file_path_by_rn,
-            claim_subsidy_work
+            claim_subsidy_work,
+            get_duplicate_rn_file_paths
         )
         from core.utility import get_converted_path, normalize_basic_info
         from pathlib import Path
@@ -744,12 +746,29 @@ class MainWindow(QMainWindow):
                 if not Path(rns_file_path).exists():
                     rns_file_path = None
             
-            # 4. 파일 경로 리스트 구성
+            # 4. duplicated_rn 테이블에서 중복 파일 경로 조회
+            duplicate_file_paths = get_duplicate_rn_file_paths(rn)
+            valid_duplicate_paths = []
+            for path in duplicate_file_paths:
+                conv_path = get_converted_path(path)
+                if Path(conv_path).exists():
+                    valid_duplicate_paths.append(conv_path)
+            
+            # 5. 파일 경로 리스트 구성
             pdf_paths = []
-            if rns_file_path:
-                pdf_paths.append(rns_file_path)
-            if chained_file_path:
-                pdf_paths.append(chained_file_path)
+            
+            if valid_duplicate_paths:
+                # 중복 메일이 있는 경우: 중복 파일들 + RNS 파일
+                # "duplicated_rn['file_path']에 rns['file_path']가 병합" -> Duplicates + RNS
+                pdf_paths.extend(valid_duplicate_paths)
+                if rns_file_path:
+                    pdf_paths.append(rns_file_path)
+            else:
+                # 일반적인 경우: RNS 파일 + Chained 파일
+                if rns_file_path:
+                    pdf_paths.append(rns_file_path)
+                if chained_file_path:
+                    pdf_paths.append(chained_file_path)
             
             if not pdf_paths:
                 QMessageBox.warning(
@@ -759,7 +778,7 @@ class MainWindow(QMainWindow):
                 )
                 return
             
-            # 5. RN으로부터 메타데이터 조회 (PostgreSQL 쿼리)
+            # 6. RN으로부터 메타데이터 조회 (PostgreSQL 쿼리)
             from contextlib import closing
             import psycopg2
             import psycopg2.extras
@@ -845,10 +864,10 @@ class MainWindow(QMainWindow):
                 import traceback
                 traceback.print_exc()
             
-            # 6. 알람 위젯에서 시작한 작업임을 표시하는 플래그 설정
+            # 7. 알람 위젯에서 시작한 작업임을 표시하는 플래그 설정
             self._is_alarm_rn_work = True
             
-            # 7. 작업 시작
+            # 8. 작업 시작
             self._handle_work_started(pdf_paths, metadata)
             
         except Exception as e:
