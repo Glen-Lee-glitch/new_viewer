@@ -262,6 +262,9 @@ class MainWindow(QMainWindow):
         self.view_saved_pdfs_action = QAction("저장된 PDF 보기", self)
         self.view_saved_pdfs_action.triggered.connect(self._necessary_widget._open_folder_in_explorer)
         self.menu_view.addAction(self.view_saved_pdfs_action)
+
+        self.view_ev_work_action = QAction("EV 신청 작업", self)
+        self.menu_view.addAction(self.view_ev_work_action)
         
         self.menu_view.addSeparator()
         
