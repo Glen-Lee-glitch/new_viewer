@@ -1935,6 +1935,7 @@ def update_subsidy_status(rn: str, status: str) -> bool:
 def update_subsidy_status_if_new(rn: str, new_status: str) -> bool:
     """
     rns 테이블에서 해당 RN의 status가 '신규'일 때만 '처리중'으로 업데이트한다. (PostgreSQL 버전)
+    '추후 신청' 상태인 경우 업데이트하지 않는다.
     
     Args:
         rn: RN 번호
@@ -1956,6 +1957,10 @@ def update_subsidy_status_if_new(rn: str, new_status: str) -> bool:
                     return False
                 
                 current_status = row[0]
+                
+                # '추후 신청' 상태인 경우 업데이트하지 않고 그대로 유지
+                if current_status == '추후 신청':
+                    return False
                 
                 # 기존 status가 '신규'일 때만 업데이트
                 if current_status == '신규':
