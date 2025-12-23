@@ -215,7 +215,7 @@
               <item>
                <widget class="QRadioButton" name="radioButton_my_rows">
                 <property name="text">
-                 <string>내신청건</string>
+                 <string>내작업건</string>
                 </property>
                </widget>
               </item>
