@@ -126,7 +126,10 @@
         <property name="frameShape">
          <enum>QFrame::Shape::NoFrame</enum>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_other">
+        <layout class="QVBoxLayout" name="verticalLayout_other">
+         <property name="spacing">
+          <number>4</number>
+         </property>
          <property name="leftMargin">
           <number>0</number>
          </property>
@@ -140,30 +143,57 @@
           <number>0</number>
          </property>
          <item>
-          <widget class="QLabel" name="label_other">
-           <property name="styleSheet">
-            <string>color: gray;</string>
-           </property>
-           <property name="text">
-            <string>↳ 기타 상세:</string>
-           </property>
-          </widget>
+          <layout class="QHBoxLayout" name="horizontalLayout_other_header">
+           <item>
+            <widget class="QLabel" name="label_other">
+             <property name="styleSheet">
+              <string>color: gray;</string>
+             </property>
+             <property name="text">
+              <string>↳ 기타 상세:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="cb_other_1">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>직접 입력</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_other">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </item>
          <item>
-          <widget class="QCheckBox" name="cb_other_1">
-           <property name="enabled">
-            <bool>false</bool>
+          <widget class="QTextEdit" name="lineEdit_other_detail">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>80</height>
+            </size>
            </property>
-           <property name="text">
-            <string>직접 입력</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
+           <property name="placeholderText">
+            <string>기타 사유를 직접 입력하세요...</string>
            </property>
           </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="lineEdit_other_detail"/>
          </item>
         </layout>
        </widget>

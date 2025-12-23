@@ -361,7 +361,7 @@ class SpecialNoteDialog(QDialog):
 
         # 4. Check Other (Main) Details
         if is_other_checked:
-            if not self.lineEdit_other_detail.text().strip():
+            if not self.lineEdit_other_detail.toPlainText().strip():
                 QMessageBox.warning(self, "경고", "기타 상세 사유를 입력해주세요.")
                 self.lineEdit_other_detail.setFocus()
                 return False
@@ -471,7 +471,7 @@ class SpecialNoteDialog(QDialog):
         
         # 3. Other (기타 - 대분류)
         if self.checkBox_3.isChecked():
-             text = self.lineEdit_other_detail.text().strip()
+             text = self.lineEdit_other_detail.toPlainText().strip()
              if text:
                  data['other'] = text
              else:
