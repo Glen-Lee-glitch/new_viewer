@@ -7,7 +7,8 @@ from PyQt6.QtWidgets import (
     QDialog, QTableWidget, QTableWidgetItem, 
     QVBoxLayout, QWidget, QHeaderView, QPushButton, QMessageBox, 
     QAbstractItemView, QStyleOptionViewItem, QStyleOptionButton, 
-    QStyle, QStyledItemDelegate, QHBoxLayout, QLabel, QApplication
+    QStyle, QStyledItemDelegate, QHBoxLayout, QLabel, QApplication,
+    QCheckBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush, QPainter
@@ -68,9 +69,15 @@ class SubsidyHistoryDialog(QDialog):
         control_layout = QHBoxLayout()
         self.refresh_btn = QPushButton("데이터 새로고침")
         self.refresh_btn.clicked.connect(self.populate_table)
+        
+        # '추후 신청' 필터 체크박스 추가
+        self.filter_checkbox = QCheckBox("'추후 신청'만 보기")
+        self.filter_checkbox.stateChanged.connect(self._on_filter_changed)
+        
         self.status_label = QLabel("준비")
         
         control_layout.addWidget(self.refresh_btn)
+        control_layout.addWidget(self.filter_checkbox)
         control_layout.addWidget(self.status_label)
         control_layout.addStretch()
         layout.addLayout(control_layout)
@@ -189,6 +196,11 @@ class SubsidyHistoryDialog(QDialog):
         # 다이얼로그 닫기
         self.accept()
 
+    def _on_filter_changed(self):
+        """필터 상태 변경 시 페이지를 0으로 초기화하고 테이블을 새로고침합니다."""
+        self.current_page = 0
+        self.populate_table()
+
     def fetch_data(self):
         """데이터베이스에서 페이징 처리하여 데이터를 조회합니다. (PostgreSQL 버전)"""
         try:
@@ -196,18 +208,23 @@ class SubsidyHistoryDialog(QDialog):
                 # 기본 쿼리 가져오기
                 base_query = _build_subsidy_query_base()
                 
+                # 필터 조건 추가
+                where_clause = 'WHERE r.last_received_date >= %s '
+                params = ['2025-01-01 00:00:00']
+                
+                if self.filter_checkbox.isChecked():
+                    where_clause += "AND r.status = '추후 신청' "
+                
                 # 페이지네이션을 위한 OFFSET 계산
                 offset = self.current_page * self.page_size
                 
                 # LIMIT과 OFFSET을 사용하여 쿼리 완성 (PostgreSQL 형식)
-                query = base_query + (
-                    'WHERE r.last_received_date >= %s '
+                query = base_query + where_clause + (
                     'ORDER BY r.last_received_date DESC '
                     f'LIMIT {self.page_size} OFFSET {offset}'
                 )
-                params = ('2025-01-01 00:00:00',) # 날짜 조건은 넉넉하게 설정
                 
-                df = pd.read_sql(query, connection, params=params)
+                df = pd.read_sql(query, connection, params=tuple(params))
                 
                 return df
                 
