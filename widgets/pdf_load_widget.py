@@ -419,6 +419,10 @@ class PdfLoadWidget(QWidget):
                 worker_val = row.get('worker')
                 rn_val = row.get('RN')
                 
+                # '추후 신청' 상태인 경우 알림 건너뛰기
+                if row.get('result') == '추후 신청':
+                    continue
+                
                 # 작업자가 없거나 비어있는 경우
                 if not worker_val or pd.isna(worker_val) or str(worker_val).strip() == "":
                     recent_received_date = row.get('recent_received_date')
