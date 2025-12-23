@@ -35,7 +35,6 @@ from widgets.config_dialog import ConfigDialog
 from widgets.necessary_widget import NecessaryWidget
 from widgets.multi_child_check_dialog import MultiChildCheckDialog
 from widgets.help_dialog import HelpDialog
-from widgets.scheduled_region_dialog import ScheduledRegionDialog
 from widgets.region_manager_dialog import RegionManagerDialog
 
 
@@ -237,11 +236,6 @@ class MainWindow(QMainWindow):
 
         self.menu_edit.addSeparator()
 
-        # 예정 지자체 관리 액션 (UI 파일에 정의됨)
-        if hasattr(self, 'action_scheduled_local_government'):
-            self.action_scheduled_local_government.setEnabled(False) # 초기에는 비활성화 (로그인 후 권한 체크)
-            self.action_scheduled_local_government.triggered.connect(self._open_scheduled_region_dialog)
-        
         # 지역 관리 액션 (UI 파일에 정의됨)
         if hasattr(self, 'action_region_manager'):
             self.action_region_manager.triggered.connect(self._open_region_manager_dialog)
@@ -505,11 +499,6 @@ class MainWindow(QMainWindow):
             payment_request_load_enabled = self._config_dialog.payment_request_load_enabled
             self._pdf_load_widget.set_payment_request_load_enabled(payment_request_load_enabled)
     
-    def _open_scheduled_region_dialog(self):
-        """예정 지자체 관리 다이얼로그를 연다."""
-        dialog = ScheduledRegionDialog(self)
-        dialog.exec()
-
     def _open_region_manager_dialog(self):
         """지역 관리 다이얼로그를 연다."""
         dialog = RegionManagerDialog(self)
@@ -1706,11 +1695,6 @@ class MainWindow(QMainWindow):
                 self.worker_label_2.setText(f"작업자: {self._worker_name}")
             else:
                 self.worker_label_2.setText("작업자: 미로그인")
-        
-        # 예정 지자체 메뉴 권한 관리 (이호형, 이경구만 허용)
-        scheduled_region_allowed_users = ['이호형', '이경구']
-        if hasattr(self, 'action_scheduled_local_government'):
-            self.action_scheduled_local_government.setEnabled(self._worker_name in scheduled_region_allowed_users)
     
     def _update_ai_results_action_state(self, rn: str):
         """AI 결과 보기 액션의 활성화 상태를 업데이트한다."""

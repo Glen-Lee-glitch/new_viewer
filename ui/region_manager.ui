@@ -163,6 +163,12 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="tab_after_open">
+      <attribute name="title">
+       <string>추후 오픈</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="after_open_layout"/>
+     </widget>
      <widget class="QWidget" name="tab_2">
       <attribute name="title">
        <string>보조금</string>
