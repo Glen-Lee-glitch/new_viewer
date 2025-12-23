@@ -521,7 +521,9 @@ class PdfLoadWidget(QWidget):
                     mail_count = 0
 
         menu = QMenu(self)  
-        start_action = menu.addAction("작업 시작하기")
+        
+        # '비고' 메뉴 추가
+        note_action = menu.addAction("비고")
         
         # mail_count >= 2인 경우에만 '이메일 확인하기' 메뉴 추가 (하이라이트 조건과 동일)
         email_action = None
@@ -529,22 +531,17 @@ class PdfLoadWidget(QWidget):
             menu.addSeparator()  # 구분선 추가
             email_action = menu.addAction("이메일 확인하기")
         
-        # 모든 row에 대해 'AI 결과' 메뉴 추가
-        menu.addSeparator()  # 구분선 추가
-        ai_result_action = menu.addAction("AI 결과")
-        
         action = menu.exec(global_pos)
 
         # action이 None이면 아무것도 하지 않음 (메뉴 밖 클릭 또는 ESC)
         if action is None:
             return
 
-        if action == start_action:
-            self.start_selected_work()
-        elif action == email_action:
+        if action == email_action:
             self._show_email_view(row)
-        elif action == ai_result_action:
-            self._show_gemini_results(row)
+        elif action == note_action:
+            # TODO: '비고' 기능 구현 예정
+            pass
     
     def _show_email_view(self, row: int):
         """이메일 확인 다이얼로그를 표시한다."""
