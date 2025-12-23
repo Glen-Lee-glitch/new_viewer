@@ -111,21 +111,23 @@ def update_status_both_tables(conn, rn, status):
             sql_rns = "UPDATE rns SET status = %s WHERE \"RN\" = %s"
             cursor.execute(sql_rns, (status, rn))
             
-            # ev_rns 테이블 업데이트
+            # ev_rns 테이블 업데이트 (데이터가 있을 때만 업데이트됨)
             sql_ev_rns = "UPDATE ev_rns SET status = %s WHERE rn = %s"
             cursor.execute(sql_ev_rns, (status, rn))
             
             conn.commit()
-            print(f"✅ DB Update Successful (Both Tables) - RN: {rn}, Status: {status}", flush=True)
+            print(f"✅ DB Update Successful - RN: {rn}, Status: {status}", flush=True)
             return True
     except Exception as e:
         conn.rollback()
         print(f"❌ Failed to update status for RN {rn}: {e}", flush=True)
         return False
 
-def send_reply_all_email(service, email_info, rn, apply_num, special_items=None):
+def send_reply_all_email(service, email_info, rn, apply_num, special_items=None, status=None):
     """
-    5. 가져온 정보를 토대로 '신청완료' 전체 답장 메일을 전송합니다.
+    5. 가져온 정보를 토대로 전체 답장 메일을 전송합니다.
+    - status == '중복메일확인': "처리 완료하였습니다."
+    - 그 외: "{apply_num} [{special}] 신청완료입니다."
     """
     if not email_info:
         print("❌ Email info is missing.", flush=True)
@@ -136,12 +138,15 @@ def send_reply_all_email(service, email_info, rn, apply_num, special_items=None)
     cc = email_info['cc_address']
     
     # 답장 내용 구성
-    if special_items and len(special_items) > 0:
-        valid_items = [str(item) for item in special_items if item]
-        special_text = "/".join(valid_items)
-        message_text = f"#{apply_num} {special_text} 신청완료입니다."
+    if status == '중복메일확인':
+        message_text = "처리 완료하였습니다."
     else:
-        message_text = f"#{apply_num} 신청완료입니다."
+        if special_items and len(special_items) > 0:
+            valid_items = [str(item) for item in special_items if item]
+            special_text = "/".join(valid_items)
+            message_text = f"#{apply_num} {special_text} 신청완료입니다."
+        else:
+            message_text = f"#{apply_num} 신청완료입니다."
     
     try:
         # Gmail API를 통해 스레드의 마지막 메시지 ID와 제목을 가져옴
@@ -184,7 +189,7 @@ def send_reply_all_email(service, email_info, rn, apply_num, special_items=None)
 
         # 전송
         sent_message = service.users().messages().send(userId='me', body=body).execute()
-        print(f"✅ Reply sent successfully for RN {rn} (Apply Num: {apply_num})", flush=True)
+        print(f"✅ Reply sent successfully for RN {rn} (Apply Num: {apply_num}, Status: {status})", flush=True)
         return sent_message
 
     except Exception as e:
@@ -192,25 +197,42 @@ def send_reply_all_email(service, email_info, rn, apply_num, special_items=None)
 
 def fetch_pending_applications(conn):
     """
-    ev_rns 테이블에서 status가 '신청완료'인 항목을 모두 조회합니다.
+    1. ev_rns 테이블에서 status가 '신청완료' 또는 '중복메일확인'인 항목
+    2. rns 테이블에서 status가 '중복메일확인'인 항목 (ev_rns에 없을 수도 있음)
     """
     print("🔄 Fetching pending applications...", flush=True)
+    results = []
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT rn, apply_num, special FROM ev_rns WHERE status = '신청완료'"
-            cursor.execute(sql)
-            results = cursor.fetchall()
+            # 1. ev_rns 조회
+            sql_ev = "SELECT rn, apply_num, special, status FROM ev_rns WHERE status IN ('신청완료', '중복메일확인')"
+            cursor.execute(sql_ev)
+            ev_rows = cursor.fetchall()
+            results.extend(ev_rows)
+            
+            # 2. rns 조회 (중복메일확인) - ev_rns에 없는 것만 추가하거나, 중복 제거 로직 필요
+            # 여기서는 간단하게 rns만 조회하되, 이미 results에 있는 RN은 제외
+            existing_rns = {row[0] for row in results}
+            
+            sql_rns = "SELECT \"RN\", NULL as apply_num, NULL as special, status FROM rns WHERE status = '중복메일확인'"
+            cursor.execute(sql_rns)
+            rns_rows = cursor.fetchall()
+            
+            for row in rns_rows:
+                if row[0] not in existing_rns:
+                    results.append(row)
+            
             print(f"📋 Fetched {len(results)} rows.", flush=True)
-            return results
+            return results  # [(rn, apply_num, special, status), ...]
     except Exception as e:
         print(f"❌ Error fetching pending applications: {e}", flush=True)
         return []
 
-def process_single_application(service, conn, rn, apply_num, special_items=None):
+def process_single_application(service, conn, rn, apply_num, special_items=None, status=None):
     """
     단일 건에 대한 처리 로직
     """
-    print(f"\n🚀 Starting process for RN: {rn}, Apply Num: {apply_num}", flush=True)
+    print(f"\n🚀 Starting process for RN: {rn}, Apply Num: {apply_num}, Status: {status}", flush=True)
     
     thread_id = get_recent_thread_id(conn, rn)
     if not thread_id:
@@ -224,7 +246,7 @@ def process_single_application(service, conn, rn, apply_num, special_items=None)
     
     print(f"🔍 Found Info - Thread: {thread_id}, To: {email_info['sender_address']}", flush=True)
 
-    sent_msg = send_reply_all_email(service, email_info, rn, apply_num, special_items)
+    sent_msg = send_reply_all_email(service, email_info, rn, apply_num, special_items, status)
     
     if sent_msg:
         update_status_both_tables(conn, rn, '이메일 전송')
@@ -249,7 +271,12 @@ def main():
             rn = row[0]
             apply_num = row[1]
             special_items = row[2] if len(row) > 2 else None
-            process_single_application(service, conn, rn, apply_num, special_items)
+            status = row[3]
+            process_single_application(service, conn, rn, apply_num, special_items, status)
+            
+            # 5초 대기
+            print("⏳ Waiting 5 seconds before next process...", flush=True)
+            time.sleep(5)
 
     finally:
         if conn:
