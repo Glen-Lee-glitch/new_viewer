@@ -10,8 +10,8 @@ from widgets.special_note_dialog import SpecialNoteDialog
 class AlarmWidget(QWidget):
     """알림 위젯 - PDF 불러오기 전 표시되는 위젯"""
     
-    # RN 작업 요청 시그널
-    rn_work_requested = pyqtSignal(str)  # RN 번호를 인자로 전달
+    # RN 작업 요청 시그널: (RN 번호, EV 보완 여부)
+    rn_work_requested = pyqtSignal(str, bool)  # RN 번호와 EV 보완 여부를 인자로 전달
     
     def __init__(self, worker_name: str = None, parent=None):
         super().__init__(parent)
@@ -131,11 +131,16 @@ class AlarmWidget(QWidget):
         text = item.text()
         if text in ["내역 없음", "로드 실패"]:
             return
+
+        # (EV) 항목인지 확인
+        is_ev = text.startswith("(EV) ")
+        if is_ev:
+            print(f"[DEBUG] EV Complement 작업 플래그 활성화 (항목: {text})")
             
         # 접두어 제거하고 RN만 추출
         rn = text.replace("(EV) ", "").replace("(요청) ", "").strip()
         if rn:
-            self.rn_work_requested.emit(rn)
+            self.rn_work_requested.emit(rn, is_ev)
     
     def _load_completed_regions(self):
         """
@@ -262,7 +267,7 @@ class AlarmWidget(QWidget):
                     self.window().refresh_data()
             elif result == 3:
                 # 처리시작 시 작업 요청 시그널 발생
-                self.rn_work_requested.emit(rn)
+                self.rn_work_requested.emit(rn, False)
             
         except Exception as e:
             print(f"이메일 확인 중 오류 발생: {e}")

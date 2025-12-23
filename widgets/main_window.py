@@ -63,6 +63,7 @@ class MainWindow(QMainWindow):
         self._is_give_works_started: bool = False  # 지급 테이블에서 시작 여부
         self._give_works_rn: str = ""  # 지급 테이블 시작 시 RN 번호
         self._is_alarm_rn_work: bool = False  # 알람 위젯에서 시작한 작업 여부
+        self._is_ev_complement_work: bool = False # EV 보완 작업 여부
         
         # --- 위젯 인스턴스 생성 ---
         self._thumbnail_viewer = ThumbnailViewWidget()
@@ -708,7 +709,7 @@ class MainWindow(QMainWindow):
             self.menu_additional_documents.menuAction().setEnabled(False)
         self.load_document(pdf_paths)
 
-    def _handle_alarm_rn_clicked(self, rn: str):
+    def _handle_alarm_rn_clicked(self, rn: str, is_ev: bool = False):
         """알람 위젯에서 RN 버튼 클릭 시 호출되는 핸들러.
         
         RN의 rns.file_path와 chained_emails.chained_file_path를 병합하여 작업을 시작한다.
@@ -716,6 +717,11 @@ class MainWindow(QMainWindow):
         """
         if not rn:
             return
+        
+        # EV 보완 작업 플래그 설정
+        self._is_ev_complement_work = is_ev
+        if is_ev:
+            print(f"[MainWindow] EV 보완 작업 모드로 시작 (RN: {rn})")
         
         from core.sql_manager import (
             get_recent_thread_id_by_rn, 
@@ -962,12 +968,13 @@ class MainWindow(QMainWindow):
             # ev_complement 모드 체크 및 설정
             if rn_value:
                 ev_memo = fetch_ev_complement_memo(rn_value)
-                if ev_memo is not None:
-                    self._info_panel.set_ev_complement_mode(True, ev_memo)
-                else:
-                    self._info_panel.set_ev_complement_mode(False)
+                # 알람 위젯 플래그 또는 DB 메모 존재 여부로 판단
+                is_ev = self._is_ev_complement_work or (ev_memo is not None)
+                self._info_panel.set_ev_complement_mode(is_ev, ev_memo if ev_memo else "")
+                self._pdf_view_widget.set_ev_complement_mode(is_ev)
             else:
                 self._info_panel.set_ev_complement_mode(False)
+                self._pdf_view_widget.set_ev_complement_mode(False)
             
             # PDF 로드 후 RN을 PdfViewWidget에 전달
             if rn_value:
@@ -1010,12 +1017,13 @@ class MainWindow(QMainWindow):
         # ev_complement 모드 체크 및 설정
         if rn_value:
             ev_memo = fetch_ev_complement_memo(rn_value)
-            if ev_memo is not None:
-                self._info_panel.set_ev_complement_mode(True, ev_memo)
-            else:
-                self._info_panel.set_ev_complement_mode(False)
+            # 알람 위젯 플래그 또는 DB 메모 존재 여부로 판단
+            is_ev = self._is_ev_complement_work or (ev_memo is not None)
+            self._info_panel.set_ev_complement_mode(is_ev, ev_memo if ev_memo else "")
+            self._pdf_view_widget.set_ev_complement_mode(is_ev)
         else:
             self._info_panel.set_ev_complement_mode(False)
+            self._pdf_view_widget.set_ev_complement_mode(False)
         
         # PDF 로드 후 RN을 PdfViewWidget에 전달 (추가)
         if rn_value:
@@ -1151,12 +1159,14 @@ class MainWindow(QMainWindow):
         # 알람 위젯에서 시작한 작업이었다면 status 업데이트 및 플래그 리셋
         if self._is_alarm_rn_work and self._current_rn:
             from core.sql_manager import update_subsidy_status
-            success = update_subsidy_status(self._current_rn, 'pdf 전처리')
+            target_status = '보완 전처리' if self._is_ev_complement_work else 'pdf 전처리'
+            success = update_subsidy_status(self._current_rn, target_status)
             if success:
-                print(f"[알람 위젯 작업] RN {self._current_rn}의 status를 'pdf 전처리'로 업데이트 완료")
+                print(f"[알람 위젯 작업] RN {self._current_rn}의 status를 '{target_status}'로 업데이트 완료")
             else:
                 print(f"[알람 위젯 작업] RN {self._current_rn}의 status 업데이트 실패")
             self._is_alarm_rn_work = False  # 플래그 리셋
+            self._is_ev_complement_work = False # EV 플래그 리셋
             print("[알람 위젯 작업 플래그] 저장 완료 후 초기화됨")
         
         # 지급 테이블 작업이었다면 플래그 리셋

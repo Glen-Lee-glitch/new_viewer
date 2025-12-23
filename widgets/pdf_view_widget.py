@@ -41,6 +41,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         self.scene = QGraphicsScene(self)
         self.current_page_item: QGraphicsPixmapItem | None = None
         self._current_rn: str = "" # 현재 작업 중인 RN 번호 저장용
+        self._is_ev_complement: bool = False # EV 보완 작업 여부 플래그
 
         # --- 페이지 별 오버레이 아이템 "데이터" 관리 ---
         self._overlay_items: dict[int, list[dict]] = {}
@@ -719,6 +720,12 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         """현재 작업 중인 RN 번호를 설정한다."""
         self._current_rn = rn or ""
 
+    def set_ev_complement_mode(self, enabled: bool):
+        """EV 보완 작업 모드 여부를 설정한다."""
+        self._is_ev_complement = enabled
+        if enabled:
+            print(f"[PdfViewWidget] EV 보완 모드 활성화 (RN: {self._current_rn})")
+
     def save_pdf(self, page_order: list[int] | None = None, worker_name: str = "", is_give_works: bool = False, rn: str = ""):
         """PDF 저장 프로세스를 시작한다."""
         print(f"[save_pdf 호출] is_give_works={is_give_works}, rn={rn}")
@@ -843,13 +850,17 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             # RN이 있으면 DB에 저장 경로 업데이트 (일반 작업)
             elif self._current_rn:
                 from core.sql_manager import update_finished_file_path
+                
+                # 1. 파일 경로 업데이트
                 db_success = update_finished_file_path(self._current_rn, output_path)
                 if db_success:
                     print(f"RN {self._current_rn}의 finished_file_path 업데이트 완료: {output_path}")
-                    # 저장 성공 후 RN 초기화
-                    self._current_rn = ""
                 else:
                     print(f"RN {self._current_rn}의 finished_file_path 업데이트 실패")
+
+                # 저장 성공 후 관련 필드 초기화 (MainWindow에서 status 업데이트 후 초기화하도록 함)
+                # self._current_rn = "" # MainWindow._handle_save_completed에서 사용해야 하므로 여기서 초기화하지 않음
+                self._is_ev_complement = False
         else:
             QMessageBox.warning(
                 self, "압축 실패",
@@ -901,6 +912,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         elif renderer is None:
             # renderer가 None일 때도 회전 정보 초기화 (메인 화면으로 돌아갈 때)
             self.page_rotations.clear()
+            self._is_ev_complement = False # 플래그 초기화
         
         # _current_rn은 보존 (set_renderer()에서 초기화하지 않음)
         
