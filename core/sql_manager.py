@@ -1995,14 +1995,44 @@ def get_duplicate_rn_file_paths(rn: str) -> list[str]:
 
 def fetch_after_apply_counts() -> tuple[int, int]:
     """
-    TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-    after_apply 테이블에서 오늘과 내일의 신청 건수를 조회한다.
+    after_apply 테이블에서 오늘과 내일의 신청 건수를 조회한다. (PostgreSQL 버전)
+    '금일'은 'after_date'의 'date'가 오늘인 것
+    '내일'은 'after_date'의 'date'가 내일인 것
     
     Returns:
         (오늘 건수, 내일 건수) 튜플
     """
-    # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-    return (0, 0)
+    try:
+        kst = pytz.timezone('Asia/Seoul')
+        now = datetime.now(kst)
+        today = now.date()
+        tomorrow = today + timedelta(days=1)
+        
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                # 오늘 건수 조회
+                query_today = """
+                    SELECT COUNT(*) 
+                    FROM after_apply 
+                    WHERE (after_date AT TIME ZONE 'Asia/Seoul')::date = %s
+                """
+                cursor.execute(query_today, (today,))
+                today_count = cursor.fetchone()[0]
+                
+                # 내일 건수 조회
+                query_tomorrow = """
+                    SELECT COUNT(*) 
+                    FROM after_apply 
+                    WHERE (after_date AT TIME ZONE 'Asia/Seoul')::date = %s
+                """
+                cursor.execute(query_tomorrow, (tomorrow,))
+                tomorrow_count = cursor.fetchone()[0]
+                
+                return (today_count, tomorrow_count)
+                
+    except Exception:
+        traceback.print_exc()
+        return (0, 0)
 
 def fetch_scheduled_regions() -> pd.DataFrame:
     """

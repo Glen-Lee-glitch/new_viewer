@@ -90,13 +90,29 @@ class LoginDialog(QDialog):
     
     def _update_reminder_labels(self):
         """
-        TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
         리마인더 라벨을 업데이트한다.
+        after_apply 테이블에서 오늘과 내일의 신청 건수를 조회하여 표시한다.
         """
-        # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-        # 아무것도 표시하지 않도록 0건으로 설정
-        self.today_apply.setText("0건")
-        self.tomorrow_label.setText("0건")
+        try:
+            today_count, tomorrow_count = fetch_after_apply_counts()
+            
+            # 라벨 업데이트 (변수명은 UI 파일에 따름)
+            if hasattr(self, 'today_apply'):
+                self.today_apply.setText(f"{today_count}건")
+                # 스타일 설정 (강조)
+                self.today_apply.setStyleSheet("font-weight: bold; color: #007bff;")
+                
+            if hasattr(self, 'tomorrow_label'):
+                self.tomorrow_label.setText(f"{tomorrow_count}건")
+                # 스타일 설정 (강조)
+                self.tomorrow_label.setStyleSheet("font-weight: bold; color: #28a745;")
+                
+        except Exception as e:
+            print(f"리마인더 업데이트 실패: {e}")
+            if hasattr(self, 'today_apply'):
+                self.today_apply.setText("-")
+            if hasattr(self, 'tomorrow_label'):
+                self.tomorrow_label.setText("-")
     
     def get_worker_name(self) -> str:
         """입력된 작업자 이름을 반환한다."""
