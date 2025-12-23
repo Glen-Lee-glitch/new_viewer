@@ -439,6 +439,30 @@ def get_email_by_thread_id(thread_id: str) -> dict | None:
         traceback.print_exc()
         return None
 
+def fetch_ev_complement_memo(rn: str) -> str | None:
+    """
+    ev_complement 테이블에서 RN으로 ev_memo를 조회한다. (PostgreSQL 버전)
+    
+    Args:
+        rn: RN 번호
+        
+    Returns:
+        ev_memo 내용 (없으면 None)
+    """
+    if not rn:
+        return None
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = 'SELECT ev_memo FROM ev_complement WHERE "RN" = %s'
+            with connection.cursor() as cursor:
+                cursor.execute(query, (rn,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+    except Exception:
+        traceback.print_exc()
+        return None
+
 def get_daily_worker_progress():
     """
     daily_application 테이블에서 type이 '지원'인 것 중 작업자별 건수를 조회한다.

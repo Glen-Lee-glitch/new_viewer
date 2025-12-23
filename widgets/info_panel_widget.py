@@ -3,7 +3,7 @@ import json
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from PyQt6 import uic
-from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox
+from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox, QTextEdit, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal
 
 class InfoPanelWidget(QWidget):
@@ -27,6 +27,50 @@ class InfoPanelWidget(QWidget):
             
         if hasattr(self, 'radioButton_3'):
             self.radioButton_3.toggled.connect(self._on_radio_button_subsidy_toggled)
+
+    def set_ev_complement_mode(self, is_enabled: bool, ev_memo: str = ""):
+        """
+        ev_complement 모드 설정.
+        True일 경우 작업 리스트를 ev_memo를 보여주는 텍스트 영역으로 교체한다.
+        False일 경우 기존 작업 리스트(체크박스)로 복원한다.
+        """
+        if not hasattr(self, 'groupBox_2'):
+            return
+
+        layout = self.groupBox_2.layout()
+        if not layout:
+            return
+
+        # ev_memo용 QTextEdit가 없으면 생성하여 layout에 추가하고 숨겨둠.
+        if not hasattr(self, '_ev_memo_text_edit'):
+            self._ev_memo_text_edit = QTextEdit()
+            self._ev_memo_text_edit.setReadOnly(True)
+            self._ev_memo_text_edit.setVisible(False)
+            layout.addWidget(self._ev_memo_text_edit)
+            
+        if is_enabled:
+            # 기존 체크박스들 숨기기
+            self._set_task_list_visible(False)
+            # 텍스트 에디트 보이기 및 내용 설정
+            self._ev_memo_text_edit.setText(ev_memo)
+            self._ev_memo_text_edit.setVisible(True)
+            self.groupBox_2.setTitle("보완 요청 사항") # 타이틀 변경
+        else:
+            # 텍스트 에디트 숨기기
+            self._ev_memo_text_edit.setVisible(False)
+            self._ev_memo_text_edit.clear()
+            # 기존 체크박스들 보이기
+            self._set_task_list_visible(True)
+            self.groupBox_2.setTitle("작업 리스트") # 타이틀 복원
+
+    def _set_task_list_visible(self, visible: bool):
+        """작업 리스트 레이아웃 내의 위젯들의 가시성을 설정한다."""
+        if hasattr(self, 'checkBox_task_1'): self.checkBox_task_1.setVisible(visible)
+        if hasattr(self, 'checkBox_task_2'): self.checkBox_task_2.setVisible(visible)
+        if hasattr(self, 'checkBox_task_3'): self.checkBox_task_3.setVisible(visible)
+        
+        for checkbox in self._dynamic_checkboxes:
+            checkbox.setVisible(visible)
 
     def set_delivery_day_gap(self, day_gap: int | None):
         """출고예정일 계산을 위한 day_gap을 설정한다."""

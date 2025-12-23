@@ -917,6 +917,9 @@ class MainWindow(QMainWindow):
         admin_workers = ['이경구', '이호형']
         is_admin = self._worker_name in admin_workers
         
+        # ev_complement 모드 처리를 위한 함수 import
+        from core.sql_manager import fetch_ev_complement_memo
+        
         # 이미 작업자가 배정되어 있고, 현재 로그인 사용자가 관리자인 경우 조회 모드로 진행
         if existing_worker and is_admin:
             print(f"[관리자 조회 모드] 작업자: {existing_worker}, 관리자: {self._worker_name}")
@@ -933,6 +936,16 @@ class MainWindow(QMainWindow):
                 self._pending_outlier_metadata = None
             
             self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
+            
+            # ev_complement 모드 체크 및 설정
+            if rn_value:
+                ev_memo = fetch_ev_complement_memo(rn_value)
+                if ev_memo is not None:
+                    self._info_panel.set_ev_complement_mode(True, ev_memo)
+                else:
+                    self._info_panel.set_ev_complement_mode(False)
+            else:
+                self._info_panel.set_ev_complement_mode(False)
             
             # PDF 로드 후 RN을 PdfViewWidget에 전달
             if rn_value:
@@ -971,6 +984,16 @@ class MainWindow(QMainWindow):
             self._pending_outlier_metadata = None
         
         self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
+        
+        # ev_complement 모드 체크 및 설정
+        if rn_value:
+            ev_memo = fetch_ev_complement_memo(rn_value)
+            if ev_memo is not None:
+                self._info_panel.set_ev_complement_mode(True, ev_memo)
+            else:
+                self._info_panel.set_ev_complement_mode(False)
+        else:
+            self._info_panel.set_ev_complement_mode(False)
         
         # PDF 로드 후 RN을 PdfViewWidget에 전달 (추가)
         if rn_value:
