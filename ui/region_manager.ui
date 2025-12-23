@@ -167,7 +167,84 @@
       <attribute name="title">
        <string>추후 오픈</string>
       </attribute>
-      <layout class="QVBoxLayout" name="after_open_layout"/>
+      <layout class="QVBoxLayout" name="after_open_layout">
+       <item>
+        <widget class="QLabel" name="label_title_after">
+         <property name="styleSheet">
+          <string>font-size: 14pt; font-weight: bold; margin-bottom: 10px;</string>
+         </property>
+         <property name="text">
+          <string>지역별 오픈 예정일 관리</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="search_layout_after">
+         <item>
+          <widget class="QLabel" name="label_search_after">
+           <property name="text">
+            <string>지역명 검색:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEdit_search_after">
+           <property name="placeholderText">
+            <string>지역명을 입력하세요 (초성 검색 가능)</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="tableWidget_after_open">
+         <column>
+          <property name="text">
+           <string>지역</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>오픈 예정일 (YYYY-MM-DD HH:MM:SS)</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="button_layout_after">
+         <item>
+          <widget class="QPushButton" name="btn_refresh_after">
+           <property name="text">
+            <string>새로고침</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_after">
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_save_after">
+           <property name="styleSheet">
+            <string>background-color: #4CAF50; color: white; font-weight: bold; padding: 5px 15px;</string>
+           </property>
+           <property name="text">
+            <string>저장</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
      </widget>
      <widget class="QWidget" name="tab_2">
       <attribute name="title">

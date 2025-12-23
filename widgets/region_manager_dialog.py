@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 import json
+from datetime import datetime
 
 # 프로젝트 루트 경로 추가 (core 모듈 임포트용)
 sys.path.append(str(Path(__file__).parent.parent))
@@ -22,36 +23,52 @@ class RegionManagerDialog(QDialog):
         
         self.setWindowTitle("지자체 설정 관리")
         
-        # 테이블 헤더 설정
+        # 테이블 헤더 설정 (tab_1: 원본대조필)
         self.tableWidget_sealed.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.tableWidget_sealed.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.tableWidget_sealed.setColumnWidth(1, 150)
         
-        # 버튼 연결
+        # 버튼 연결 (tab_1)
         self.btn_refresh.clicked.connect(self.load_data)
         self.btn_save.clicked.connect(self.save_changes)
         self.btn_close.clicked.connect(self.close)
         
-        # 검색 기능 연결
+        # 검색 기능 연결 (tab_1)
         self.lineEdit_search.textChanged.connect(self.filter_table)
-        self.lineEdit_search_docs.textChanged.connect(self.filter_table_documents)
         
-        # 테이블 헤더 설정 (tab_3)
+        # 테이블 헤더 설정 (tab_3: 지원_서류)
         self.tableWidget_documents.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.tableWidget_documents.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tableWidget_documents.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         
+        # 검색 기능 연결 (tab_3)
+        self.lineEdit_search_docs.textChanged.connect(self.filter_table_documents)
+        
         # tab_3 더블 클릭 이벤트 연결
         self.tableWidget_documents.itemDoubleClicked.connect(self._on_document_item_double_clicked)
+
+        # --- tab_after_open (추후 오픈) 설정 ---
+        # 테이블 헤더 설정
+        self.tableWidget_after_open.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.tableWidget_after_open.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        
+        # 버튼 연결
+        self.btn_refresh_after.clicked.connect(self.load_after_open_data)
+        self.btn_save_after.clicked.connect(self.save_after_open_data)
+        
+        # 검색 기능 연결
+        self.lineEdit_search_after.textChanged.connect(self.filter_table_after_open)
         
         # 데이터 저장소
         self.original_data = {} # {region: is_apply_sealed}
         self.checkbox_map = {} # {region: QCheckBox}
         self.document_data = {} # {region_id: notification_apply dict}
+        self.original_after_data = {} # {region: after_date_str}
         
         # 데이터 로드
         self.load_data()
         self.load_tab3_data()
+        self.load_after_open_data()
         
     def load_data(self):
         """MCP를 통해 region_metadata 테이블에서 데이터를 로드합니다."""
@@ -359,6 +376,125 @@ class RegionManagerDialog(QDialog):
                 conn.commit()
                 
             QMessageBox.information(self, "완료", "서류 정보가 저장되었습니다.")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"저장 중 오류가 발생했습니다: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def load_after_open_data(self):
+        """region_metadata에서 after_date 정보를 로드합니다."""
+        try:
+            from core.sql_manager import DB_CONFIG
+            import psycopg2
+            from contextlib import closing
+            
+            with closing(psycopg2.connect(**DB_CONFIG)) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT region, after_date FROM region_metadata ORDER BY region")
+                    rows = cursor.fetchall()
+            
+            self.tableWidget_after_open.setRowCount(len(rows))
+            self.original_after_data = {}
+            
+            for row_idx, (region, after_date) in enumerate(rows):
+                # 1. 지역 (Read-only)
+                region_item = QTableWidgetItem(region)
+                region_item.setFlags(region_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                self.tableWidget_after_open.setItem(row_idx, 0, region_item)
+                
+                # 2. 오픈 예정일 (Editable text)
+                date_str = ""
+                if after_date:
+                    # datetime 객체인 경우 포맷팅
+                    if isinstance(after_date, datetime):
+                        date_str = after_date.strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        date_str = str(after_date)
+                
+                date_item = QTableWidgetItem(date_str)
+                self.tableWidget_after_open.setItem(row_idx, 1, date_item)
+                
+                self.original_after_data[region] = date_str
+            
+            self.filter_table_after_open()
+                
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"오픈 예정일 데이터를 로드하는 중 오류가 발생했습니다: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def filter_table_after_open(self):
+        """검색어에 따라 추후 오픈 탭 테이블을 필터링합니다."""
+        search_text = self.lineEdit_search_after.text().strip()
+        
+        if not search_text:
+            for row in range(self.tableWidget_after_open.rowCount()):
+                self.tableWidget_after_open.setRowHidden(row, False)
+            return
+        
+        search_chosung = self._extract_chosung(search_text)
+        search_lower = search_text.lower()
+        
+        for row in range(self.tableWidget_after_open.rowCount()):
+            region_item = self.tableWidget_after_open.item(row, 0)
+            if not region_item:
+                self.tableWidget_after_open.setRowHidden(row, True)
+                continue
+            
+            region = region_item.text()
+            region_chosung = self._extract_chosung(region)
+            region_lower = region.lower()
+            
+            matches = (
+                search_lower in region_lower or
+                search_chosung in region_chosung or
+                region_lower.startswith(search_lower) or
+                region_chosung.startswith(search_chosung)
+            )
+            
+            self.tableWidget_after_open.setRowHidden(row, not matches)
+
+    def save_after_open_data(self):
+        """오픈 예정일 변경사항을 저장합니다."""
+        changed_data = []
+        
+        for row in range(self.tableWidget_after_open.rowCount()):
+            region_item = self.tableWidget_after_open.item(row, 0)
+            date_item = self.tableWidget_after_open.item(row, 1)
+            
+            if not region_item or not date_item:
+                continue
+                
+            region = region_item.text()
+            new_date_str = date_item.text().strip()
+            original_date_str = self.original_after_data.get(region, "")
+            
+            if new_date_str != original_date_str:
+                # 빈 문자열은 None(NULL)으로 처리
+                val_to_save = new_date_str if new_date_str else None
+                changed_data.append((val_to_save, region))
+        
+        if not changed_data:
+            QMessageBox.information(self, "알림", "변경된 내용이 없습니다.")
+            return
+            
+        try:
+            from core.sql_manager import DB_CONFIG
+            import psycopg2
+            from contextlib import closing
+            
+            with closing(psycopg2.connect(**DB_CONFIG)) as conn:
+                with conn.cursor() as cursor:
+                    for val, region in changed_data:
+                        cursor.execute(
+                            "UPDATE region_metadata SET after_date = %s WHERE region = %s",
+                            (val, region)
+                        )
+                conn.commit()
+                
+            QMessageBox.information(self, "완료", f"{len(changed_data)}건의 변경사항이 저장되었습니다.")
+            self.load_after_open_data() # 새로고침
             
         except Exception as e:
             QMessageBox.critical(self, "오류", f"저장 중 오류가 발생했습니다: {str(e)}")
