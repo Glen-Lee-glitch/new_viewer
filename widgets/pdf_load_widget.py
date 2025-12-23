@@ -673,9 +673,17 @@ class PdfLoadWidget(QWidget):
         else:
             print(f"[지원 시작] status 업데이트 건너뜀: 기존 status가 '신규'가 아님 (RN: {rn})")
 
+        # 결과 상태 확인 (3번 컬럼) - 업데이트 이후의 값을 확인
+        result_item = table.item(row, 3)
+        result_text = self._safe_item_text(result_item)
+
         file_path = ""
+        # '추후 신청'인 경우 원본 파일 경로 우선 사용
+        if result_text == "추후 신청" and original_file_path:
+            file_path = self._normalize_file_path(original_file_path)
+            print(f"[지원 시작] '추후 신청' 건이므로 원본 파일 경로 사용: {file_path}")
         # 작업자가 할당된 경우, finished_file_path 우선 사용
-        if worker and finished_file_path:
+        elif worker and finished_file_path:
             file_path = finished_file_path
         # 그 외의 경우 original_filepath 사용
         else:
@@ -697,6 +705,11 @@ class PdfLoadWidget(QWidget):
             return
 
         metadata = self._extract_row_metadata(rn_item)
+
+        # '추후 신청'인 경우 메타데이터에서도 finished_file_path 제거 (원본으로 로드하기 위함)
+        if result_text == "추후 신청":
+            metadata['finished_file_path'] = ""
+            metadata['file_rendered'] = 0
         metadata['rn'] = metadata.get('rn') or self._safe_item_text(rn_item)
         metadata['region'] = metadata.get('region') or self._safe_item_text(table.item(row, 0))  # 지역은 이제 0번 컬럼
         metadata['worker'] = metadata.get('worker') or self._safe_item_text(table.item(row, 2))
