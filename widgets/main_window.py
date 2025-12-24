@@ -1125,12 +1125,16 @@ class MainWindow(QMainWindow):
             
             # 저장 완료 후 자동으로 메인화면으로 돌아가도록 플래그 설정
             self._auto_return_to_main_after_save = True
+            
+            # 저장 시 사용할 RN 결정 (지급 작업이 아니면 현재 RN 사용)
+            target_rn = self._give_works_rn if self._is_give_works_started else self._current_rn
+            
             try:
                 self._pdf_view_widget.save_pdf(
                     page_order=self._page_order, 
                     worker_name=self._worker_name,
                     is_give_works=self._is_give_works_started,
-                    rn=self._give_works_rn
+                    rn=target_rn
                 )
             except Exception as e:
                 # 저장 호출 중 예외 발생 시 안전장치
