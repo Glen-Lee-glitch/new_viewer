@@ -1145,16 +1145,19 @@ class MainWindow(QMainWindow):
     def _handle_save_completed(self):
         """PDF 저장이 완료되었을 때 호출된다."""
         
-        # 알람 위젯에서 시작한 작업이었다면 status 업데이트 및 플래그 리셋
-        if self._is_alarm_rn_work and self._current_rn:
+        # RN이 존재하고 지급 작업이 아닌 경우 status 업데이트 (알람, 컨텍스트 메뉴 등)
+        if self._current_rn and not self._is_give_works_started:
             from core.sql_manager import update_subsidy_status
             target_status = '보완 전처리' if self._is_ev_complement_work else 'pdf 전처리'
             success = update_subsidy_status(self._current_rn, target_status)
             if success:
-                print(f"[알람 위젯 작업] RN {self._current_rn}의 status를 '{target_status}'로 업데이트 완료")
+                print(f"[저장 완료] RN {self._current_rn}의 status를 '{target_status}'로 업데이트 완료")
             else:
-                print(f"[알람 위젯 작업] RN {self._current_rn}의 status 업데이트 실패")
-            self._is_alarm_rn_work = False  # 플래그 리셋
+                print(f"[저장 완료] RN {self._current_rn}의 status 업데이트 실패")
+
+        # 알람 위젯 작업 플래그 리셋
+        if self._is_alarm_rn_work:
+            self._is_alarm_rn_work = False
             self._is_ev_complement_work = False # EV 플래그 리셋
             print("[알람 위젯 작업 플래그] 저장 완료 후 초기화됨")
         
@@ -1167,15 +1170,14 @@ class MainWindow(QMainWindow):
         if hasattr(self, '_auto_return_to_main_after_save') and self._auto_return_to_main_after_save:
             self._auto_return_to_main_after_save = False
             
-            # 컨텍스트 메뉴를 통한 작업이었다면 이메일 창을 먼저 열기
+            # 컨텍스트 메뉴 작업 플래그 리셋
             if self._is_context_menu_work:
-                self._is_context_menu_work = False  # 플래그 리셋
-                self._open_special_note_dialog_then_return_to_main()
-            else:
-                # 일반적인 경우 바로 메인화면으로 돌아가기
-                self.show_load_view()
-                # 메인화면으로 돌아갈 때 데이터 새로고침
-                self._refresh_all_data()
+                self._is_context_menu_work = False
+
+            # 바로 메인화면으로 돌아가기
+            self.show_load_view()
+            # 메인화면으로 돌아갈 때 데이터 새로고침
+            self._refresh_all_data()
 
     def show_load_view(self):
         """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
