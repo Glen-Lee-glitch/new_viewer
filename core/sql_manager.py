@@ -118,25 +118,11 @@ def _build_subsidy_query_base():
 
 def fetch_recent_subsidy_applications():
     """최근 접수된 지원금 신청 데이터를 조회하고 출력한다. (PostgreSQL 버전)"""
-    try:
-        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            query = _build_subsidy_query_base() + (
-                'WHERE r.last_received_date >= %s '
-                'ORDER BY r.last_received_date DESC '
-                'LIMIT 30'
-            )
-            params = ('2025-01-01 00:00:00',)
-            df = pd.read_sql(query, connection, params=params)
-
-        if df.empty:
-            print('조회된 데이터가 없습니다.')
-            return df
-
-        return df
-
-    except Exception:
-        traceback.print_exc()
-        return pd.DataFrame()
+    return fetch_subsidy_applications(
+        start_date='2025-01-01 00:00:00',
+        filter_type='all',
+        limit=30
+    )
 
 
 def fetch_today_subsidy_applications_by_worker(worker_id: int) -> pd.DataFrame:
@@ -147,36 +133,22 @@ def fetch_today_subsidy_applications_by_worker(worker_id: int) -> pd.DataFrame:
     if worker_id is None:
         return pd.DataFrame()
 
-    try:
-        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            threshold_dt = get_previous_business_day_after_18h()
-            if threshold_dt is not None:
-                threshold_str = threshold_dt.strftime("%Y-%m-%d %H:%M:%S")
-            else:
-                # fallback: 어제 18시
-                fallback_dt = datetime.now() - timedelta(days=1)
-                threshold_str = fallback_dt.replace(hour=18, minute=0, second=0, microsecond=0).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
+    threshold_dt = get_previous_business_day_after_18h()
+    if threshold_dt is not None:
+        threshold_str = threshold_dt.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        # fallback: 어제 18시
+        fallback_dt = datetime.now() - timedelta(days=1)
+        threshold_str = fallback_dt.replace(hour=18, minute=0, second=0, microsecond=0).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
-            query = _build_subsidy_query_base() + (
-                'WHERE r.last_received_date >= %s '
-                '  AND r.worker_id = %s '
-                'ORDER BY r.last_received_date DESC '
-                'LIMIT 30'
-            )
-            params = (threshold_str, worker_id)
-            df = pd.read_sql(query, connection, params=params)
-
-        if df.empty:
-            print('조회된 데이터가 없습니다.')
-            return df
-
-        return df
-
-    except Exception:
-        traceback.print_exc()
-        return pd.DataFrame()
+    return fetch_subsidy_applications(
+        worker_id=worker_id,
+        start_date=threshold_str,
+        filter_type='mine',
+        limit=30
+    )
 
 
 def fetch_today_unfinished_subsidy_applications() -> pd.DataFrame:
@@ -184,33 +156,77 @@ def fetch_today_unfinished_subsidy_applications() -> pd.DataFrame:
     이전 영업일 18시 이후의 지원금 신청 데이터 중
     작업자가 할당되지 않은 데이터를 조회한다. (PostgreSQL 버전)
     """
+    threshold_dt = get_previous_business_day_after_18h()
+    if threshold_dt is not None:
+        threshold_str = threshold_dt.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        fallback_dt = datetime.now() - timedelta(days=1)
+        threshold_str = fallback_dt.replace(hour=18, minute=0, second=0, microsecond=0).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+    
+    return fetch_subsidy_applications(
+        start_date=threshold_str,
+        filter_type='unfinished',
+        limit=30
+    )
+
+
+def fetch_subsidy_applications(
+    worker_id: int = None,
+    filter_type: str = 'all',  # 'all', 'mine', 'unfinished', 'uncompleted'
+    start_date: str = '2025-01-01 00:00:00',
+    show_only_deferred: bool = False,
+    limit: int = 100,
+    offset: int = 0
+) -> pd.DataFrame:
+    """
+    지원금 신청 데이터를 필터링 및 페이징하여 조회한다. (PostgreSQL 버전)
+    
+    Args:
+        worker_id: 작업자 ID (filter_type='mine'일 때 사용)
+        filter_type: 필터 종류 ('all', 'mine', 'unfinished', 'uncompleted')
+        start_date: 조회 시작 날짜 (YYYY-MM-DD HH:MM:SS)
+        show_only_deferred: '추후 신청' 상태인 건만 조회할지 여부
+        limit: 조회 건수 제한
+        offset: 조회 시작 위치
+        
+    Returns:
+        조회된 데이터의 DataFrame
+    """
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            threshold_dt = get_previous_business_day_after_18h()
-            if threshold_dt is not None:
-                threshold_str = threshold_dt.strftime("%Y-%m-%d %H:%M:%S")
-            else:
-                # fallback: 어제 18시
-                fallback_dt = datetime.now() - timedelta(days=1)
-                threshold_str = fallback_dt.replace(hour=18, minute=0, second=0, microsecond=0).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-
-            query = _build_subsidy_query_base() + (
-                'WHERE r.last_received_date >= %s '
-                '  AND r.worker_id IS NULL '
+            base_query = _build_subsidy_query_base()
+            
+            # WHERE 절 구성
+            where_clause = "WHERE r.last_received_date >= %s "
+            params = [start_date]
+            
+            # 필터 타입 적용
+            if filter_type == 'mine':
+                if worker_id is not None:
+                    where_clause += "AND r.worker_id = %s "
+                    params.append(worker_id)
+                else:
+                    where_clause += "AND 1=0 "
+            elif filter_type == 'unfinished':
+                where_clause += "AND r.worker_id IS NULL "
+            elif filter_type == 'uncompleted':
+                # '처리완료'가 아닌 건들만 조회
+                where_clause += "AND (r.status IS NULL OR r.status != '처리완료') "
+            
+            # '추후 신청' 필터 적용
+            if show_only_deferred:
+                where_clause += "AND r.status = '추후 신청' "
+                
+            query = base_query + where_clause + (
                 'ORDER BY r.last_received_date DESC '
-                'LIMIT 30'
+                f'LIMIT {limit} OFFSET {offset}'
             )
-            params = (threshold_str,)
-            df = pd.read_sql(query, connection, params=params)
-
-        if df.empty:
-            print('조회된 데이터가 없습니다.')
+            
+            df = pd.read_sql(query, connection, params=tuple(params))
             return df
-
-        return df
-
+            
     except Exception:
         traceback.print_exc()
         return pd.DataFrame()

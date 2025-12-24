@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush, QPainter
 from pathlib import Path
 
-from core.sql_manager import DB_CONFIG, _build_subsidy_query_base
+from core.sql_manager import DB_CONFIG, _build_subsidy_query_base, fetch_subsidy_applications
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -73,7 +73,7 @@ class SubsidyHistoryDialog(QDialog):
         
         # 필터 콤보박스
         self.filter_combo = QComboBox()
-        self.filter_combo.addItems(["전체 보기", "내 작업건", "미작업건"])
+        self.filter_combo.addItems(["전체 보기", "내 작업건", "미작업건", "미완료 건"])
         self.filter_combo.setFixedWidth(120)
         self.filter_combo.currentIndexChanged.connect(lambda: self._on_filter_changed())
         
@@ -211,44 +211,31 @@ class SubsidyHistoryDialog(QDialog):
         self.populate_table()
 
     def fetch_data(self):
-        """데이터베이스에서 페이징 처리하여 데이터를 조회합니다. (PostgreSQL 버전)"""
+        """데이터베이스에서 페이징 처리하여 데이터를 조회합니다."""
         try:
-            with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-                # 기본 쿼리 가져오기
-                base_query = _build_subsidy_query_base()
-                
-                # 기본 조건 설정 (WHERE 절 시작)
-                where_clause = 'WHERE r.last_received_date >= %s '
-                params = ['2025-01-01 00:00:00']
-                
-                # 콤보박스 필터 적용
-                # 0: 전체, 1: 내 작업건, 2: 미작업건
-                combo_index = self.filter_combo.currentIndex()
-                if combo_index == 1: # 내 작업건
-                    if self.worker_id:
-                        where_clause += "AND r.worker_id = %s "
-                        params.append(self.worker_id)
-                    else:
-                        where_clause += "AND 1=0 " 
-                elif combo_index == 2: # 미작업건
-                    where_clause += "AND r.worker_id IS NULL "
-                
-                # '추후 신청' 필터 체크박스 적용
-                if self.filter_checkbox.isChecked():
-                    where_clause += "AND r.status = '추후 신청' "
-                
-                # 페이지네이션을 위한 OFFSET 계산
-                offset = self.current_page * self.page_size
-                
-                # LIMIT과 OFFSET을 사용하여 쿼리 완성 (PostgreSQL 형식)
-                query = base_query + where_clause + (
-                    'ORDER BY r.last_received_date DESC '
-                    f'LIMIT {self.page_size} OFFSET {offset}'
-                )
-                
-                df = pd.read_sql(query, connection, params=tuple(params))
-                
-                return df
+            # 콤보박스 필터 매핑
+            # 0: 전체보기 -> 'all'
+            # 1: 내 작업건 -> 'mine'
+            # 2: 미작업건 -> 'unfinished'
+            # 3: 미완료 건 -> 'uncompleted'
+            filter_map = {0: 'all', 1: 'mine', 2: 'unfinished', 3: 'uncompleted'}
+            combo_index = self.filter_combo.currentIndex()
+            filter_type = filter_map.get(combo_index, 'all')
+            
+            show_only_deferred = self.filter_checkbox.isChecked()
+            offset = self.current_page * self.page_size
+            
+            # sql_manager의 통합 함수 호출
+            df = fetch_subsidy_applications(
+                worker_id=self.worker_id,
+                filter_type=filter_type,
+                start_date='2025-01-01 00:00:00',
+                show_only_deferred=show_only_deferred,
+                limit=self.page_size,
+                offset=offset
+            )
+            
+            return df
                 
         except Exception as e:
             QMessageBox.critical(self, "에러", f"데이터 조회 중 오류 발생:\n{e}")
