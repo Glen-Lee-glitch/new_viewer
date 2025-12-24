@@ -228,21 +228,14 @@ class InfoPanelWidget(QWidget):
             error_rows = fetch_error_results(rn)
             
             for row in error_rows:
-                # validation_errors만 처리
+                # null_fields는 무시하고 validation_errors만 처리
                 validation_errors = row.get('validation_errors', {})
                 
                 if isinstance(validation_errors, dict):
                     for err_type, err_details in validation_errors.items():
-                        # 값이 리스트인 경우 각 항목을 별도 체크리스트로 분리
-                        if isinstance(err_details, list):
-                            for detail in err_details:
-                                check_items.append(f"{err_type}: {detail}")
-                        # 값이 문자열인 경우
-                        elif isinstance(err_details, str):
-                            check_items.append(f"{err_type}: {err_details}")
-                        # 그 외의 경우 키값만 표시
-                        else:
-                            check_items.append(f"{err_type}")
+                        # 값이 리스트든 문자열이든 상관없이 하나의 항목으로 표시
+                        check_items.append(f"{err_type}: {err_details}")
+
         except Exception as e:
             print(f"작업 리스트 업데이트 중 오류 발생: {e}")
             return

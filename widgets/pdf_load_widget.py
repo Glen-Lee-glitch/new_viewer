@@ -671,7 +671,7 @@ class PdfLoadWidget(QWidget):
             if result_item:
                 result_item.setText('처리중')
         else:
-            print(f"[지원 시작] status 업데이트 건너뜀: 기존 status가 '신규'가 아님 (RN: {rn})")
+            pass
 
         # 결과 상태 확인 (3번 컬럼) - 업데이트 이후의 값을 확인
         result_item = table.item(row, 3)
