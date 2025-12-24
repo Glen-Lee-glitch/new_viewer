@@ -213,45 +213,28 @@ class InfoPanelWidget(QWidget):
         self.update_task_list(region)
 
     def update_task_list(self, region: str):
-        """지역에 따라 작업 리스트 체크박스를 동적으로 업데이트한다."""
+        """지역에 관계없이 임시 작업 리스트 체크박스를 동적으로 업데이트한다."""
         # 기존 작업 리스트 초기화 (정적 체크박스는 보이기 상태로 복귀됨)
         self.reset_task_checkboxes()
         
-        if not region:
-            return
-
-        try:
-            # region_data.json 파일 로드
-            json_path = Path(__file__).parent.parent / "core" / "region_data.json"
-            if not json_path.exists():
-                return
-                
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+        # 임시 체크리스트 항목 정의
+        check_items = ["임시 항목 1", "임시 항목 2", "임시 항목 3"]
+        
+        # 체크리스트 항목이 있으면 정적 체크박스 숨기기
+        if hasattr(self, 'checkBox_task_1'): self.checkBox_task_1.setVisible(False)
+        if hasattr(self, 'checkBox_task_2'): self.checkBox_task_2.setVisible(False)
+        if hasattr(self, 'checkBox_task_3'): self.checkBox_task_3.setVisible(False)
+        
+        # 동적 체크박스 생성 및 추가
+        for item in check_items:
+            checkbox = QCheckBox(item)
+            # 폰트 크기 조정 (기본보다 2pt 작게)
+            font = checkbox.font()
+            font.setPointSize(font.pointSize() - 2)
+            checkbox.setFont(font)
             
-            # 해당 지역의 체크리스트 데이터 확인
-            if region in data and 'check' in data[region]:
-                check_items = data[region]['check']
-                
-                # 체크리스트 항목이 있으면 정적 체크박스 숨기기
-                if check_items:
-                    if hasattr(self, 'checkBox_task_1'): self.checkBox_task_1.setVisible(False)
-                    if hasattr(self, 'checkBox_task_2'): self.checkBox_task_2.setVisible(False)
-                    if hasattr(self, 'checkBox_task_3'): self.checkBox_task_3.setVisible(False)
-                    
-                    # 동적 체크박스 생성 및 추가
-                    for item in check_items:
-                        checkbox = QCheckBox(item)
-                        # 폰트 크기 조정 (기본보다 2pt 작게)
-                        font = checkbox.font()
-                        font.setPointSize(font.pointSize() - 2)
-                        checkbox.setFont(font)
-                        
-                        self.verticalLayout_task_list.addWidget(checkbox)
-                        self._dynamic_checkboxes.append(checkbox)
-                        
-        except Exception as e:
-            print(f"작업 리스트 업데이트 중 오류 발생: {e}")
+            self.verticalLayout_task_list.addWidget(checkbox)
+            self._dynamic_checkboxes.append(checkbox)
 
     def _validate_date_format(self, text: str) -> bool:
         """날짜 형식(MM/DD 또는 M/D)을 검증한다."""

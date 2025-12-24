@@ -900,9 +900,6 @@ class MainWindow(QMainWindow):
         if self._is_context_menu_work:
             # print(f"[컨텍스트 메뉴를 통한 작업 시작] RN: {metadata.get('rn', 'N/A')}")
             pass
-        
-        # print(f"[디버그] _handle_work_started - 수신된 metadata: {metadata}")
-        # print(f"[디버그] _handle_work_started - outlier 값: {metadata.get('outlier', 'N/A')}")
 
         # 메일 content 조회
         thread_id = metadata.get('recent_thread_id')
