@@ -209,17 +209,47 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.setText(rn)
         
-        # 지역 정보에 따라 작업 리스트 업데이트
-        self.update_task_list(region)
+        # RN 에러 데이터에 따라 작업 리스트 업데이트
+        self.update_task_list(rn)
 
-    def update_task_list(self, region: str):
-        """지역에 관계없이 임시 작업 리스트 체크박스를 동적으로 업데이트한다."""
+    def update_task_list(self, rn: str):
+        """RN 에러 데이터(validation_errors)를 기반으로 작업 리스트 체크박스를 동적으로 업데이트한다."""
         # 기존 작업 리스트 초기화 (정적 체크박스는 보이기 상태로 복귀됨)
         self.reset_task_checkboxes()
         
-        # 임시 체크리스트 항목 정의
-        check_items = ["임시 항목 1", "임시 항목 2", "임시 항목 3"]
+        if not rn:
+            return
+
+        check_items = []
         
+        try:
+            from core.sql_manager import fetch_error_results
+            # 해당 RN의 모든 에러 row를 가져옴
+            error_rows = fetch_error_results(rn)
+            
+            for row in error_rows:
+                # validation_errors만 처리
+                validation_errors = row.get('validation_errors', {})
+                
+                if isinstance(validation_errors, dict):
+                    for err_type, err_details in validation_errors.items():
+                        # 값이 리스트인 경우 각 항목을 별도 체크리스트로 분리
+                        if isinstance(err_details, list):
+                            for detail in err_details:
+                                check_items.append(f"{err_type}: {detail}")
+                        # 값이 문자열인 경우
+                        elif isinstance(err_details, str):
+                            check_items.append(f"{err_type}: {err_details}")
+                        # 그 외의 경우 키값만 표시
+                        else:
+                            check_items.append(f"{err_type}")
+        except Exception as e:
+            print(f"작업 리스트 업데이트 중 오류 발생: {e}")
+            return
+        
+        if not check_items:
+            return
+
         # 체크리스트 항목이 있으면 정적 체크박스 숨기기
         if hasattr(self, 'checkBox_task_1'): self.checkBox_task_1.setVisible(False)
         if hasattr(self, 'checkBox_task_2'): self.checkBox_task_2.setVisible(False)

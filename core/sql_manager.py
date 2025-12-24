@@ -1309,6 +1309,35 @@ def insert_additional_note(
         traceback.print_exc()
         return False
 
+def fetch_error_results(rn: str) -> list:
+    """
+    error_results 테이블에서 특정 RN에 대한 에러 데이터를 조회한다. (PostgreSQL 버전)
+    
+    Args:
+        rn: RN 번호
+        
+    Returns:
+        에러 정보 리스트 (딕셔너리 형태)
+    """
+    if not rn:
+        return []
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT document_type, null_fields, validation_errors
+                FROM error_results
+                WHERE "RN" = %s
+                ORDER BY detected_at DESC
+            """
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute(query, (rn,))
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 def is_admin_user(worker_name: str) -> bool:
     """
     workers 테이블에서 사용자가 관리자인지 확인한다.
