@@ -176,6 +176,7 @@ def fetch_subsidy_applications(
     worker_id: int = None,
     filter_type: str = 'all',  # 'all', 'mine', 'unfinished', 'uncompleted'
     start_date: str = '2025-01-01 00:00:00',
+    end_date: str = None, # Add end_date
     show_only_deferred: bool = False,
     limit: int = 100,
     offset: int = 0
@@ -187,6 +188,7 @@ def fetch_subsidy_applications(
         worker_id: 작업자 ID (filter_type='mine'일 때 사용)
         filter_type: 필터 종류 ('all', 'mine', 'unfinished', 'uncompleted')
         start_date: 조회 시작 날짜 (YYYY-MM-DD HH:MM:SS)
+        end_date: 조회 종료 날짜 (YYYY-MM-DD HH:MM:SS)
         show_only_deferred: '추후 신청' 상태인 건만 조회할지 여부
         limit: 조회 건수 제한
         offset: 조회 시작 위치
@@ -201,6 +203,11 @@ def fetch_subsidy_applications(
             # WHERE 절 구성
             where_clause = "WHERE r.last_received_date >= %s "
             params = [start_date]
+            
+            # end_date가 있으면 조건 추가
+            if end_date:
+                where_clause += "AND r.last_received_date <= %s "
+                params.append(end_date)
             
             # 필터 타입 적용
             if filter_type == 'mine':

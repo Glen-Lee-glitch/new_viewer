@@ -3,16 +3,16 @@ import pandas as pd
 import psycopg2
 import pytz
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from PyQt6.QtWidgets import (
     QDialog, QTableWidget, QTableWidgetItem, 
     QVBoxLayout, QWidget, QHeaderView, QPushButton, QMessageBox, 
     QAbstractItemView, QStyleOptionViewItem, QStyleOptionButton, 
     QStyle, QStyledItemDelegate, QHBoxLayout, QLabel, QApplication,
-    QCheckBox, QComboBox
+    QCheckBox, QComboBox, QDateEdit
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QColor, QBrush, QPainter
 from pathlib import Path
 
@@ -60,7 +60,7 @@ class SubsidyHistoryDialog(QDialog):
         super().__init__(parent)
         self.worker_id = worker_id
         self.setWindowTitle("지원금 신청 전체 목록")
-        self.resize(1100, 650)
+        self.resize(1200, 650) # Width slightly increased for date filter
         
         self.current_page = 0  # 현재 페이지 (0부터 시작)
         self.page_size = 100   # 페이지 당 행 수
@@ -89,6 +89,10 @@ class SubsidyHistoryDialog(QDialog):
         control_layout.addWidget(self.refresh_btn)
         control_layout.addWidget(self.filter_combo)
         control_layout.addWidget(self.filter_checkbox)
+        
+        # Date Filter UI Setup
+        self._setup_date_filter_ui(control_layout)
+        
         control_layout.addStretch()
         control_layout.addWidget(self.status_label)
         layout.addLayout(control_layout)
@@ -124,6 +128,80 @@ class SubsidyHistoryDialog(QDialog):
         
         # 초기 데이터 로드
         self.populate_table()
+
+    def _setup_date_filter_ui(self, layout):
+        """Set up date filtering controls."""
+        # Separator (Vertical Line)
+        line = QWidget()
+        line.setFixedWidth(1)
+        line.setFixedHeight(20)
+        line.setStyleSheet("background-color: #cccccc;")
+        layout.addWidget(line)
+        
+        layout.addWidget(QLabel("기간:"))
+        
+        # Period Combo
+        self.period_combo = QComboBox()
+        self.period_combo.addItems(["전체 (2025~)", "오늘", "어제", "최근 7일", "직접 입력"])
+        self.period_combo.setFixedWidth(110)
+        self.period_combo.currentIndexChanged.connect(self._on_period_changed)
+        layout.addWidget(self.period_combo)
+        
+        # Date Edits
+        self.start_date_edit = QDateEdit()
+        self.end_date_edit = QDateEdit()
+        self.start_date_edit.setCalendarPopup(True)
+        self.end_date_edit.setCalendarPopup(True)
+        self.start_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.end_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.start_date_edit.setFixedWidth(120)
+        self.end_date_edit.setFixedWidth(120)
+        
+        # Init Date (2025-01-01 ~ Today)
+        self.start_date_edit.setDate(QDate(2025, 1, 1))
+        self.end_date_edit.setDate(QDate.currentDate())
+        
+        # Initially disabled
+        self.start_date_edit.setEnabled(False)
+        self.end_date_edit.setEnabled(False)
+        
+        layout.addWidget(self.start_date_edit)
+        layout.addWidget(QLabel("~"))
+        layout.addWidget(self.end_date_edit)
+
+    def _on_period_changed(self):
+        """Handle period selection change."""
+        idx = self.period_combo.currentIndex()
+        today = QDate.currentDate()
+        
+        if idx == 0: # 전체 (2025~)
+            self.start_date_edit.setDate(QDate(2025, 1, 1))
+            self.end_date_edit.setDate(today)
+            self.start_date_edit.setEnabled(False)
+            self.end_date_edit.setEnabled(False)
+        elif idx == 1: # 오늘
+            self.start_date_edit.setDate(today)
+            self.end_date_edit.setDate(today)
+            self.start_date_edit.setEnabled(False)
+            self.end_date_edit.setEnabled(False)
+        elif idx == 2: # 어제
+            yesterday = today.addDays(-1)
+            self.start_date_edit.setDate(yesterday)
+            self.end_date_edit.setDate(yesterday)
+            self.start_date_edit.setEnabled(False)
+            self.end_date_edit.setEnabled(False)
+        elif idx == 3: # 최근 7일
+            week_ago = today.addDays(-6)
+            self.start_date_edit.setDate(week_ago)
+            self.end_date_edit.setDate(today)
+            self.start_date_edit.setEnabled(False)
+            self.end_date_edit.setEnabled(False)
+        elif idx == 4: # 직접 입력
+            self.start_date_edit.setEnabled(True)
+            self.end_date_edit.setEnabled(True)
+            
+        # Trigger reload (reset page to 0)
+        self._on_filter_changed()
 
     def setup_table(self):
         """테이블 초기 설정"""
@@ -230,11 +308,17 @@ class SubsidyHistoryDialog(QDialog):
             show_only_deferred = self.filter_checkbox.isChecked()
             offset = self.current_page * self.page_size
             
+            # 날짜 필터 적용
+            start_date_str = self.start_date_edit.date().toString("yyyy-MM-dd 00:00:00")
+            # end_date는 해당 일의 마지막 시간까지 포함해야 하므로 23:59:59로 설정
+            end_date_str = self.end_date_edit.date().toString("yyyy-MM-dd 23:59:59")
+            
             # sql_manager의 통합 함수 호출
             df = fetch_subsidy_applications(
                 worker_id=self.worker_id,
                 filter_type=filter_type,
-                start_date='2025-01-01 00:00:00',
+                start_date=start_date_str,
+                end_date=end_date_str,
                 show_only_deferred=show_only_deferred,
                 limit=self.page_size,
                 offset=offset
