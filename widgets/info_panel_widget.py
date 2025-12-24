@@ -179,16 +179,16 @@ class InfoPanelWidget(QWidget):
 
     def reset_task_checkboxes(self):
         """작업 리스트 체크박스들을 모두 해제 상태로 초기화하고 동적 체크박스를 제거한다."""
-        # 정적 체크박스 해제 및 보이기 (기본 상태)
+        # 정적 체크박스 해제 및 숨기기 (기본 상태: 숨김)
         if hasattr(self, 'checkBox_task_1'):
             self.checkBox_task_1.setChecked(False)
-            self.checkBox_task_1.setVisible(True)
+            self.checkBox_task_1.setVisible(False)
         if hasattr(self, 'checkBox_task_2'):
             self.checkBox_task_2.setChecked(False)
-            self.checkBox_task_2.setVisible(True)
+            self.checkBox_task_2.setVisible(False)
         if hasattr(self, 'checkBox_task_3'):
             self.checkBox_task_3.setChecked(False)
-            self.checkBox_task_3.setVisible(True)
+            self.checkBox_task_3.setVisible(False)
         
         # 동적 체크박스 제거
         for checkbox in self._dynamic_checkboxes:
@@ -214,7 +214,7 @@ class InfoPanelWidget(QWidget):
 
     def update_task_list(self, rn: str):
         """RN 에러 데이터(validation_errors)를 기반으로 작업 리스트 체크박스를 동적으로 업데이트한다."""
-        # 기존 작업 리스트 초기화 (정적 체크박스는 보이기 상태로 복귀됨)
+        # 기존 작업 리스트 초기화 (정적 체크박스는 숨김 상태로 복귀됨)
         self.reset_task_checkboxes()
         
         if not rn:
@@ -228,7 +228,7 @@ class InfoPanelWidget(QWidget):
             error_rows = fetch_error_results(rn)
             
             for row in error_rows:
-                # null_fields는 무시하고 validation_errors만 처리
+                # validation_errors만 처리
                 validation_errors = row.get('validation_errors', {})
                 
                 if isinstance(validation_errors, dict):
@@ -242,11 +242,6 @@ class InfoPanelWidget(QWidget):
         
         if not check_items:
             return
-
-        # 체크리스트 항목이 있으면 정적 체크박스 숨기기
-        if hasattr(self, 'checkBox_task_1'): self.checkBox_task_1.setVisible(False)
-        if hasattr(self, 'checkBox_task_2'): self.checkBox_task_2.setVisible(False)
-        if hasattr(self, 'checkBox_task_3'): self.checkBox_task_3.setVisible(False)
         
         # 동적 체크박스 생성 및 추가
         for item in check_items:
