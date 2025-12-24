@@ -249,7 +249,7 @@ def process_single_application(service, conn, rn, apply_num, special_items=None,
     sent_msg = send_reply_all_email(service, email_info, rn, apply_num, special_items, status)
     
     if sent_msg:
-        update_status_both_tables(conn, rn, '이메일 전송')
+        update_status_both_tables(conn, rn, '처리완료')
 
 def main():
     try:
