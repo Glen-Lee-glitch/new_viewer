@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QHeaderView, QPushButton, QMessageBox, 
     QAbstractItemView, QStyleOptionViewItem, QStyleOptionButton, 
     QStyle, QStyledItemDelegate, QHBoxLayout, QLabel, QApplication,
-    QCheckBox, QComboBox, QDateEdit, QListWidget, QListWidgetItem
+    QCheckBox, QComboBox, QDateEdit, QListWidget, QListWidgetItem, QLineEdit
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QColor, QBrush, QPainter
@@ -100,14 +100,24 @@ class FilterHeader(QHeaderView):
 class RegionFilterDialog(QDialog):
     """지역 선택을 위한 팝업 다이얼로그"""
     def __init__(self, parent=None, all_regions=None, selected_regions=None):
-        super().__init__(parent, Qt.WindowType.Popup) # 팝업 스타일
-        self.resize(200, 300)
+        # Popup 플래그 대신 Dialog | FramelessWindowHint 사용 (한글 IME 문제 해결)
+        super().__init__(parent, Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        self.resize(250, 350)
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(5, 5, 5, 5)
         
+        # 다이얼로그 외곽선 추가 (Frameless라 경계가 없으므로)
+        self.setStyleSheet("QDialog { border: 1px solid #aaaaaa; background-color: white; }")
+        
+        # 검색창 추가
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("지역 검색...")
+        self.search_edit.textChanged.connect(self.filter_items)
+        self.layout.addWidget(self.search_edit)
+
         # 전체 선택 체크박스
         self.cb_all = QCheckBox("전체 선택")
-        self.cb_all.setChecked(True) # 기본적으로 전체 선택 상태로 시작한다고 가정 (로직에 따라 변경)
+        self.cb_all.setChecked(True) 
         self.cb_all.stateChanged.connect(self.toggle_all)
         self.layout.addWidget(self.cb_all)
         
@@ -144,12 +154,30 @@ class RegionFilterDialog(QDialog):
         btn_layout.addWidget(ok_btn)
         btn_layout.addWidget(cancel_btn)
         self.layout.addLayout(btn_layout)
-        
+
+    def showEvent(self, event):
+        """다이얼로그가 보여질 때 검색창에 포커스"""
+        super().showEvent(event)
+        self.search_edit.setFocus()
+
+
+    def filter_items(self, text):
+        """검색어에 따라 리스트 아이템 필터링"""
+        search_text = text.strip().lower()
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            item_text = item.text().lower()
+            # 검색어가 포함되어 있으면 표시, 아니면 숨김
+            item.setHidden(search_text not in item_text)
+
     def toggle_all(self, state):
-        """전체 선택/해제 토글"""
+        """전체 선택/해제 토글 (현재 보이는 아이템만)"""
         check_state = Qt.CheckState(state)
-        for item in self.items:
-            item.setCheckState(check_state)
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            # 숨겨진 아이템은 건너뛰고 보이는 아이템만 상태 변경
+            if not item.isHidden():
+                item.setCheckState(check_state)
 
     def get_selected_regions(self):
         """선택된 지역 리스트 반환"""
