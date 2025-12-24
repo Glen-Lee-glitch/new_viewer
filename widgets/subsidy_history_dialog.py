@@ -10,13 +10,16 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QHeaderView, QPushButton, QMessageBox, 
     QAbstractItemView, QStyleOptionViewItem, QStyleOptionButton, 
     QStyle, QStyledItemDelegate, QHBoxLayout, QLabel, QApplication,
-    QCheckBox, QComboBox, QDateEdit
+    QCheckBox, QComboBox, QDateEdit, QListWidget, QListWidgetItem
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QColor, QBrush, QPainter
 from pathlib import Path
 
-from core.sql_manager import DB_CONFIG, _build_subsidy_query_base, fetch_subsidy_applications
+from core.sql_manager import (
+    DB_CONFIG, _build_subsidy_query_base, fetch_subsidy_applications,
+    get_distinct_regions
+)
 
 # 하이라이트를 위한 커스텀 데이터 역할 정의
 HighlightRole = Qt.ItemDataRole.UserRole + 1
@@ -51,6 +54,112 @@ class ButtonDelegate(QStyledItemDelegate):
         
         QApplication.style().drawControl(QStyle.ControlElement.CE_PushButton, button_opt, painter)
 
+class FilterHeader(QHeaderView):
+    """필터 아이콘을 그리고 클릭 이벤트를 처리하는 커스텀 헤더"""
+    filterClicked = pyqtSignal(int)
+
+    def __init__(self, orientation, parent=None):
+        super().__init__(orientation, parent)
+        self.setSectionsClickable(True)
+        self.filtered_sections = set() # 필터가 활성화된 컬럼 인덱스 집합
+
+    def setFilterActive(self, logicalIndex, active):
+        if active:
+            self.filtered_sections.add(logicalIndex)
+        else:
+            self.filtered_sections.discard(logicalIndex)
+        self.viewport().update()
+
+    def paintSection(self, painter, rect, logicalIndex):
+        painter.save()
+        super().paintSection(painter, rect, logicalIndex)
+        painter.restore()
+
+        if logicalIndex in self.filtered_sections:
+            # 필터 아이콘 그리기 (간단히 텍스트 아이콘 사용)
+            painter.save()
+            icon_color = QColor("#007bff") # 파란색
+            painter.setPen(icon_color)
+            font = painter.font()
+            font.setBold(True)
+            painter.setFont(font)
+            
+            # 우측 정렬하여 아이콘 표시
+            text_rect = rect.adjusted(0, 0, -5, 0)
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "🌪")
+            painter.restore()
+
+    def mouseReleaseEvent(self, event):
+        # 클릭 시 필터 팝업 요청
+        logicalIndex = self.logicalIndexAt(event.pos())
+        if logicalIndex == 0: # 지역 컬럼 (인덱스 0)만 필터 지원
+            self.filterClicked.emit(logicalIndex)
+        else:
+            super().mouseReleaseEvent(event)
+
+class RegionFilterDialog(QDialog):
+    """지역 선택을 위한 팝업 다이얼로그"""
+    def __init__(self, parent=None, all_regions=None, selected_regions=None):
+        super().__init__(parent, Qt.WindowType.Popup) # 팝업 스타일
+        self.resize(200, 300)
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(5, 5, 5, 5)
+        
+        # 전체 선택 체크박스
+        self.cb_all = QCheckBox("전체 선택")
+        self.cb_all.setChecked(True) # 기본적으로 전체 선택 상태로 시작한다고 가정 (로직에 따라 변경)
+        self.cb_all.stateChanged.connect(self.toggle_all)
+        self.layout.addWidget(self.cb_all)
+        
+        # 리스트 위젯
+        self.list_widget = QListWidget()
+        self.layout.addWidget(self.list_widget)
+        
+        self.items = []
+        if all_regions:
+            # 모든 지역이 선택된 상태인지 확인 (selected_regions가 None이거나 전체 개수와 같음)
+            is_all_selected = (not selected_regions) or (len(selected_regions) == len(all_regions))
+            self.cb_all.setChecked(is_all_selected)
+
+            for region in all_regions:
+                item = QListWidgetItem(region)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                
+                # 선택 상태 결정
+                if is_all_selected or (selected_regions and region in selected_regions):
+                    item.setCheckState(Qt.CheckState.Checked)
+                else:
+                    item.setCheckState(Qt.CheckState.Unchecked)
+                
+                self.list_widget.addItem(item)
+                self.items.append(item)
+        
+        # 버튼 영역
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("적용")
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("취소")
+        cancel_btn.clicked.connect(self.reject)
+        
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        self.layout.addLayout(btn_layout)
+        
+    def toggle_all(self, state):
+        """전체 선택/해제 토글"""
+        check_state = Qt.CheckState(state)
+        for item in self.items:
+            item.setCheckState(check_state)
+
+    def get_selected_regions(self):
+        """선택된 지역 리스트 반환"""
+        selected = []
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected.append(item.text())
+        return selected
+
 class SubsidyHistoryDialog(QDialog):
     # 시그널 정의
     work_started = pyqtSignal(list, dict)  # 작업 시작 시그널 (파일 경로 리스트, 메타데이터)
@@ -59,6 +168,11 @@ class SubsidyHistoryDialog(QDialog):
     def __init__(self, parent=None, worker_id=None):
         super().__init__(parent)
         self.worker_id = worker_id
+        
+        # 필터 상태 관리
+        self.selected_regions = [] # 빈 리스트는 '전체'를 의미함
+        self.all_regions_cache = [] # 전체 지역 리스트 캐시
+
         self.setWindowTitle("지원금 신청 전체 목록")
         self.resize(1200, 650) # Width slightly increased for date filter
         
@@ -206,6 +320,12 @@ class SubsidyHistoryDialog(QDialog):
     def setup_table(self):
         """테이블 초기 설정"""
         table = self.table_widget
+        
+        # 커스텀 헤더 설정 (필터 기능)
+        self.header = FilterHeader(Qt.Orientation.Horizontal, table)
+        self.header.filterClicked.connect(self.open_region_filter)
+        table.setHorizontalHeader(self.header)
+        
         # 컬럼: 지역, RN, 수신일, 작업자, 결과, AI, 보기
         table.setColumnCount(7)
         table.setHorizontalHeaderLabels(['지역', 'RN', '수신일', '작업자', '결과', 'AI', '보기'])
@@ -225,6 +345,40 @@ class SubsidyHistoryDialog(QDialog):
         
         # 클릭 이벤트 연결
         table.cellClicked.connect(self._handle_cell_clicked)
+
+    def open_region_filter(self, logicalIndex):
+        """지역 필터 다이얼로그 열기"""
+        if logicalIndex != 0: return # 지역 컬럼만
+        
+        # 지역 데이터 로드 (최초 1회)
+        if not self.all_regions_cache:
+            self.all_regions_cache = get_distinct_regions()
+            
+        # 현재 선택된 지역 목록 (없으면 전체 선택된 것으로 간주)
+        current_selection = self.selected_regions if self.selected_regions else self.all_regions_cache
+        
+        # 다이얼로그 생성
+        dlg = RegionFilterDialog(self, self.all_regions_cache, current_selection)
+        
+        # 헤더 아래에 위치시키기
+        header_pos = self.table_widget.mapToGlobal(self.header.pos())
+        section_pos = self.header.sectionPosition(0)
+        dlg.move(header_pos.x() + section_pos, header_pos.y() + self.header.height())
+        
+        if dlg.exec():
+            new_selection = dlg.get_selected_regions()
+            
+            # 전체 선택인지 확인 (모두 선택되었으면 필터 해제와 동일)
+            if len(new_selection) == len(self.all_regions_cache):
+                self.selected_regions = [] # 빈 리스트 = 전체
+                self.header.setFilterActive(0, False)
+            else:
+                self.selected_regions = new_selection
+                self.header.setFilterActive(0, True)
+                
+            # 데이터 다시 로드
+            self.current_page = 0
+            self.populate_table()
 
     def _handle_cell_clicked(self, row, column):
         """테이블 셀 클릭 핸들러"""
@@ -320,6 +474,7 @@ class SubsidyHistoryDialog(QDialog):
                 start_date=start_date_str,
                 end_date=end_date_str,
                 show_only_deferred=show_only_deferred,
+                regions=self.selected_regions if self.selected_regions else None, # 지역 필터 전달
                 limit=self.page_size,
                 offset=offset
             )

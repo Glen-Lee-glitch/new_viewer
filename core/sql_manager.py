@@ -176,8 +176,9 @@ def fetch_subsidy_applications(
     worker_id: int = None,
     filter_type: str = 'all',  # 'all', 'mine', 'unfinished', 'uncompleted'
     start_date: str = '2025-01-01 00:00:00',
-    end_date: str = None, # Add end_date
+    end_date: str = None,
     show_only_deferred: bool = False,
+    regions: list = None,  # Add regions parameter
     limit: int = 100,
     offset: int = 0
 ) -> pd.DataFrame:
@@ -190,6 +191,7 @@ def fetch_subsidy_applications(
         start_date: 조회 시작 날짜 (YYYY-MM-DD HH:MM:SS)
         end_date: 조회 종료 날짜 (YYYY-MM-DD HH:MM:SS)
         show_only_deferred: '추후 신청' 상태인 건만 조회할지 여부
+        regions: 지역 필터 리스트 (예: ['서울시', '부산시'])
         limit: 조회 건수 제한
         offset: 조회 시작 위치
         
@@ -208,6 +210,13 @@ def fetch_subsidy_applications(
             if end_date:
                 where_clause += "AND r.last_received_date <= %s "
                 params.append(end_date)
+            
+            # 지역 필터 적용
+            if regions:
+                # 리스트가 비어있지 않은 경우에만 적용
+                placeholders = ','.join(['%s'] * len(regions))
+                where_clause += f"AND r.region IN ({placeholders}) "
+                params.extend(regions)
             
             # 필터 타입 적용
             if filter_type == 'mine':
@@ -237,6 +246,22 @@ def fetch_subsidy_applications(
     except Exception:
         traceback.print_exc()
         return pd.DataFrame()
+
+
+def get_distinct_regions() -> list[str]:
+    """
+    rns 테이블에서 존재하는 모든 지역명을 중복 없이 조회하여 반환한다.
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "SELECT DISTINCT region FROM rns WHERE region IS NOT NULL ORDER BY region"
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
 
 
 def fetch_application_data_by_rn(rn: str) -> dict | None:
