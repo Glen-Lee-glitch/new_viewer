@@ -18,6 +18,7 @@ class InfoPanelWidget(QWidget):
         self._delivery_day_gap: int | None = None # day_gap 저장 변수
         self._dynamic_checkboxes = [] # 동적으로 생성된 체크박스 리스트
         self._current_rn: str = "" # 현재 표시 중인 RN 저장
+        self._initial_error_items = set() # 최초 로드된 에러 항목 저장 (비교용)
 
         # 자동 새로고침 타이머 설정 (20초)
         self._refresh_timer = QTimer(self)
@@ -48,9 +49,9 @@ class InfoPanelWidget(QWidget):
     def _on_refresh_timeout(self):
         """타이머 타임아웃 시 작업 리스트 갱신"""
         if self._current_rn and self.isVisible():
-            # 현재 RN으로 작업 리스트만 업데이트
+            # 현재 RN으로 작업 리스트만 업데이트 (초기 로드 아님)
             # print(f"Auto-refreshing task list for RN: {self._current_rn}")
-            self.update_task_list(self._current_rn)
+            self.update_task_list(self._current_rn, is_initial_load=False)
 
     def set_ev_complement_mode(self, is_enabled: bool, ev_memo: str = ""):
         """
@@ -183,6 +184,7 @@ class InfoPanelWidget(QWidget):
         self.lineEdit_region.clear()
         self.lineEdit_special.clear()
         self._current_rn = "" # RN 초기화
+        self._initial_error_items.clear() # 초기 항목 세트도 초기화
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.clear()  # RN 필드도 초기화
 
@@ -220,11 +222,12 @@ class InfoPanelWidget(QWidget):
             self.lineEdit_rn_num.setText(rn)
         
         self._current_rn = rn # 현재 RN 저장
+        self._initial_error_items.clear() # 새 RN이 로드되면 초기 항목 리셋 준비
         
-        # RN 에러 데이터에 따라 작업 리스트 업데이트
-        self.update_task_list(rn)
+        # RN 에러 데이터에 따라 작업 리스트 업데이트 (초기 로드)
+        self.update_task_list(rn, is_initial_load=True)
 
-    def update_task_list(self, rn: str):
+    def update_task_list(self, rn: str, is_initial_load: bool = False):
         """RN 에러 데이터(validation_errors)를 기반으로 작업 리스트 체크박스를 동적으로 업데이트한다."""
         # 기존 작업 리스트 초기화
         self.reset_task_checkboxes()
@@ -252,6 +255,10 @@ class InfoPanelWidget(QWidget):
             print(f"작업 리스트 업데이트 중 오류 발생: {e}")
             return
         
+        # 초기 로드인 경우 현재 아이템들을 '초기 아이템'으로 등록
+        if is_initial_load:
+            self._initial_error_items = set(check_items)
+
         if not check_items:
             return
         
@@ -262,6 +269,10 @@ class InfoPanelWidget(QWidget):
             font = checkbox.font()
             font.setPointSize(font.pointSize() - 2)
             checkbox.setFont(font)
+            
+            # 초기 리스트에 없던 새로운 항목이면 스타일 적용 (빨간색 굵게)
+            if item not in self._initial_error_items:
+                checkbox.setStyleSheet("QCheckBox { color: red; font-weight: bold; }")
             
             self.verticalLayout_task_list.addWidget(checkbox)
             self._dynamic_checkboxes.append(checkbox)
