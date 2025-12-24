@@ -19,29 +19,7 @@
      <property name="title">
       <string>작업 리스트</string>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout_task_list">
-      <item>
-       <widget class="QCheckBox" name="checkBox_task_1">
-        <property name="text">
-         <string>임시1</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkBox_task_2">
-        <property name="text">
-         <string>임시2</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkBox_task_3">
-        <property name="text">
-         <string>임시3</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
+     <layout class="QVBoxLayout" name="verticalLayout_task_list"/>
     </widget>
    </item>
    <item>
