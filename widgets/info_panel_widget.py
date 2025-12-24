@@ -52,7 +52,7 @@ class InfoPanelWidget(QWidget):
             # 기존 체크박스들 숨기기
             self._set_task_list_visible(False)
             # 텍스트 에디트 보이기 및 내용 설정
-            # DB에서 가져온 '\\n'을 실제 줄바꿈 문자인 '\n'으로 변환
+            # DB에서 가져온 '\n'을 실제 줄바꿈 문자인 '\n'으로 변환
             processed_memo = ev_memo.replace('\\n', '\n')
             self._ev_memo_text_edit.setText(processed_memo)
             self._ev_memo_text_edit.setVisible(True)
@@ -67,10 +67,6 @@ class InfoPanelWidget(QWidget):
 
     def _set_task_list_visible(self, visible: bool):
         """작업 리스트 레이아웃 내의 위젯들의 가시성을 설정한다."""
-        if hasattr(self, 'checkBox_task_1'): self.checkBox_task_1.setVisible(visible)
-        if hasattr(self, 'checkBox_task_2'): self.checkBox_task_2.setVisible(visible)
-        if hasattr(self, 'checkBox_task_3'): self.checkBox_task_3.setVisible(visible)
-        
         for checkbox in self._dynamic_checkboxes:
             checkbox.setVisible(visible)
 
@@ -179,17 +175,6 @@ class InfoPanelWidget(QWidget):
 
     def reset_task_checkboxes(self):
         """작업 리스트 체크박스들을 모두 해제 상태로 초기화하고 동적 체크박스를 제거한다."""
-        # 정적 체크박스 해제 및 숨기기 (기본 상태: 숨김)
-        if hasattr(self, 'checkBox_task_1'):
-            self.checkBox_task_1.setChecked(False)
-            self.checkBox_task_1.setVisible(False)
-        if hasattr(self, 'checkBox_task_2'):
-            self.checkBox_task_2.setChecked(False)
-            self.checkBox_task_2.setVisible(False)
-        if hasattr(self, 'checkBox_task_3'):
-            self.checkBox_task_3.setChecked(False)
-            self.checkBox_task_3.setVisible(False)
-        
         # 동적 체크박스 제거
         for checkbox in self._dynamic_checkboxes:
             self.verticalLayout_task_list.removeWidget(checkbox)
@@ -214,7 +199,7 @@ class InfoPanelWidget(QWidget):
 
     def update_task_list(self, rn: str):
         """RN 에러 데이터(validation_errors)를 기반으로 작업 리스트 체크박스를 동적으로 업데이트한다."""
-        # 기존 작업 리스트 초기화 (정적 체크박스는 숨김 상태로 복귀됨)
+        # 기존 작업 리스트 초기화
         self.reset_task_checkboxes()
         
         if not rn:
