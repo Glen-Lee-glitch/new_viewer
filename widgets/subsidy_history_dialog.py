@@ -1,7 +1,9 @@
 import math
 import pandas as pd
 import psycopg2
+import pytz
 from contextlib import closing
+from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QDialog, QTableWidget, QTableWidgetItem, 
@@ -58,7 +60,7 @@ class SubsidyHistoryDialog(QDialog):
         super().__init__(parent)
         self.worker_id = worker_id
         self.setWindowTitle("지원금 신청 전체 목록")
-        self.resize(1000, 650)
+        self.resize(1100, 650)
         
         self.current_page = 0  # 현재 페이지 (0부터 시작)
         self.page_size = 100   # 페이지 당 행 수
@@ -126,12 +128,14 @@ class SubsidyHistoryDialog(QDialog):
     def setup_table(self):
         """테이블 초기 설정"""
         table = self.table_widget
-        # 컬럼: 지역, RN, 작업자, 결과, AI, 보기
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '결과', 'AI', '보기'])
+        # 컬럼: 지역, RN, 수신일, 작업자, 결과, AI, 보기
+        table.setColumnCount(7)
+        table.setHorizontalHeaderLabels(['지역', 'RN', '수신일', '작업자', '결과', 'AI', '보기'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # 수신일 컬럼 너비 조정 (선택사항)
+        # header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         
         table.setAlternatingRowColors(False)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -139,14 +143,14 @@ class SubsidyHistoryDialog(QDialog):
         
         # 델리게이트 설정
         table.setItemDelegate(HighlightDelegate(table))
-        table.setItemDelegateForColumn(5, ButtonDelegate(table, "시작"))
+        table.setItemDelegateForColumn(6, ButtonDelegate(table, "시작"))
         
         # 클릭 이벤트 연결
         table.cellClicked.connect(self._handle_cell_clicked)
 
     def _handle_cell_clicked(self, row, column):
         """테이블 셀 클릭 핸들러"""
-        if column == 5: # 버튼 컬럼
+        if column == 6: # 버튼 컬럼
             self._start_work_by_row(row)
 
     def _start_work_by_row(self, row):
@@ -155,7 +159,8 @@ class SubsidyHistoryDialog(QDialog):
         rn_item = table.item(row, 1)  # RN은 1번 컬럼
 
         # AI 결과가 있는 경우 -> AI 결과 요청 시그널 emit
-        ai_item = table.item(row, 4)
+        # AI 컬럼은 인덱스 5
+        ai_item = table.item(row, 5)
         if ai_item and ai_item.text() == 'O':
             if rn_item:
                 self.ai_review_requested.emit(rn_item.text())
@@ -281,6 +286,9 @@ class SubsidyHistoryDialog(QDialog):
 
         table.setRowCount(len(df))
         
+        # 타임존 설정 (KST)
+        kst = pytz.timezone('Asia/Seoul')
+        
         for row_index, (_, row) in enumerate(df.iterrows()):
             # 데이터 정제
             row_data = {
@@ -288,6 +296,7 @@ class SubsidyHistoryDialog(QDialog):
                 'region': self._sanitize_text(row.get('region', '')),
                 'worker': self._sanitize_text(row.get('worker', '')),
                 'result': self._sanitize_text(row.get('result', '')),
+                'recent_received_date': row.get('recent_received_date'), # 날짜 원본
                 'urgent': row.get('urgent', 0),
                 'mail_count': row.get('mail_count', 0),
                 'finished_file_path': row.get('finished_file_path', ''),  # 추가됨
@@ -298,6 +307,19 @@ class SubsidyHistoryDialog(QDialog):
                 '공동명의': row.get('공동명의', 0),
                 'is_법인': row.get('is_법인', 0),
             }
+
+            # 수신일 포맷팅 (MM-DD HH:mm) 및 KST 변환
+            received_date_str = ""
+            raw_date = row_data['recent_received_date']
+            if raw_date and not pd.isna(raw_date):
+                try:
+                    # pandas Timestamp 또는 python datetime 처리
+                    if hasattr(raw_date, 'astimezone'):
+                        # KST로 변환
+                        raw_date = raw_date.astimezone(kst)
+                    received_date_str = raw_date.strftime("%m-%d %H:%M")
+                except Exception:
+                    received_date_str = str(raw_date)
 
             # AI 상태 계산
             ai_status = 'X'
@@ -316,10 +338,13 @@ class SubsidyHistoryDialog(QDialog):
             rn_item.setData(Qt.ItemDataRole.UserRole, row_data)
             table.setItem(row_index, 1, rn_item)
             
-            table.setItem(row_index, 2, QTableWidgetItem(row_data['worker']))
-            table.setItem(row_index, 3, QTableWidgetItem(row_data['result']))
-            table.setItem(row_index, 4, QTableWidgetItem(ai_status))
-            table.setItem(row_index, 5, QTableWidgetItem(""))
+            # 수신일 컬럼 추가
+            table.setItem(row_index, 2, QTableWidgetItem(received_date_str))
+            
+            table.setItem(row_index, 3, QTableWidgetItem(row_data['worker']))
+            table.setItem(row_index, 4, QTableWidgetItem(row_data['result']))
+            table.setItem(row_index, 5, QTableWidgetItem(ai_status))
+            table.setItem(row_index, 6, QTableWidgetItem(""))
 
             # 하이라이트 처리
             self._apply_highlight(table, row_index, row_data)
