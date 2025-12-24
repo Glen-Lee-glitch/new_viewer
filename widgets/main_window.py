@@ -126,6 +126,12 @@ class MainWindow(QMainWindow):
         # 초기 상태에서 작업자 현황 버튼 숨김
         if hasattr(self, 'pushButton_worker_progress'):
             self.pushButton_worker_progress.hide()
+
+        # PDF 편집 모드 3분 경과 체크 타이머
+        self._edit_mode_timer = QTimer(self)
+        self._edit_mode_timer.setInterval(180000)  # 3분
+        self._edit_mode_timer.setSingleShot(True)
+        self._edit_mode_timer.timeout.connect(lambda: print("3분경과!"))
         
         # 앱 시작 시 로그인 다이얼로그 표시
         self._show_login_dialog()
@@ -656,6 +662,9 @@ class MainWindow(QMainWindow):
             # PDF 렌더 완료 후 이상치 체크 (약간의 지연을 두어 렌더링 완료 보장)
             if self._pending_outlier_check:
                 QTimer.singleShot(500, self._check_and_show_outlier_reminder)
+
+        # PDF 편집 모드 진입 시 3분 타이머 시작
+        self._edit_mode_timer.start()
         
         # 컨텍스트 메뉴를 통한 작업인 경우 '원본 불러오기' 및 '추가서류' 액션 활성화
         if self._is_context_menu_work:
