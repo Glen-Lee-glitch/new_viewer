@@ -726,9 +726,9 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
         if enabled:
             print(f"[PdfViewWidget] EV 보완 모드 활성화 (RN: {self._current_rn})")
 
-    def save_pdf(self, page_order: list[int] | None = None, worker_name: str = "", is_give_works: bool = False, rn: str = ""):
+    def save_pdf(self, page_order: list[int] | None = None, worker_name: str = "", is_give_works: bool = False, rn: str = "", skip_confirmation: bool = False):
         """PDF 저장 프로세스를 시작한다."""
-        print(f"[save_pdf 호출] is_give_works={is_give_works}, rn={rn}")
+        print(f"[save_pdf 호출] is_give_works={is_give_works}, rn={rn}, skip_confirmation={skip_confirmation}")
         try:
             if not self.renderer or not self.renderer.get_pdf_bytes():
                 QMessageBox.warning(self, "저장 오류", "저장할 PDF 파일이 없습니다.")
@@ -781,18 +781,19 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
                 suffix = PathLib(filename).suffix
                 output_path = str(save_dir / f"{stem}_{timestamp}{suffix}")
             
-            # 저장 확인 다이얼로그
-            reply = QMessageBox.question(
-                self, 
-                "저장 확인", 
-                f"다음 경로에 PDF를 저장하시겠습니까?\n\n{output_path}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            
-            if reply != QMessageBox.StandardButton.Yes:
-                # 사용자가 취소한 경우 그냥 확인창만 닫고 현재 상태 유지
-                return
+            # 저장 확인 다이얼로그 (skip_confirmation이 True이면 생략)
+            if not skip_confirmation:
+                reply = QMessageBox.question(
+                    self, 
+                    "저장 확인", 
+                    f"다음 경로에 PDF를 저장하시겠습니까?\n\n{output_path}",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                
+                if reply != QMessageBox.StandardButton.Yes:
+                    # 사용자가 취소한 경우 그냥 확인창만 닫고 현재 상태 유지
+                    return
             
             print(f"자동 저장 경로: {output_path}")
 

@@ -1114,7 +1114,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "오류", f"서류 병합 중 오류가 발생했습니다:\n{e}")
             return False
 
-    def _save_document(self):
+    def _save_document(self, skip_confirmation: bool = False):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
         # 알람 위젯에서 시작한 작업인 경우 chained_emails 검토 건너뛰기
         if self._is_alarm_rn_work:
@@ -1127,7 +1127,7 @@ class MainWindow(QMainWindow):
         
         if self.renderer:
             print(f"저장할 페이지 순서: {self._page_order}")  # 디버그 출력
-            print(f"[_save_document 호출] is_give_works={self._is_give_works_started}, rn={self._give_works_rn}")
+            print(f"[_save_document 호출] is_give_works={self._is_give_works_started}, rn={self._give_works_rn}, skip_confirmation={skip_confirmation}")
             
             # 저장 완료 후 자동으로 메인화면으로 돌아가도록 플래그 설정
             self._auto_return_to_main_after_save = True
@@ -1140,7 +1140,8 @@ class MainWindow(QMainWindow):
                     page_order=self._page_order, 
                     worker_name=self._worker_name,
                     is_give_works=self._is_give_works_started,
-                    rn=target_rn
+                    rn=target_rn,
+                    skip_confirmation=skip_confirmation
                 )
             except Exception as e:
                 # 저장 호출 중 예외 발생 시 안전장치
@@ -1810,12 +1811,38 @@ class MainWindow(QMainWindow):
 
     def _handle_edit_mode_timeout(self):
         """PDF 편집 모드 3분 경과 시 호출되는 핸들러"""
+        # 1분 후 자동 저장 및 종료를 위한 타이머 설정
+        self._auto_save_timer = QTimer(self)
+        self._auto_save_timer.setInterval(60000)  # 1분
+        self._auto_save_timer.setSingleShot(True)
+        self._auto_save_triggered = False  # 자동 저장 트리거 플래그
+
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.Warning)
         msg_box.setWindowTitle("경고")
         msg_box.setText("PDF 편집 모드에서 3분이 경과했습니다.")
+        msg_box.setInformativeText("1분 내에 확인을 누르지 않으면 변경사항이 저장되고 메인화면으로 이동합니다.")
         msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        
+        def on_auto_save_timeout():
+            self._auto_save_triggered = True
+            if msg_box.isVisible():
+                msg_box.close()
+
+        self._auto_save_timer.timeout.connect(on_auto_save_timeout)
+        self._auto_save_timer.start()
+        
+        # 메시지 박스 실행 (Blocking)
         msg_box.exec()
+        
+        # 메시지 박스가 닫히면 타이머 중지
+        if self._auto_save_timer.isActive():
+            self._auto_save_timer.stop()
+            
+        # 자동 저장이 트리거된 경우 저장 로직 실행
+        if self._auto_save_triggered:
+            print("[3분 경과] 1분 추가 대기 시간 초과. 자동 저장 프로세스 시작.")
+            self._save_document(skip_confirmation=True)
 
     # === 유틸리티 및 헬퍼 ===
 
