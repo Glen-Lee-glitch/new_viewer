@@ -131,7 +131,7 @@ class MainWindow(QMainWindow):
         self._edit_mode_timer = QTimer(self)
         self._edit_mode_timer.setInterval(180000)  # 3분
         self._edit_mode_timer.setSingleShot(True)
-        self._edit_mode_timer.timeout.connect(lambda: print("3분경과!"))
+        self._edit_mode_timer.timeout.connect(self._handle_edit_mode_timeout)
         
         # 앱 시작 시 로그인 다이얼로그 표시
         self._show_login_dialog()
@@ -1807,6 +1807,15 @@ class MainWindow(QMainWindow):
         """썸네일에서 Undo 요청이 왔을 때 PDF 뷰어의 되돌리기를 실행한다."""
         if self._pdf_view_widget and self.renderer:
             self._pdf_view_widget.undo_last_action()
+
+    def _handle_edit_mode_timeout(self):
+        """PDF 편집 모드 3분 경과 시 호출되는 핸들러"""
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setWindowTitle("경고")
+        msg_box.setText("PDF 편집 모드에서 3분이 경과했습니다.")
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
 
     # === 유틸리티 및 헬퍼 ===
 
