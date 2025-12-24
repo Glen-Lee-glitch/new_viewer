@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox, QTextEdit, QVBoxLayout
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, QTimer
 
 class InfoPanelWidget(QWidget):
     """PDF 파일 및 페이지 정보를 표시하는 위젯"""
@@ -17,6 +17,12 @@ class InfoPanelWidget(QWidget):
         
         self._delivery_day_gap: int | None = None # day_gap 저장 변수
         self._dynamic_checkboxes = [] # 동적으로 생성된 체크박스 리스트
+        self._current_rn: str = "" # 현재 표시 중인 RN 저장
+
+        # 자동 새로고침 타이머 설정 (20초)
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setInterval(20000)
+        self._refresh_timer.timeout.connect(self._on_refresh_timeout)
 
         if hasattr(self, 'pushButton_insert_text'):
             self.pushButton_insert_text.clicked.connect(self._on_insert_text_clicked)
@@ -27,6 +33,24 @@ class InfoPanelWidget(QWidget):
             
         if hasattr(self, 'radioButton_3'):
             self.radioButton_3.toggled.connect(self._on_radio_button_subsidy_toggled)
+
+    def showEvent(self, event):
+        """위젯이 보여질 때 타이머 시작"""
+        super().showEvent(event)
+        if not self._refresh_timer.isActive():
+            self._refresh_timer.start()
+
+    def hideEvent(self, event):
+        """위젯이 숨겨질 때 타이머 중지"""
+        super().hideEvent(event)
+        self._refresh_timer.stop()
+
+    def _on_refresh_timeout(self):
+        """타이머 타임아웃 시 작업 리스트 갱신"""
+        if self._current_rn and self.isVisible():
+            # 현재 RN으로 작업 리스트만 업데이트
+            # print(f"Auto-refreshing task list for RN: {self._current_rn}")
+            self.update_task_list(self._current_rn)
 
     def set_ev_complement_mode(self, is_enabled: bool, ev_memo: str = ""):
         """
@@ -158,6 +182,7 @@ class InfoPanelWidget(QWidget):
         self.lineEdit_name.clear()
         self.lineEdit_region.clear()
         self.lineEdit_special.clear()
+        self._current_rn = "" # RN 초기화
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.clear()  # RN 필드도 초기화
 
@@ -193,6 +218,8 @@ class InfoPanelWidget(QWidget):
         self.lineEdit_special.setText(special_note)
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.setText(rn)
+        
+        self._current_rn = rn # 현재 RN 저장
         
         # RN 에러 데이터에 따라 작업 리스트 업데이트
         self.update_task_list(rn)
