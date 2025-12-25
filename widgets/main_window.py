@@ -46,25 +46,61 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        # UI 파일 로드
+        # 1. UI 로드 및 변수 초기화
+        self._load_ui_file()
+        self._init_variables()
+        
+        # 2. 위젯 생성 및 타이머 설정
+        self._create_widgets()
+        self._setup_timers()
+
+        # 3. UI 배치 및 초기 상태 설정
+        self._setup_ui_containers()
+        self._set_initial_ui_state()
+
+        # 4. 시스템 설정 (메뉴, 시그널, 단축키)
+        self._setup_menus()
+        self._setup_connections()
+        self._setup_global_shortcuts()
+
+        # 5. 로그인 다이얼로그 초기화 및 실행
+        self._init_login_dialog()
+        self._show_login_dialog()
+
+    def _load_ui_file(self):
+        """UI 파일을 로드한다."""
         ui_path = Path(__file__).parent.parent / "ui" / "main_window.ui"
         uic.loadUi(str(ui_path), self)
 
+    def _init_variables(self):
+        """클래스 멤버 변수들을 초기화한다."""
         self.renderer: PdfRender | None = None
         self.current_page = -1
         self.thread_pool = QThreadPool()
-        self._initial_resize_done = False  # 초기 크기 조정 완료 플래그
+        self._initial_resize_done = False
         self._auto_return_to_main_after_save = False
-        self._worker_name = ""  # 작업자 이름 저장용 (위젯 생성 전에 초기화)
-        self._worker_id = None  # 작업자 ID 저장용 (위젯 생성 전에 초기화)
-        self._original_filepath: str | None = None # 현재 로드된 PDF의 원본 파일 경로
-        self._is_current_file_processed: bool = False # 현재 파일이 전처리된 파일인지 여부
-        self._is_give_works_started: bool = False  # 지급 테이블에서 시작 여부
-        self._give_works_rn: str = ""  # 지급 테이블 시작 시 RN 번호
-        self._is_alarm_rn_work: bool = False  # 알람 위젯에서 시작한 작업 여부
-        self._is_ev_complement_work: bool = False # EV 보완 작업 여부
+        self._worker_name = ""
+        self._worker_id = None
+        self._original_filepath: str | None = None
+        self._is_current_file_processed: bool = False
+        self._is_give_works_started: bool = False
+        self._give_works_rn: str = ""
+        self._is_alarm_rn_work: bool = False
+        self._is_ev_complement_work: bool = False
+        self._page_order: list[int] = []
+        self._pending_basic_info: dict | None = None
         
-        # --- 위젯 인스턴스 생성 ---
+        # 이상치 및 작업 관련 변수
+        self._current_rn = ""
+        self._is_context_menu_work = False
+        self._pending_outlier_check = False
+        self._pending_outlier_metadata = None
+        self._pending_outlier_metadata_copy = None
+        self._outlier_queue = []
+        self._original_outlier_types = []
+
+    def _create_widgets(self):
+        """자식 위젯들을 생성한다."""
         self._thumbnail_viewer = ThumbnailViewWidget()
         self._pdf_view_widget = PdfViewWidget()
         self._pdf_load_widget = PdfLoadWidget()
@@ -72,69 +108,46 @@ class MainWindow(QMainWindow):
         self._alarm_widget = AlarmWidget(self._worker_name)
         self._todo_widget = ToDoWidget(self)
         self._settings_dialog = SettingsDialog(self)
-        # self._mail_dialog = MailDialog(parent=self) # SpecialNoteDialog는 필요할 때 생성
-        self._pending_basic_info: dict | None = None
         self._detail_form_dialog = DetailFormDialog(self)
         self._config_dialog = ConfigDialog(self)
         self._necessary_widget = NecessaryWidget()
-        
+
+    def _setup_timers(self):
+        """타이머를 설정한다."""
         # 새로고침 타이머
         self._refresh_timer = QTimer(self)
         self._refresh_timer.timeout.connect(self._refresh_all_data)
-
-        # --- 페이지 순서 관리 ---
-        self._page_order: list[int] = []
-
-        # --- UI 컨테이너에 위젯 배치 ---
-        self._setup_ui_containers()
         
-        # --- 초기 위젯 상태 설정 ---
-        self._pdf_view_widget.hide()
-        self._thumbnail_viewer.hide()
-        self._info_panel.hide()
-        self._necessary_widget.show()
-        self._alarm_widget.show()  # alarm_widget은 초기에 표시
-        self._todo_widget.hide()
-
-        # --- 메뉴바 및 액션 설정 ---
-        self._setup_menus()
-
-        # --- 상태바에 네비게이션 위젯 추가 ---
-        self.ui_status_bar.addPermanentWidget(self.ui_nav_widget)
-        
-        # database_updated_time_label이 HTML을 인식하도록 설정
-        if hasattr(self, 'database_updated_time_label'):
-            self.database_updated_time_label.setTextFormat(Qt.TextFormat.RichText)
-
-        # --- 시그널 연결 ---
-        self._setup_connections()
-
-        # --- 전역 단축키 설정 ---
-        self._setup_global_shortcuts()
-
-        # 로그인 다이얼로그 초기화
-        # parent를 None으로 설정하여 독립적인 윈도우로 생성 (작업 표시줄 표시 보장)
-        self._login_dialog = LoginDialog()
-        self._current_rn = ""  # 현재 작업 중인 RN 번호 저장용
-        self._is_context_menu_work = False  # 컨텍스트 메뉴를 통한 작업 여부
-        self._pending_outlier_check = False  # PDF 렌더 완료 후 이상치 체크 플래그
-        self._pending_outlier_metadata = None  # 이상치 메타데이터 저장용
-        self._pending_outlier_metadata_copy = None # 이상치 처리 중 사용할 메타데이터 복사본
-        self._outlier_queue = [] # 순차 처리를 위한 이상치 큐
-        self._original_outlier_types = [] # 페이지 이동 로직을 위한 원본 이상치 목록
-        
-        # 초기 상태에서 작업자 현황 버튼 숨김
-        if hasattr(self, 'pushButton_worker_progress'):
-            self.pushButton_worker_progress.hide()
-
         # PDF 편집 모드 3분 경과 체크 타이머
         self._edit_mode_timer = QTimer(self)
         self._edit_mode_timer.setInterval(180000)  # 3분
         self._edit_mode_timer.setSingleShot(True)
         self._edit_mode_timer.timeout.connect(self._handle_edit_mode_timeout)
+
+    def _set_initial_ui_state(self):
+        """위젯들의 초기 표시/숨김 상태와 스타일을 설정한다."""
+        self._pdf_view_widget.hide()
+        self._thumbnail_viewer.hide()
+        self._info_panel.hide()
+        self._necessary_widget.show()
+        self._alarm_widget.show()
+        self._todo_widget.hide()
+
+        # 상태바에 네비게이션 위젯 추가
+        self.ui_status_bar.addPermanentWidget(self.ui_nav_widget)
         
-        # 앱 시작 시 로그인 다이얼로그 표시
-        self._show_login_dialog()
+        # 라벨 포맷 설정
+        if hasattr(self, 'database_updated_time_label'):
+            self.database_updated_time_label.setTextFormat(Qt.TextFormat.RichText)
+            
+        # 초기 상태에서 작업자 현황 버튼 숨김
+        if hasattr(self, 'pushButton_worker_progress'):
+            self.pushButton_worker_progress.hide()
+
+    def _init_login_dialog(self):
+        """로그인 다이얼로그를 초기화한다."""
+        # parent를 None으로 설정하여 독립적인 윈도우로 생성
+        self._login_dialog = LoginDialog()
 
     def _setup_ui_containers(self):
         """UI 컨테이너에 위젯들을 배치한다."""
@@ -1192,6 +1205,10 @@ class MainWindow(QMainWindow):
 
     def show_load_view(self):
         """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
+        # PDF 편집 모드 타이머 중지
+        if self._edit_mode_timer.isActive():
+            self._edit_mode_timer.stop()
+
         self.setWindowTitle("PDF Viewer")
         if self.renderer:
             self.renderer.close()
