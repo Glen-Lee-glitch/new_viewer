@@ -18,6 +18,7 @@ class AlarmWidget(QWidget):
         
         # 현재 로그인한 작업자 이름 저장
         self._worker_name = worker_name
+        self._special_note_dialog = None  # 비모달 다이얼로그 인스턴스 유지용
         
         # UI 파일 로드
         ui_path = Path(__file__).parent.parent / "ui" / "alarm_widget.ui"
@@ -274,18 +275,21 @@ class AlarmWidget(QWidget):
             QMessageBox.critical(self, "오류", f"이메일 확인 중 오류가 발생했습니다.\n{e}")
 
     def _open_special_note_dialog(self):
-        """특이사항 입력 다이얼로그를 연다."""
-        dialog = SpecialNoteDialog(parent=self)
+        """특이사항 입력 다이얼로그를 비모달로 연다."""
+        if self._special_note_dialog is None or not self._special_note_dialog.isVisible():
+            self._special_note_dialog = SpecialNoteDialog(parent=self)
         
         # MainWindow의 PdfLoadWidget에서 선택된 RN 가져오기
         try:
             main_window = self.window()
             if hasattr(main_window, 'pdf_load_widget'):
                 selected_rn = main_window.pdf_load_widget.get_selected_rn()
-                if selected_rn and hasattr(dialog, 'RN_lineEdit'):
-                    dialog.RN_lineEdit.setText(selected_rn)
+                if selected_rn and hasattr(self._special_note_dialog, 'RN_lineEdit'):
+                    self._special_note_dialog.RN_lineEdit.setText(selected_rn)
         except Exception as e:
             print(f"RN 자동 입력 실패: {e}")
             
-        dialog.exec()
+        self._special_note_dialog.show()
+        self._special_note_dialog.raise_()
+        self._special_note_dialog.activateWindow()
 

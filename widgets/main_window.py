@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
         # 이상치 및 작업 관련 변수
         self._current_rn = ""
         self._is_context_menu_work = False
+        self._special_note_dialog = None  # 비모달 다이얼로그 인스턴스 유지용
         self._pending_outlier_check = False
         self._pending_outlier_metadata = None
         self._pending_outlier_metadata_copy = None
@@ -481,31 +482,45 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def _open_special_note_dialog(self):
-        """특이사항 입력 다이얼로그를 연다."""
-        dialog = SpecialNoteDialog(parent=self)
+        """특이사항 입력 다이얼로그를 비모달로 연다."""
+        if self._special_note_dialog is None or not self._special_note_dialog.isVisible():
+            self._special_note_dialog = SpecialNoteDialog(parent=self)
         
         # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
-        if self._current_rn and hasattr(dialog, 'RN_lineEdit'):
-            dialog.RN_lineEdit.setText(self._current_rn)
+        if self._current_rn and hasattr(self._special_note_dialog, 'RN_lineEdit'):
+            self._special_note_dialog.RN_lineEdit.setText(self._current_rn)
 
-        dialog.exec()
+        self._special_note_dialog.show()
+        self._special_note_dialog.raise_()
+        self._special_note_dialog.activateWindow()
 
     def _open_special_note_dialog_then_return_to_main(self):
-        """특이사항 입력 다이얼로그를 열고, 완료 후 메인화면으로 돌아간다."""
-        dialog = SpecialNoteDialog(parent=self)
+        """특이사항 입력 다이얼로그를 비모달로 열고, 완료 후 메인화면으로 돌아간다."""
+        if self._special_note_dialog is None or not self._special_note_dialog.isVisible():
+            self._special_note_dialog = SpecialNoteDialog(parent=self)
 
         # 현재 작업 중인 RN 값을 다이얼로그에 자동 설정
-        if self._current_rn and hasattr(dialog, 'RN_lineEdit'):
-            dialog.RN_lineEdit.setText(self._current_rn)
+        if self._current_rn and hasattr(self._special_note_dialog, 'RN_lineEdit'):
+            self._special_note_dialog.RN_lineEdit.setText(self._current_rn)
         
-        # 다이얼로그를 모달로 실행
-        dialog.exec()
+        # 완료(확인/취소) 시 실행될 로직 연결
+        try:
+            self._special_note_dialog.finished.disconnect()
+        except:
+            pass
+        self._special_note_dialog.finished.connect(self._handle_special_note_finished_return_to_main)
         
+        self._special_note_dialog.show()
+        self._special_note_dialog.raise_()
+        self._special_note_dialog.activateWindow()
+
+    def _handle_special_note_finished_return_to_main(self, result):
+        """특이사항 다이얼로그 종료 후 메인 화면 복귀 처리를 수행한다."""
         # 이메일 창 완료 후 즉시 컨텍스트 메뉴 작업 플래그 리셋
         self._is_context_menu_work = False
         print("[컨텍스트 메뉴 작업 플래그] 특이사항 창 완료 후 False로 리셋됨")
         
-        # 이메일 창이 닫힌 후 메인화면으로 돌아가기
+        # 메인화면으로 돌아가기
         self.show_load_view()
         # 메인화면으로 돌아갈 때 데이터 새로고침
         self._pdf_load_widget.refresh_data()
