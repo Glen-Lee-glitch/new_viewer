@@ -123,38 +123,21 @@ def update_status_both_tables(conn, rn, status):
         print(f"❌ Failed to update status for RN {rn}: {e}", flush=True)
         return False
 
-def send_reply_all_email(service, email_info, rn, apply_num, special_items=None, status=None):
+def send_gmail_reply(service, email_info, message_text):
     """
-    5. 가져온 정보를 토대로 전체 답장 메일을 전송합니다.
-    - status == '중복메일확인': "처리 완료하였습니다."
-    - 그 외: "{apply_num} [{special}] 신청완료입니다."
+    공통 Gmail 답장 전송 로직
     """
-    if not email_info:
-        print("❌ Email info is missing.", flush=True)
-        return
-
     thread_id = email_info['thread_id']
     sender = email_info['sender_address']
     cc = email_info['cc_address']
-    
-    # 답장 내용 구성
-    if status == '중복메일확인':
-        message_text = "처리 완료하였습니다."
-    else:
-        if special_items and len(special_items) > 0:
-            valid_items = [str(item) for item in special_items if item]
-            special_text = "/".join(valid_items)
-            message_text = f"#{apply_num} {special_text} 신청완료입니다."
-        else:
-            message_text = f"#{apply_num} 신청완료입니다."
-    
+
     try:
         # Gmail API를 통해 스레드의 마지막 메시지 ID와 제목을 가져옴
         thread = service.users().threads().get(userId='me', id=thread_id).execute()
         messages = thread.get('messages', [])
         if not messages:
             print(f"⚠️ No messages found in thread {thread_id}", flush=True)
-            return
+            return None
             
         last_msg = messages[-1]
         
@@ -189,11 +172,38 @@ def send_reply_all_email(service, email_info, rn, apply_num, special_items=None,
 
         # 전송
         sent_message = service.users().messages().send(userId='me', body=body).execute()
-        print(f"✅ Reply sent successfully for RN {rn} (Apply Num: {apply_num}, Status: {status})", flush=True)
+        print(f"✅ Email sent successfully to {sender}", flush=True)
         return sent_message
 
     except Exception as e:
         print(f"❌ Failed to send reply: {e}", flush=True)
+        return None
+
+def send_reply_all_email(service, email_info, rn, apply_num, special_items=None, status=None):
+    """
+    5. 가져온 정보를 토대로 전체 답장 메일을 전송합니다.
+    - status == '중복메일확인': "처리 완료하였습니다."
+    - 그 외: "{apply_num} [{special}] 신청완료입니다."
+    """
+    if not email_info:
+        print("❌ Email info is missing.", flush=True)
+        return
+
+    # 답장 내용 구성
+    if status == '중복메일확인':
+        message_text = "처리 완료하였습니다."
+    else:
+        if special_items and len(special_items) > 0:
+            valid_items = [str(item) for item in special_items if item]
+            special_text = "/".join(valid_items)
+            message_text = f"#{apply_num} {special_text} 신청완료입니다."
+        else:
+            message_text = f"#{apply_num} 신청완료입니다."
+    
+    sent_message = send_gmail_reply(service, email_info, message_text)
+    if sent_message:
+        print(f"✅ Reply sent successfully for RN {rn} (Apply Num: {apply_num}, Status: {status})", flush=True)
+    return sent_message
 
 def fetch_pending_applications(conn):
     """
@@ -227,6 +237,64 @@ def fetch_pending_applications(conn):
     except Exception as e:
         print(f"❌ Error fetching pending applications: {e}", flush=True)
         return []
+
+def fetch_pending_replies(conn):
+    """
+    replies 테이블에서 status가 0인 항목 조회
+    """
+    print("🔄 Fetching pending replies from 'replies' table...", flush=True)
+    try:
+        with conn.cursor() as cursor:
+            sql = 'SELECT id, "RN", thread_id, content FROM replies WHERE status = 0'
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            print(f"📋 Fetched {len(rows)} pending replies.", flush=True)
+            return rows
+    except Exception as e:
+        print(f"❌ Error fetching pending replies: {e}", flush=True)
+        return []
+
+def update_reply_status(conn, reply_id):
+    """
+    replies 테이블 업데이트: status=1, sent_at=NOW()
+    """
+    try:
+        with conn.cursor() as cursor:
+            sql = "UPDATE replies SET status = 1, sent_at = NOW() WHERE id = %s"
+            cursor.execute(sql, (reply_id,))
+            conn.commit()
+            print(f"✅ Updated replies status for ID {reply_id}", flush=True)
+            return True
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Failed to update replies status for ID {reply_id}: {e}", flush=True)
+        return False
+
+def process_replies_queue(service, conn):
+    """
+    replies 테이블의 대기열 처리
+    """
+    pending_replies = fetch_pending_replies(conn)
+    for row in pending_replies:
+        reply_id, rn, thread_id, content = row
+        print(f"\n🚀 Processing Reply ID: {reply_id}, RN: {rn}", flush=True)
+
+        email_info = get_email_details(conn, thread_id)
+        if not email_info:
+            print(f"⚠️ Email details not found for thread: {thread_id}", flush=True)
+            continue
+        
+        # content가 None일 경우 빈 문자열로 처리
+        if content is None:
+            content = ""
+
+        sent_msg = send_gmail_reply(service, email_info, content)
+        if sent_msg:
+            update_reply_status(conn, reply_id)
+            # RN 상태를 '첨부파일 누락'으로 업데이트
+            update_status_both_tables(conn, rn, '첨부파일 누락')
+            print("⏳ Waiting 2 seconds before next reply...", flush=True)
+            time.sleep(2)
 
 def process_single_application(service, conn, rn, apply_num, special_items=None, status=None):
     """
@@ -264,6 +332,7 @@ def main():
         return
 
     try:
+        # 1. 일반 신청 처리
         pending_apps = fetch_pending_applications(conn)
         print(f"📋 Found {len(pending_apps)} pending applications.", flush=True)
 
@@ -277,6 +346,9 @@ def main():
             # 5초 대기
             print("⏳ Waiting 5 seconds before next process...", flush=True)
             time.sleep(5)
+        
+        # 2. Replies 테이블 처리 (추가된 로직)
+        process_replies_queue(service, conn)
 
     finally:
         if conn:
