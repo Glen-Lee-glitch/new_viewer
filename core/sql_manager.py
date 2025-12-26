@@ -580,20 +580,19 @@ def fetch_daily_status_counts() -> dict:
             kst = pytz.timezone('Asia/Seoul')
             today_str = datetime.now(kst).strftime('%Y-%m-%d')
             
-            # 금일 접수된 건들의 전체 카운트와 상태별 카운트를 한 번에 조회
-            query = """
-                SELECT 
-                    COUNT(DISTINCT "RN") as total_pipeline,
-                    COUNT(DISTINCT CASE WHEN status = '신청불가' THEN "RN" END) as impossible_count,
-                    COUNT(DISTINCT CASE WHEN status = '처리완료' THEN "RN" END) as completed_count,
-                    COUNT(DISTINCT CASE WHEN status IN ('서류미비 요청', '서류미비 도착', 'EV 보완요청', '중복메일') THEN "RN" END) as deferred_count,
-                    COUNT(DISTINCT CASE WHEN status = '추후 신청' THEN "RN" END) as future_apply_count
-                FROM rns 
-                WHERE original_received_date::date = %s
-            """
-            
             with connection.cursor() as cursor:
-                cursor.execute(query, (today_str,))
+                # 1. rns 테이블 통계
+                query_rns = """
+                    SELECT 
+                        COUNT(DISTINCT "RN") as total_pipeline,
+                        COUNT(DISTINCT CASE WHEN status = '신청불가' THEN "RN" END) as impossible_count,
+                        COUNT(DISTINCT CASE WHEN status = '처리완료' THEN "RN" END) as completed_count,
+                        COUNT(DISTINCT CASE WHEN status IN ('서류미비 요청', '서류미비 도착', 'EV보완요청', '중복메일') THEN "RN" END) as deferred_count,
+                        COUNT(DISTINCT CASE WHEN status = '추후 신청' THEN "RN" END) as future_apply_count
+                    FROM rns 
+                    WHERE original_received_date::date = %s
+                """
+                cursor.execute(query_rns, (today_str,))
                 row = cursor.fetchone()
                 
                 total = row[0] if row and row[0] else 0
@@ -602,9 +601,18 @@ def fetch_daily_status_counts() -> dict:
                 deferred = row[3] if row and row[3] else 0
                 future_apply = row[4] if row and row[4] else 0
                 
-                # 나머지는 모두 처리중으로 간주
                 processing = total - (impossible + completed + deferred + future_apply)
                 if processing < 0: processing = 0
+                
+                # 2. ev_rns 테이블 통계 (금일 applied_date 기준)
+                query_ev = """
+                    SELECT COUNT(*) 
+                    FROM ev_rns 
+                    WHERE (applied_date AT TIME ZONE 'Asia/Seoul')::date = %s
+                """
+                cursor.execute(query_ev, (today_str,))
+                row_ev = cursor.fetchone()
+                ev_completed = row_ev[0] if row_ev else 0
                 
                 return {
                     'pipeline': total,
@@ -612,7 +620,8 @@ def fetch_daily_status_counts() -> dict:
                     'completed': completed,
                     'deferred': deferred,
                     'impossible': impossible,
-                    'future_apply': future_apply
+                    'future_apply': future_apply,
+                    'ev_completed': ev_completed
                 }
     except Exception:
         traceback.print_exc()
@@ -621,7 +630,9 @@ def fetch_daily_status_counts() -> dict:
             'processing': 0,
             'completed': 0,
             'deferred': 0,
-            'impossible': 0
+            'impossible': 0,
+            'future_apply': 0,
+            'ev_completed': 0
         }
 
 def fetch_gemini_contract_results(rn: str) -> dict:

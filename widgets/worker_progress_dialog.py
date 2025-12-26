@@ -183,14 +183,16 @@ class WorkerProgressDialog(QDialog):
         # 카드 위젯 참조
         val_label.setProperty("card_widget", card)
 
-    def _refresh_summary_ui(self, pipeline="0", processing="0", completed="0", deferred="0", impossible="0", future_apply="0"):
+    def _refresh_summary_ui(self, pipeline="0", processing="0", completed="0", deferred="0", impossible="0", future_apply="0", ev_completed="0"):
         """요약 영역의 값을 갱신한다."""
         if "pipeline" in self.summary_widgets:
             self.summary_widgets["pipeline"].setText(str(pipeline))
         if "processing" in self.summary_widgets:
             self.summary_widgets["processing"].setText(str(processing))
         if "completed" in self.summary_widgets:
-            self.summary_widgets["completed"].setText(str(completed))
+            # {completed}({ev_completed}) 형식
+            text = f"{completed}({ev_completed})"
+            self.summary_widgets["completed"].setText(text)
         if "deferred" in self.summary_widgets:
             self.summary_widgets["deferred"].setText(str(deferred))
         if "impossible" in self.summary_widgets:
@@ -231,7 +233,8 @@ class WorkerProgressDialog(QDialog):
                 completed=counts.get('completed', 0),
                 deferred=counts.get('deferred', 0),
                 impossible=counts.get('impossible', 0),
-                future_apply=counts.get('future_apply', 0)
+                future_apply=counts.get('future_apply', 0),
+                ev_completed=counts.get('ev_completed', 0)
             )
             
             # 하단 타이틀 업데이트
