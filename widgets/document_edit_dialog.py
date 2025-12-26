@@ -2,7 +2,7 @@ import sys
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, 
     QLineEdit, QPushButton, QLabel, QScrollArea, QFrame,
-    QApplication, QSpacerItem, QSizePolicy
+    QApplication, QSpacerItem, QSizePolicy, QSpinBox
 )
 from PyQt6.QtCore import Qt
 
@@ -73,12 +73,31 @@ class DocumentListEditor(QWidget):
 
 class DocumentEditDialog(QDialog):
     """서류 상세 수정 다이얼로그"""
-    def __init__(self, region_name, data=None, parent=None):
+    def __init__(self, region_name, data=None, residence_requirements=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"서류 수정 - {region_name}")
         self.resize(400, 500)
         
         layout = QVBoxLayout(self)
+        
+        # 거주요건 설정
+        req_layout = QHBoxLayout()
+        req_label = QLabel("거주요건:")
+        self.req_spinbox = QSpinBox()
+        self.req_spinbox.setRange(0, 3650) # 10년
+        self.req_spinbox.setSingleStep(30)
+        self.req_spinbox.setSuffix(" 일")
+        
+        if residence_requirements is not None:
+            self.req_spinbox.setValue(residence_requirements)
+        else:
+            self.req_spinbox.setValue(0)
+            
+        req_layout.addWidget(req_label)
+        req_layout.addWidget(self.req_spinbox)
+        req_layout.addStretch()
+        
+        layout.addLayout(req_layout)
         
         self.tab_widget = QTabWidget()
         
@@ -110,12 +129,16 @@ class DocumentEditDialog(QDialog):
 
     def get_data(self):
         """수정된 데이터를 dict 형태로 반환"""
-        data = self.original_data.copy()
-        data.update({
+        doc_data = self.original_data.copy()
+        doc_data.update({
             "general_documents": self.general_editor.get_items(),
             "additional_documents": self.additional_editor.get_items()
         })
-        return data
+        
+        return {
+            "notification_apply": doc_data,
+            "residence_requirements": self.req_spinbox.value()
+        }
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

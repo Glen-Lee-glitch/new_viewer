@@ -40,6 +40,7 @@ class RegionManagerDialog(QDialog):
         self.tableWidget_documents.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.tableWidget_documents.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tableWidget_documents.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.tableWidget_documents.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         
         # 검색 기능 연결 (tab_3)
         self.lineEdit_search_docs.textChanged.connect(self.filter_table_documents)
@@ -276,7 +277,7 @@ class RegionManagerDialog(QDialog):
             with closing(psycopg2.connect(**DB_CONFIG)) as conn:
                 with conn.cursor() as cursor:
                     query = """
-                        SELECT rm.region_id, rm.region, g.notification_apply 
+                        SELECT rm.region_id, rm.region, g.notification_apply, g.residence_requirements 
                         FROM region_metadata rm 
                         LEFT JOIN "공고문" g ON rm.region_id = g.region_id 
                         ORDER BY rm.region
@@ -291,7 +292,7 @@ class RegionManagerDialog(QDialog):
             self.tableWidget_documents.setRowCount(len(rows))
             self.document_data = {}
             
-            for row_idx, (region_id, region, notification_apply) in enumerate(rows):
+            for row_idx, (region_id, region, notification_apply, residence_requirements) in enumerate(rows):
                 # region_id를 UserRole로 저장
                 region_item = QTableWidgetItem(region)
                 region_item.setData(Qt.ItemDataRole.UserRole, region_id)
@@ -308,7 +309,10 @@ class RegionManagerDialog(QDialog):
                     data = {"general_documents": [], "additional_documents": []}
                 
                 # 데이터 저장
-                self.document_data[region_id] = data
+                self.document_data[region_id] = {
+                    "notification_apply": data,
+                    "residence_requirements": residence_requirements if residence_requirements is not None else 0
+                }
                 
                 # 일반서류 요약
                 general_items = data.get("general_documents", [])
@@ -323,6 +327,13 @@ class RegionManagerDialog(QDialog):
                 additional_item = QTableWidgetItem(additional_summary)
                 additional_item.setFlags(additional_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
                 self.tableWidget_documents.setItem(row_idx, 2, additional_item)
+
+                # 거주요건 (4번째 컬럼)
+                req_val = residence_requirements if residence_requirements is not None else 0
+                req_text = f"{req_val}(일)"
+                req_item = QTableWidgetItem(req_text)
+                req_item.setFlags(req_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                self.tableWidget_documents.setItem(row_idx, 3, req_item)
             
             # 로드 후 현재 검색어에 맞춰 필터링 적용
             self.filter_table_documents()
@@ -343,11 +354,13 @@ class RegionManagerDialog(QDialog):
         region_name = region_item.text()
         
         # 현재 데이터 가져오기
-        current_data = self.document_data.get(region_id, {"general_documents": [], "additional_documents": []})
+        saved_data = self.document_data.get(region_id, {})
+        current_data = saved_data.get("notification_apply", {"general_documents": [], "additional_documents": []})
+        current_req = saved_data.get("residence_requirements", 0)
         
         # 수정 다이얼로그 열기
         from widgets.document_edit_dialog import DocumentEditDialog
-        dialog = DocumentEditDialog(region_name, current_data, self)
+        dialog = DocumentEditDialog(region_name, current_data, residence_requirements=current_req, parent=self)
         
         if dialog.exec():
             # 수정된 데이터 저장
@@ -364,15 +377,20 @@ class RegionManagerDialog(QDialog):
             from contextlib import closing
             import json
             
+            notification_apply = data.get("notification_apply", {})
+            residence_requirements = data.get("residence_requirements", 0)
+            
             with closing(psycopg2.connect(**DB_CONFIG)) as conn:
                 with conn.cursor() as cursor:
                     # UPSERT: 존재하면 UPDATE, 없으면 INSERT
                     cursor.execute("""
-                        INSERT INTO "공고문" (region_id, notification_apply)
-                        VALUES (%s, %s::jsonb)
+                        INSERT INTO "공고문" (region_id, notification_apply, residence_requirements)
+                        VALUES (%s, %s::jsonb, %s)
                         ON CONFLICT (region_id) 
-                        DO UPDATE SET notification_apply = EXCLUDED.notification_apply
-                    """, (region_id, json.dumps(data, ensure_ascii=False)))
+                        DO UPDATE SET 
+                            notification_apply = EXCLUDED.notification_apply,
+                            residence_requirements = EXCLUDED.residence_requirements
+                    """, (region_id, json.dumps(notification_apply, ensure_ascii=False), residence_requirements))
                 conn.commit()
                 
             QMessageBox.information(self, "완료", "서류 정보가 저장되었습니다.")

@@ -159,6 +159,11 @@
            <string>추가서류</string>
           </property>
          </column>
+         <column>
+          <property name="text">
+           <string>거주요건</string>
+          </property>
+         </column>
         </widget>
        </item>
       </layout>
