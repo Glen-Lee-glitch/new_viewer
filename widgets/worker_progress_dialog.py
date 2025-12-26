@@ -1,4 +1,7 @@
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QMessageBox
+from PyQt6.QtWidgets import (
+    QDialog, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QMessageBox, 
+    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
+)
 from PyQt6.QtCore import Qt, pyqtSignal, QRectF
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen
 from PyQt6 import uic
@@ -8,7 +11,8 @@ from core.sql_manager import (
     get_daily_worker_progress, 
     get_daily_worker_payment_progress,
     fetch_daily_status_counts,
-    fetch_today_completed_worker_stats
+    fetch_today_completed_worker_stats,
+    fetch_today_impossible_list
 )
 
 class ClickableCard(QWidget):
@@ -131,7 +135,7 @@ class WorkerProgressDialog(QDialog):
         self._create_summary_card("processing", "처리중", "#f1c40f")
         self._create_summary_card("completed", "완료", "#2ecc71", clickable=True, onClick=self._show_completed_stats)
         self._create_summary_card("deferred", "미비/보류", "#e74c3c")
-        self._create_summary_card("impossible", "신청불가", "#95a5a6")
+        self._create_summary_card("impossible", "신청불가", "#95a5a6", clickable=True, onClick=self._show_impossible_list)
         
     def _create_summary_card(self, key: str, label: str, color: str, clickable=False, onClick=None):
         """요약 카드를 생성하고 레이아웃에 추가한다."""
@@ -216,7 +220,7 @@ class WorkerProgressDialog(QDialog):
             self.title_label.setText(f"실시간 업무 현황 (금일 접수: {counts.get('pipeline', 0)}건)")
             
             # 차트 컨테이너 초기화 (기본 메시지)
-            self._show_message_in_chart("상단의 '완료' 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
+            self._show_message_in_chart("상단의 '완료' 또는 '신청불가' 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
             self.current_chart_type = None
             
         except Exception as e:
@@ -227,7 +231,7 @@ class WorkerProgressDialog(QDialog):
         """완료 건에 대한 상세 통계(파이 차트)를 보여준다 (토글 방식)."""
         # 토글 로직: 이미 보고 있다면 닫기
         if self.current_chart_type == 'completed':
-            self._show_message_in_chart("상단의 '완료' 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
+            self._show_message_in_chart("상단의 '완료' 또는 '신청불가' 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
             self.current_chart_type = None
             return
 
@@ -255,6 +259,78 @@ class WorkerProgressDialog(QDialog):
             
         except Exception as e:
             self._show_message_in_chart(f"차트 로드 실패: {str(e)}")
+            self.current_chart_type = None
+
+    def _show_impossible_list(self):
+        """신청불가 건에 대한 상세 목록을 보여준다 (토글 방식)."""
+        # 토글 로직: 이미 보고 있다면 닫기
+        if self.current_chart_type == 'impossible':
+            self._show_message_in_chart("상단의 '완료' 또는 '신청불가' 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
+            self.current_chart_type = None
+            return
+            
+        try:
+            items = fetch_today_impossible_list()
+            
+            # 차트 컨테이너 비우기
+            self._clear_layout(self.chart_container.layout())
+            
+            # 레이아웃 생성 및 설정
+            if self.chart_container.layout() is None:
+                layout = QVBoxLayout()
+                self.chart_container.setLayout(layout)
+            
+            if not items:
+                self._show_message_in_chart("신청불가 데이터가 없습니다.")
+                self.current_chart_type = 'impossible'
+                return
+            
+            # 테이블 위젯 생성
+            table = QTableWidget()
+            table.setColumnCount(2)
+            table.setHorizontalHeaderLabels(["RN", "불가 사유"])
+            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents) # RN 컬럼
+            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch) # 사유 컬럼
+            
+            # 테이블 스타일 설정 (다크 테마)
+            table.setStyleSheet("""
+                QTableWidget {
+                    background-color: #2c3e50;
+                    gridline-color: #3e5871;
+                    border: none;
+                }
+                QHeaderView::section {
+                    background-color: #34495e;
+                    color: #ecf0f1;
+                    padding: 5px;
+                    border: 1px solid #2c3e50;
+                }
+                QTableWidget::item {
+                    color: #ecf0f1;
+                    padding: 5px;
+                }
+                QTableWidget::item:selected {
+                    background-color: #3498db;
+                }
+            """)
+            
+            # 데이터 채우기
+            table.setRowCount(len(items))
+            for i, item in enumerate(items):
+                rn_item = QTableWidgetItem(str(item.get('RN', '')))
+                rn_item.setFlags(rn_item.flags() ^ Qt.ItemFlag.ItemIsEditable) # 읽기 전용
+                
+                reason_item = QTableWidgetItem(str(item.get('reason', '')))
+                reason_item.setFlags(reason_item.flags() ^ Qt.ItemFlag.ItemIsEditable) # 읽기 전용
+                
+                table.setItem(i, 0, rn_item)
+                table.setItem(i, 1, reason_item)
+            
+            self.chart_container.layout().addWidget(table)
+            self.current_chart_type = 'impossible'
+            
+        except Exception as e:
+            self._show_message_in_chart(f"데이터 로드 실패: {str(e)}")
             self.current_chart_type = None
 
     def _show_message_in_chart(self, message: str):

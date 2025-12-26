@@ -2296,6 +2296,66 @@ def get_original_pdf_path_by_rn(rn: str) -> str | None:
         traceback.print_exc()
         return None
 
+def fetch_today_completed_worker_stats() -> dict:
+    """
+    금일 '처리완료'된 건들의 작업자별 통계를 조회한다. (PostgreSQL 버전)
+    
+    Returns:
+        dict: { '작업자명': 건수, ... } (건수 내림차순 정렬)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT w.worker_name, COUNT(*) as count
+                FROM rns r
+                JOIN workers w ON r.worker_id = w.worker_id
+                WHERE r.original_received_date::date = %s
+                  AND r.status = '처리완료'
+                GROUP BY w.worker_name
+                ORDER BY count DESC
+            """
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                
+                return {row[0]: row[1] for row in rows}
+    except Exception:
+        traceback.print_exc()
+        return {}
+
+def fetch_today_impossible_list() -> list[dict]:
+    """
+    금일 '신청불가'로 처리된 건들의 목록(RN, 사유)을 조회한다. (PostgreSQL 버전)
+    
+    Returns:
+        list[dict]: [{'RN': str, 'reason': str}, ...]
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT i."RN", i.reason
+                FROM impossible_apply i
+                JOIN rns r ON i."RN" = r."RN"
+                WHERE r.original_received_date::date = %s
+                ORDER BY i."RN" ASC
+            """
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                
+                return [{'RN': row[0], 'reason': row[1]} for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
