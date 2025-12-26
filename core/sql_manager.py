@@ -564,6 +564,31 @@ def get_today_completed_subsidies(worker: str = None) -> list:
     # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
     return []
 
+def fetch_today_pipeline_count() -> int:
+    """
+    rns 테이블에서 original_received_date가 오늘인 데이터의 고유 건수를 조회한다. (PostgreSQL 버전)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # 한국 시간 기준 오늘 날짜 구하기
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            # original_received_date가 DATE 타입이라고 가정하고 비교
+            # 만약 TIMESTAMP라면 DATE(original_received_date)로 비교
+            query = """
+                SELECT COUNT(DISTINCT "RN") 
+                FROM rns 
+                WHERE original_received_date::date = %s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (today_str,))
+                row = cursor.fetchone()
+                return row[0] if row else 0
+    except Exception:
+        traceback.print_exc()
+        return 0
+
 def fetch_gemini_contract_results(rn: str) -> dict:
     """
     analysis_results 테이블의 '구매계약서' JSONB 컬럼에서 RN으로 데이터를 조회한다. (PostgreSQL 버전)

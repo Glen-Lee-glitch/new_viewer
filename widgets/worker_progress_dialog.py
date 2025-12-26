@@ -4,7 +4,11 @@ from PyQt6 import uic
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
-from core.sql_manager import get_daily_worker_progress, get_daily_worker_payment_progress
+from core.sql_manager import (
+    get_daily_worker_progress, 
+    get_daily_worker_payment_progress,
+    fetch_today_pipeline_count
+)
 
 class WorkerProgressDialog(QDialog):
     """전체 업무 현황판 다이얼로그"""
@@ -22,22 +26,31 @@ class WorkerProgressDialog(QDialog):
         
         # 초기화
         self._setup_ui()
-        self._load_overall_status()
+        # 데이터 로드는 창이 보일 때(showEvent) 혹은 명시적으로 호출
     
+    def showEvent(self, event):
+        """다이얼로그가 표시될 때 데이터를 로드한다."""
+        super().showEvent(event)
+        self._load_overall_status()
+
     def _setup_ui(self):
         """UI 컴포넌트를 설정한다."""
         # 닫기 버튼 연결
         self.close_button.clicked.connect(self.accept)
         
-        # 요약 정보 레이아웃 초기화
+        # 요약 정보 레이아웃 초기화 (Placeholders)
+        self._refresh_summary_ui(pipeline="0", processing="0", completed="0", deferred="0")
+    
+    def _refresh_summary_ui(self, pipeline="0", processing="0", completed="0", deferred="0"):
+        """요약 영역의 UI를 갱신한다."""
         self._clear_layout(self.summary_layout)
-        self._add_summary_item("접수", "0", "#3498db")
-        self._add_summary_item("처리중", "0", "#f1c40f")
-        self._add_summary_item("완료", "0", "#2ecc71")
-        self._add_summary_item("미비/보류", "0", "#e74c3c")
+        self._add_summary_item("파이프라인", str(pipeline), "#3498db")
+        self._add_summary_item("처리중", str(processing), "#f1c40f")
+        self._add_summary_item("완료", str(completed), "#2ecc71")
+        self._add_summary_item("미비/보류", str(deferred), "#e74c3c")
     
     def _clear_layout(self, layout):
-        """레이아웃 내의 모든 위젯을 제거한다."""
+        # ... (기존 코드와 동일)
         if layout:
             while layout.count():
                 child = layout.takeAt(0)
@@ -47,7 +60,7 @@ class WorkerProgressDialog(QDialog):
                     self._clear_layout(child.layout())
 
     def _add_summary_item(self, label: str, value: str, color: str):
-        """상단 요약 영역에 항목을 추가한다."""
+        # ... (기존 코드와 동일)
         item_widget = QWidget()
         item_layout = QVBoxLayout(item_widget)
         item_layout.setContentsMargins(10, 5, 10, 5)
@@ -67,9 +80,28 @@ class WorkerProgressDialog(QDialog):
         self.summary_layout.addWidget(item_widget)
 
     def _load_overall_status(self):
-        """전체 업무 현황 데이터를 로드한다. (현재는 UI 구성만 수행)"""
-        # TODO: PostgreSQL 기반의 새로운 통계 쿼리로 교체 필요
-        pass
+        """전체 업무 현황 데이터를 로드한다."""
+        try:
+            # 1. 파이프라인 (금일 접수 건수)
+            pipeline_count = fetch_today_pipeline_count()
+            
+            # TODO: 나머지 항목들도 쿼리 함수 구현 후 연결
+            processing_count = 0
+            completed_count = 0
+            deferred_count = 0
+            
+            self._refresh_summary_ui(
+                pipeline=pipeline_count,
+                processing=processing_count,
+                completed=completed_count,
+                deferred=deferred_count
+            )
+            
+            # 하단 타이틀 업데이트
+            self.title_label.setText(f"실시간 업무 현황 (금일 접수: {pipeline_count}건)")
+            
+        except Exception as e:
+            print(f"Error loading status: {e}")
     
     def _load_worker_progress(self):
         """이전 작업자 현황 로드 로직 (필요 시 현황판 하단 차트용으로 재구성 가능)"""
