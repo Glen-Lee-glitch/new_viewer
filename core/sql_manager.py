@@ -564,30 +564,54 @@ def get_today_completed_subsidies(worker: str = None) -> list:
     # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
     return []
 
-def fetch_today_pipeline_count() -> int:
+def fetch_daily_status_counts() -> dict:
     """
-    rns 테이블에서 original_received_date가 오늘인 데이터의 고유 건수를 조회한다. (PostgreSQL 버전)
+    금일 접수된 건들의 현황 통계를 조회한다. (PostgreSQL 버전)
+    
+    Returns:
+        dict: {
+            'pipeline': int,      # 금일 전체 접수 건수
+            'processing': int,    # (미구현)
+            'completed': int,     # 금일 접수 건 중 '처리완료' 상태 건수
+            'deferred': int,      # (미구현)
+            'impossible': int     # 금일 접수 건 중 '신청불가' 상태 건수
+        }
     """
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            # 한국 시간 기준 오늘 날짜 구하기
             kst = pytz.timezone('Asia/Seoul')
             today_str = datetime.now(kst).strftime('%Y-%m-%d')
             
-            # original_received_date가 DATE 타입이라고 가정하고 비교
-            # 만약 TIMESTAMP라면 DATE(original_received_date)로 비교
+            # 금일 접수된 건들의 전체 카운트와 상태별 카운트를 한 번에 조회
             query = """
-                SELECT COUNT(DISTINCT "RN") 
+                SELECT 
+                    COUNT(DISTINCT "RN") as total_pipeline,
+                    COUNT(DISTINCT CASE WHEN status = '신청불가' THEN "RN" END) as impossible_count,
+                    COUNT(DISTINCT CASE WHEN status = '처리완료' THEN "RN" END) as completed_count
                 FROM rns 
                 WHERE original_received_date::date = %s
             """
+            
             with connection.cursor() as cursor:
                 cursor.execute(query, (today_str,))
                 row = cursor.fetchone()
-                return row[0] if row else 0
+                
+                return {
+                    'pipeline': row[0] if row and row[0] else 0,
+                    'processing': 0, # 추후 구현
+                    'completed': row[2] if row and row[2] else 0,
+                    'deferred': 0,   # 추후 구현
+                    'impossible': row[1] if row and row[1] else 0
+                }
     except Exception:
         traceback.print_exc()
-        return 0
+        return {
+            'pipeline': 0,
+            'processing': 0,
+            'completed': 0,
+            'deferred': 0,
+            'impossible': 0
+        }
 
 def fetch_gemini_contract_results(rn: str) -> dict:
     """

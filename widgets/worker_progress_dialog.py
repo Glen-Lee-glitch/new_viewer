@@ -7,7 +7,7 @@ from datetime import datetime
 from core.sql_manager import (
     get_daily_worker_progress, 
     get_daily_worker_payment_progress,
-    fetch_today_pipeline_count
+    fetch_daily_status_counts
 )
 
 class WorkerProgressDialog(QDialog):
@@ -39,15 +39,16 @@ class WorkerProgressDialog(QDialog):
         self.close_button.clicked.connect(self.accept)
         
         # 요약 정보 레이아웃 초기화 (Placeholders)
-        self._refresh_summary_ui(pipeline="0", processing="0", completed="0", deferred="0")
+        self._refresh_summary_ui()
     
-    def _refresh_summary_ui(self, pipeline="0", processing="0", completed="0", deferred="0"):
+    def _refresh_summary_ui(self, pipeline="0", processing="0", completed="0", deferred="0", impossible="0"):
         """요약 영역의 UI를 갱신한다."""
         self._clear_layout(self.summary_layout)
         self._add_summary_item("파이프라인", str(pipeline), "#3498db")
         self._add_summary_item("처리중", str(processing), "#f1c40f")
         self._add_summary_item("완료", str(completed), "#2ecc71")
         self._add_summary_item("미비/보류", str(deferred), "#e74c3c")
+        self._add_summary_item("신청불가", str(impossible), "#95a5a6") # 회색 계열
     
     def _clear_layout(self, layout):
         # ... (기존 코드와 동일)
@@ -82,26 +83,23 @@ class WorkerProgressDialog(QDialog):
     def _load_overall_status(self):
         """전체 업무 현황 데이터를 로드한다."""
         try:
-            # 1. 파이프라인 (금일 접수 건수)
-            pipeline_count = fetch_today_pipeline_count()
-            
-            # TODO: 나머지 항목들도 쿼리 함수 구현 후 연결
-            processing_count = 0
-            completed_count = 0
-            deferred_count = 0
+            # 통합 쿼리 함수 호출
+            counts = fetch_daily_status_counts()
             
             self._refresh_summary_ui(
-                pipeline=pipeline_count,
-                processing=processing_count,
-                completed=completed_count,
-                deferred=deferred_count
+                pipeline=counts.get('pipeline', 0),
+                processing=counts.get('processing', 0),
+                completed=counts.get('completed', 0),
+                deferred=counts.get('deferred', 0),
+                impossible=counts.get('impossible', 0)
             )
             
             # 하단 타이틀 업데이트
-            self.title_label.setText(f"실시간 업무 현황 (금일 접수: {pipeline_count}건)")
+            self.title_label.setText(f"실시간 업무 현황 (금일 접수: {counts.get('pipeline', 0)}건)")
             
         except Exception as e:
             print(f"Error loading status: {e}")
+            self.title_label.setText("데이터 로드 실패")
     
     def _load_worker_progress(self):
         """이전 작업자 현황 로드 로직 (필요 시 현황판 하단 차트용으로 재구성 가능)"""
