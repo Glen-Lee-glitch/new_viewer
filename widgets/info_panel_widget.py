@@ -50,6 +50,7 @@ class InfoPanelWidget(QWidget):
         self._dynamic_checkboxes = [] # 동적으로 생성된 체크박스 리스트
         self._current_rn: str = "" # 현재 표시 중인 RN 저장
         self._initial_error_items = set() # 최초 로드된 에러 항목 저장 (비교용)
+        self._is_ev_complement_mode = False # EV 보완 모드 여부
 
         # 자동 새로고침 타이머 설정 (20초)
         self._refresh_timer = QTimer(self)
@@ -129,6 +130,8 @@ class InfoPanelWidget(QWidget):
         True일 경우 작업 리스트를 ev_memo를 보여주는 텍스트 영역으로 교체한다.
         False일 경우 기존 작업 리스트(체크박스)로 복원한다.
         """
+        self._is_ev_complement_mode = is_enabled
+        
         if not hasattr(self, 'groupBox_2'):
             return
 
@@ -152,6 +155,9 @@ class InfoPanelWidget(QWidget):
             self._ev_memo_text_edit.setText(processed_memo)
             self._ev_memo_text_edit.setVisible(True)
             self.groupBox_2.setTitle("보완 요청 사항") # 타이틀 변경
+            
+            # EV 보완 모드일 때는 체크박스가 새로 생성되지 않도록 해야 함
+            # 이미 생성된 체크박스가 있다면 숨김 처리됨
         else:
             # 텍스트 에디트 숨기기
             self._ev_memo_text_edit.setVisible(False)
@@ -159,6 +165,10 @@ class InfoPanelWidget(QWidget):
             # 기존 체크박스들 보이기
             self._set_task_list_visible(True)
             self.groupBox_2.setTitle("작업 리스트") # 타이틀 복원
+            
+            # 복원 시 현재 RN에 대한 작업 리스트 갱신 필요할 수 있음
+            if self._current_rn:
+                self.update_task_list(self._current_rn)
 
     def _set_task_list_visible(self, visible: bool):
         """작업 리스트 레이아웃 내의 위젯들의 가시성을 설정한다."""
@@ -257,6 +267,9 @@ class InfoPanelWidget(QWidget):
         self._initial_error_items.clear() # 초기 항목 세트도 초기화
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.clear()  # RN 필드도 초기화
+            
+        # EV 보완 모드 초기화 (텍스트 에디트 숨김 등)
+        self.set_ev_complement_mode(False)
 
     def update_file_info(self, file_path: str, file_size_mb: float, total_pages: int):
         """파일 관련 정보를 업데이트한다. (UI에서 파일 정보 그룹박스가 제거되어 비활성화됨)"""
@@ -299,6 +312,12 @@ class InfoPanelWidget(QWidget):
 
     def update_task_list(self, rn: str, is_initial_load: bool = False):
         """RN 에러 데이터(validation_errors)를 기반으로 작업 리스트 체크박스를 동적으로 업데이트한다."""
+        # EV 보완 모드일 경우 작업 리스트(체크박스) 업데이트를 건너뜀
+        if self._is_ev_complement_mode:
+            # 단, 내부 데이터 처리를 위해 필요한 경우 로직 분리 가능
+            # 현재는 UI 표시가 주 목적이므로 리턴
+            return
+
         # 기존 작업 리스트 초기화
         self.reset_task_checkboxes()
         
