@@ -6,14 +6,19 @@ from PyQt6.QtCore import Qt, QEvent
 from core.sql_manager import (fetch_gemini_contract_results, check_gemini_flags, fetch_gemini_chobon_results, 
                               fetch_subsidy_model, fetch_gemini_multichild_results, fetch_subsidy_region, 
                               calculate_delivery_date, fetch_gemini_business_results, fetch_gemini_joint_results,
-                              fetch_gemini_corporation_results)
+                              fetch_gemini_corporation_results, process_duplicate_application)
 from core.ui_helpers import ReverseToolHandler
+from widgets.image_paste_dialog import ImagePasteDialog
+from datetime import datetime
+import os
+from PyQt6.QtWidgets import QMessageBox
 
 class DetailFormDialog(QDialog):
     """상세 정보 표시 다이얼로그 (form.ui 사용)"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.rn = None # 초기화
         
         ui_path = Path(__file__).parent.parent / "ui" / "form.ui"
         uic.loadUi(ui_path, self)
@@ -33,6 +38,10 @@ class DetailFormDialog(QDialog):
         if hasattr(self, 'buttonBox'):
             self.buttonBox.accepted.connect(self.accept)
             self.buttonBox.rejected.connect(self.reject)
+        
+        # 중복 버튼 연결
+        if hasattr(self, 'pushButton_duplicate'):
+            self.pushButton_duplicate.clicked.connect(self._open_image_paste_dialog)
             
         # 역순 도구 핸들러 초기화
         if hasattr(self, 'lineEdit_reverse_tool'):
@@ -159,6 +168,45 @@ class DetailFormDialog(QDialog):
                 label.setCursor(Qt.CursorShape.PointingHandCursor)
                 label.installEventFilter(self)
 
+    def _open_image_paste_dialog(self):
+        """이미지 붙여넣기 다이얼로그를 연다."""
+        if not self.rn:
+            QMessageBox.warning(self, "오류", "RN 정보가 없습니다.")
+            return
+
+        dialog = ImagePasteDialog(self)
+        if dialog.exec():
+            pixmap = dialog.get_image()
+            if pixmap and not pixmap.isNull():
+                # 이미지 저장 경로 설정
+                base_dir = r"\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\25q4_test\image_file"
+                
+                # 디렉토리 존재 확인 및 생성 시도 (네트워크 경로라 권한 문제 가능성 있음)
+                if not os.path.exists(base_dir):
+                    try:
+                        os.makedirs(base_dir, exist_ok=True)
+                    except Exception as e:
+                        QMessageBox.critical(self, "오류", f"이미지 저장 경로에 접근할 수 없습니다:\n{base_dir}\n\n오류: {e}")
+                        return
+
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"{self.rn}_duplicate_{timestamp}.png"
+                file_path = os.path.join(base_dir, filename)
+                
+                try:
+                    # 이미지 저장
+                    if pixmap.save(file_path, "PNG"):
+                        # DB 처리
+                        if process_duplicate_application(self.rn, file_path):
+                            QMessageBox.information(self, "완료", "중복 신청 처리가 완료되었습니다.")
+                            self.accept() # 다이얼로그 닫기
+                        else:
+                            QMessageBox.critical(self, "오류", "데이터베이스 처리에 실패했습니다.")
+                    else:
+                        QMessageBox.critical(self, "오류", "이미지 파일 저장에 실패했습니다.")
+                except Exception as e:
+                    QMessageBox.critical(self, "오류", f"작업 중 오류가 발생했습니다:\n{e}")
+
     def eventFilter(self, obj, event):
         """이벤트 필터. 클릭 시 텍스트를 복사하는 로직을 처리한다."""
         clickable_labels = self._get_all_clickable_labels()
@@ -190,6 +238,8 @@ class DetailFormDialog(QDialog):
 
     def load_data(self, rn: str):
         """제공된 RN으로 데이터를 조회하고 UI를 업데이트한다."""
+        self.rn = rn # RN 저장
+        
         # 라벨 스타일 초기화 (새로 열 때 깨끗한 상태로 시작)
         self._reset_label_styles()
         

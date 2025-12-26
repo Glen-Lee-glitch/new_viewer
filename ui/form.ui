@@ -676,6 +676,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="pushButton_duplicate">
+       <property name="text">
+        <string>중복</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacer_button">
        <property name="orientation">
         <enum>Qt::Orientation::Horizontal</enum>

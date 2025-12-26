@@ -2388,6 +2388,71 @@ def fetch_today_future_apply_stats() -> list[dict]:
         traceback.print_exc()
         return []
 
+def process_duplicate_application(rn: str, image_path: str) -> bool:
+    """
+    중복 신청 건을 처리한다.
+    1. rns 테이블에서 정보 조회
+    2. impossible_apply 테이블에 등록 (reason='중복', image_path 저장)
+    3. rns 테이블 status를 '신청불가'로 업데이트
+    
+    Args:
+        rn: RN 번호
+        image_path: 저장된 증빙 이미지 경로
+        
+    Returns:
+        성공 여부
+    """
+    if not rn:
+        return False
+        
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            try:
+                with connection.cursor() as cursor:
+                    # 1. rns 테이블에서 정보 조회
+                    select_query = 'SELECT recent_thread_id FROM rns WHERE "RN" = %s'
+                    cursor.execute(select_query, (rn,))
+                    row = cursor.fetchone()
+                    
+                    if not row:
+                        print(f"[중복 처리 실패] RN을 찾을 수 없음: {rn}")
+                        connection.rollback()
+                        return False
+                        
+                    recent_thread_id = row[0]
+                    
+                    # 2. impossible_apply 테이블에 등록 (reason='중복')
+                    insert_query = """
+                        INSERT INTO impossible_apply 
+                        ("RN", recent_thread_id, reason, image_path) 
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT ("RN") 
+                        DO UPDATE SET 
+                            reason = EXCLUDED.reason,
+                            image_path = EXCLUDED.image_path,
+                            recent_thread_id = EXCLUDED.recent_thread_id
+                    """
+                    cursor.execute(insert_query, (rn, recent_thread_id, '중복', image_path))
+                    
+                    # 3. rns 테이블 status 업데이트
+                    update_query = 'UPDATE rns SET status = %s WHERE "RN" = %s'
+                    cursor.execute(update_query, ('신청불가', rn))
+                    
+                    connection.commit()
+                    print(f"[중복 처리 완료] RN: {rn}, 이미지: {image_path}")
+                    return True
+                    
+            except Exception as e:
+                connection.rollback()
+                print(f"[중복 처리 DB 오류] {e}")
+                traceback.print_exc()
+                return False
+                
+    except Exception as e:
+        print(f"[중복 처리 연결 오류] {e}")
+        traceback.print_exc()
+        return False
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
