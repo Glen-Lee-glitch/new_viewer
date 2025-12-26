@@ -113,9 +113,14 @@ class PdfLoadWidget(QWidget):
         
         if hasattr(self, 'center_open_btn'):
             self.center_open_btn.setText("로컬에서 PDF 열기")
+        
+        if hasattr(self, 'center_open_rn_btn'):
+            self.center_open_rn_btn.setText("RN번호로 열기")
+            
         if hasattr(self, 'center_refresh_btn'):
             self.center_refresh_btn.setText("데이터 새로고침")
-            
+        
+        # 지원 테이블 설정
         if hasattr(self, 'complement_table_widget'):
             self.setup_table()
         
@@ -153,7 +158,6 @@ class PdfLoadWidget(QWidget):
 
         self.populate_recent_subsidy_rows()
         table.customContextMenuRequested.connect(self.show_context_menu)
-        table.cellDoubleClicked.connect(self._handle_cell_double_clicked)
         table.cellClicked.connect(self._handle_cell_clicked)
     
     def _handle_cell_clicked(self, row, column):
@@ -289,6 +293,7 @@ class PdfLoadWidget(QWidget):
                 df = fetch_today_unfinished_subsidy_applications()
             else:
                 df = fetch_recent_subsidy_applications()
+        
         except Exception as error:  # pragma: no cover - UI 경고용
             QMessageBox.warning(self, "데이터 로드 실패", f"지원금 신청 데이터 조회 중 오류가 발생했습니다.\n{error}")
             table.setRowCount(0)
@@ -799,8 +804,8 @@ class PdfLoadWidget(QWidget):
             self.center_open_btn.clicked.connect(self.open_pdf_file)
         if hasattr(self, 'center_refresh_btn'):
             self.center_refresh_btn.clicked.connect(lambda: self.refresh_data(force_refresh_give_works=True))
-        if hasattr(self, 'pushButton'):
-            self.pushButton.clicked.connect(self.open_by_rn)
+        if hasattr(self, 'center_open_rn_btn'):
+            self.center_open_rn_btn.clicked.connect(self.open_by_rn)
         if hasattr(self, 'pushButton_more'):
             self.pushButton_more.clicked.connect(self.open_history_dialog)
         if hasattr(self, 'ai_checkbox'):
@@ -998,16 +1003,6 @@ class PdfLoadWidget(QWidget):
             'birth_date': data.get('birth_date', ''), # birth_date 추가
             'address_1': data.get('address_1', '') # address_1 추가
         }
-
-    def _handle_cell_double_clicked(self, row, column):
-        """테이블 셀 더블 클릭 시 AI 검토 요청을 emit한다."""
-        # AI 칼럼(5번째)을 클릭했을 때만 동작하도록 수정
-        if column == 4:
-            ai_item = self.complement_table_widget.item(row, column)
-            if ai_item and ai_item.text() == 'O':
-                rn_item = self.complement_table_widget.item(row, 1) # RN은 1번 컬럼
-                if rn_item:
-                    self.ai_review_requested.emit(rn_item.text())
 
     def get_selected_rn(self) -> str | None:
         """현재 선택된 행의 RN을 반환한다."""
