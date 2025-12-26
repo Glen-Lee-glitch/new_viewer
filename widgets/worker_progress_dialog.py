@@ -13,7 +13,8 @@ from core.sql_manager import (
     fetch_daily_status_counts,
     fetch_today_completed_worker_stats,
     fetch_today_impossible_list,
-    fetch_today_future_apply_stats
+    fetch_today_future_apply_stats,
+    fetch_today_email_count
 )
 
 class ClickableCard(QWidget):
@@ -132,7 +133,7 @@ class WorkerProgressDialog(QDialog):
         self.summary_widgets.clear()
         
         # 초기 카드 생성 및 참조 저장
-        self._create_summary_card("pipeline", "파이프라인", "#3498db")
+        self._create_summary_card("pipeline", "파이프라인", "#3498db", clickable=True, onClick=self._show_pipeline_stats)
         self._create_summary_card("processing", "처리중", "#f1c40f")
         self._create_summary_card("completed", "완료", "#2ecc71", clickable=True, onClick=self._show_completed_stats)
         self._create_summary_card("deferred", "미비/보류", "#e74c3c")
@@ -183,10 +184,12 @@ class WorkerProgressDialog(QDialog):
         # 카드 위젯 참조
         val_label.setProperty("card_widget", card)
 
-    def _refresh_summary_ui(self, pipeline="0", processing="0", completed="0", deferred="0", impossible="0", future_apply="0", ev_completed="0"):
+    def _refresh_summary_ui(self, pipeline="0", processing="0", completed="0", deferred="0", impossible="0", future_apply="0", ev_completed="0", email_pipeline="0"):
         """요약 영역의 값을 갱신한다."""
         if "pipeline" in self.summary_widgets:
-            self.summary_widgets["pipeline"].setText(str(pipeline))
+            # {pipeline}({email_pipeline}) 형식
+            text = f"{pipeline}({email_pipeline})"
+            self.summary_widgets["pipeline"].setText(text)
         if "processing" in self.summary_widgets:
             self.summary_widgets["processing"].setText(str(processing))
         if "completed" in self.summary_widgets:
@@ -234,7 +237,8 @@ class WorkerProgressDialog(QDialog):
                 deferred=counts.get('deferred', 0),
                 impossible=counts.get('impossible', 0),
                 future_apply=counts.get('future_apply', 0),
-                ev_completed=counts.get('ev_completed', 0)
+                ev_completed=counts.get('ev_completed', 0),
+                email_pipeline=counts.get('email_pipeline', 0)
             )
             
             # 하단 타이틀 업데이트
@@ -247,6 +251,21 @@ class WorkerProgressDialog(QDialog):
         except Exception as e:
             print(f"Error loading status: {e}")
             self.title_label.setText("데이터 로드 실패")
+
+    def _show_pipeline_stats(self):
+        """파이프라인 건에 대한 상세 정보(이메일 수신 건수)를 보여준다 (토글 방식)."""
+        if self.current_chart_type == 'pipeline':
+            self._show_message_in_chart("상단의 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
+            self.current_chart_type = None
+            return
+        
+        try:
+            count = fetch_today_email_count()
+            self._show_message_in_chart(f"금일 수신된 총 이메일 건수: {count}건")
+            self.current_chart_type = 'pipeline'
+        except Exception as e:
+            self._show_message_in_chart(f"데이터 로드 실패: {str(e)}")
+            self.current_chart_type = None
 
     def _show_completed_stats(self):
         """완료 건에 대한 상세 통계(파이 차트)를 보여준다 (토글 방식)."""

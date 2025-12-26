@@ -613,6 +613,16 @@ def fetch_daily_status_counts() -> dict:
                 cursor.execute(query_ev, (today_str,))
                 row_ev = cursor.fetchone()
                 ev_completed = row_ev[0] if row_ev else 0
+
+                # 3. emails 테이블 통계 (금일 original_received_date 기준)
+                query_emails = """
+                    SELECT COUNT(*)
+                    FROM emails
+                    WHERE (original_received_date AT TIME ZONE 'Asia/Seoul')::date = %s
+                """
+                cursor.execute(query_emails, (today_str,))
+                row_emails = cursor.fetchone()
+                email_pipeline = row_emails[0] if row_emails else 0
                 
                 return {
                     'pipeline': total,
@@ -621,7 +631,8 @@ def fetch_daily_status_counts() -> dict:
                     'deferred': deferred,
                     'impossible': impossible,
                     'future_apply': future_apply,
-                    'ev_completed': ev_completed
+                    'ev_completed': ev_completed,
+                    'email_pipeline': email_pipeline
                 }
     except Exception:
         traceback.print_exc()
@@ -632,7 +643,8 @@ def fetch_daily_status_counts() -> dict:
             'deferred': 0,
             'impossible': 0,
             'future_apply': 0,
-            'ev_completed': 0
+            'ev_completed': 0,
+            'email_pipeline': 0
         }
 
 def fetch_gemini_contract_results(rn: str) -> dict:
@@ -2489,6 +2501,32 @@ def update_rn_region(rn: str, new_region: str) -> bool:
     except Exception:
         traceback.print_exc()
         return False
+
+def fetch_today_email_count() -> int:
+    """
+    금일 수신된 이메일(emails 테이블 기준)의 총 개수를 조회한다. (PostgreSQL 버전)
+    
+    Returns:
+        int: 금일 수신된 이메일 개수
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT COUNT(*)
+                FROM emails
+                WHERE (original_received_date AT TIME ZONE 'Asia/Seoul')::date = %s
+            """
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query, (today_str,))
+                row = cursor.fetchone()
+                return row[0] if row else 0
+    except Exception:
+        traceback.print_exc()
+        return 0
 
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
