@@ -3,8 +3,39 @@ import json
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from PyQt6 import uic
-from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox, QTextEdit, QVBoxLayout
-from PyQt6.QtCore import pyqtSignal, QTimer
+from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox, QTextEdit, QVBoxLayout, QDialog, QLabel, QPushButton, QHBoxLayout, QLineEdit, QDialogButtonBox
+from PyQt6.QtCore import pyqtSignal, QTimer, QEvent, Qt
+
+class RegionEditDialog(QDialog):
+    """지역 수정을 위한 다이얼로그"""
+    def __init__(self, current_region: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("지역 수정")
+        self.setFixedWidth(300)
+        
+        layout = QVBoxLayout(self)
+        
+        # 기존 지역명 표시
+        layout.addWidget(QLabel("기존 지역명:"))
+        self.old_region_edit = QLineEdit(current_region)
+        self.old_region_edit.setReadOnly(True)
+        self.old_region_edit.setStyleSheet("background-color: #f0f0f0; color: #666;")
+        layout.addWidget(self.old_region_edit)
+        
+        # 변경할 지역명 입력
+        layout.addWidget(QLabel("변경할 지역명:"))
+        self.new_region_edit = QLineEdit()
+        self.new_region_edit.setPlaceholderText("새로운 지역명을 입력하세요")
+        layout.addWidget(self.new_region_edit)
+        
+        # 버튼 박스
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+        
+    def get_new_region(self) -> str:
+        return self.new_region_edit.text().strip()
 
 class InfoPanelWidget(QWidget):
     """PDF 파일 및 페이지 정보를 표시하는 위젯"""
@@ -34,6 +65,45 @@ class InfoPanelWidget(QWidget):
             
         if hasattr(self, 'radioButton_3'):
             self.radioButton_3.toggled.connect(self._on_radio_button_subsidy_toggled)
+
+        # 지역 입력 필드 더블클릭 이벤트 필터 설치
+        if hasattr(self, 'lineEdit_region'):
+            self.lineEdit_region.installEventFilter(self)
+            # 읽기 전용으로 설정하여 사용자가 직접 수정하는 것처럼 보이지 않게 함 (더블클릭 유도)
+            self.lineEdit_region.setReadOnly(True)
+
+    def eventFilter(self, source, event):
+        """이벤트 필터 처리"""
+        if source == self.lineEdit_region and event.type() == QEvent.Type.MouseButtonDblClick:
+            self._on_region_double_clicked()
+            return True
+        return super().eventFilter(source, event)
+
+    def _on_region_double_clicked(self):
+        """지역 입력 필드 더블클릭 시 처리"""
+        if not self._current_rn:
+            QMessageBox.warning(self, "경고", "RN 정보가 없습니다.")
+            return
+
+        current_region = self.lineEdit_region.text()
+        dialog = RegionEditDialog(current_region, self)
+        
+        if dialog.exec():
+            new_region = dialog.get_new_region()
+            if not new_region:
+                QMessageBox.warning(self, "경고", "변경할 지역명을 입력해주세요.")
+                return
+            
+            if new_region == current_region:
+                return
+
+            # DB 업데이트
+            from core.sql_manager import update_rn_region
+            if update_rn_region(self._current_rn, new_region):
+                self.lineEdit_region.setText(new_region)
+                QMessageBox.information(self, "성공", "지역 정보가 수정되었습니다.")
+            else:
+                QMessageBox.critical(self, "오류", "지역 정보 수정에 실패했습니다.")
 
     def showEvent(self, event):
         """위젯이 보여질 때 타이머 시작"""

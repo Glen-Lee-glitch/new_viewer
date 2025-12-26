@@ -2453,6 +2453,32 @@ def process_duplicate_application(rn: str, image_path: str) -> bool:
         traceback.print_exc()
         return False
 
+
+def update_rn_region(rn: str, new_region: str) -> bool:
+    """
+    rns 테이블에서 해당 RN의 region을 업데이트한다. (PostgreSQL 버전)
+    
+    Args:
+        rn: RN 번호
+        new_region: 변경할 지역명
+        
+    Returns:
+        업데이트 성공 여부
+    """
+    if not rn:
+        return False
+        
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "UPDATE rns SET region = %s WHERE \"RN\" = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (new_region, rn))
+                connection.commit()
+                return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
 if __name__ == "__main__":
     # fetch_recent_subsidy_applications()
     # test_fetch_emails()
