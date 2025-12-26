@@ -116,6 +116,7 @@ class WorkerProgressDialog(QDialog):
         
         # 요약 정보 위젯 참조 저장소
         self.summary_widgets = {}
+        self.current_chart_type = None  # 현재 표시 중인 차트 타입 (toggle 기능용)
         
         # 요약 정보 레이아웃 초기화 (Placeholders)
         self._init_summary_ui()
@@ -216,34 +217,45 @@ class WorkerProgressDialog(QDialog):
             
             # 차트 컨테이너 초기화 (기본 메시지)
             self._show_message_in_chart("상단의 '완료' 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
+            self.current_chart_type = None
             
         except Exception as e:
             print(f"Error loading status: {e}")
             self.title_label.setText("데이터 로드 실패")
 
     def _show_completed_stats(self):
-        """완료 건에 대한 상세 통계(파이 차트)를 보여준다."""
+        """완료 건에 대한 상세 통계(파이 차트)를 보여준다 (토글 방식)."""
+        # 토글 로직: 이미 보고 있다면 닫기
+        if self.current_chart_type == 'completed':
+            self._show_message_in_chart("상단의 '완료' 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
+            self.current_chart_type = None
+            return
+
         try:
             stats = fetch_today_completed_worker_stats()
             
             # 차트 컨테이너 비우기
             self._clear_layout(self.chart_container.layout())
             
-            # 레이아웃 생성 및 설정 (오류 수정: 부모 없이 생성 후 설정)
+            # 레이아웃 생성 및 설정
             if self.chart_container.layout() is None:
                 layout = QVBoxLayout()
                 self.chart_container.setLayout(layout)
             
             if not stats:
                 self._show_message_in_chart("완료된 작업 데이터가 없습니다.")
+                self.current_chart_type = 'completed' # 데이터 없어도 상태는 변경
                 return
 
             # 파이 차트 위젯 생성 및 추가
             chart = PieChartWidget(stats)
             self.chart_container.layout().addWidget(chart)
             
+            self.current_chart_type = 'completed'
+            
         except Exception as e:
             self._show_message_in_chart(f"차트 로드 실패: {str(e)}")
+            self.current_chart_type = None
 
     def _show_message_in_chart(self, message: str):
         """차트 영역에 메시지를 표시한다."""
@@ -251,7 +263,7 @@ class WorkerProgressDialog(QDialog):
         if self.chart_container.layout():
             self._clear_layout(self.chart_container.layout())
         
-        # 레이아웃 생성 및 설정 (오류 수정: 부모 없이 생성 후 설정)
+        # 레이아웃 생성 및 설정
         if self.chart_container.layout() is None:
             layout = QVBoxLayout()
             self.chart_container.setLayout(layout)
