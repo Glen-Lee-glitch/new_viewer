@@ -2050,6 +2050,43 @@ def get_original_worker_by_rn(rn: str) -> str | None:
         traceback.print_exc()
         return None
 
+def fetch_today_completed_worker_stats() -> dict:
+    """
+    금일 접수된 건 중 '처리완료'된 건들의 작업자별 통계를 조회한다. (PostgreSQL 버전)
+    
+    Returns:
+        dict: { '작업자명': 건수, ... }
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT w.worker_name, COUNT(r."RN")
+                FROM rns r
+                LEFT JOIN workers w ON r.worker_id = w.worker_id
+                WHERE r.original_received_date::date = %s 
+                  AND r.status = '처리완료'
+                GROUP BY w.worker_name
+                ORDER BY COUNT(r."RN") DESC
+            """
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                
+                # 작업자 이름이 없는 경우(NULL)는 '미할당' 등으로 처리하거나 제외
+                result = {}
+                for row in rows:
+                    name = row[0] if row[0] else "미확인"
+                    count = row[1]
+                    result[name] = count
+                return result
+    except Exception:
+        traceback.print_exc()
+        return {}
+
 def update_subsidy_status(rn: str, status: str) -> bool:
     """
     rns 테이블에서 해당 RN의 status를 업데이트한다. (PostgreSQL 버전)
