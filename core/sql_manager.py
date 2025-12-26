@@ -247,7 +247,6 @@ def fetch_subsidy_applications(
         traceback.print_exc()
         return pd.DataFrame()
 
-
 def get_distinct_regions() -> list[str]:
     """
     rns 테이블에서 존재하는 모든 지역명을 중복 없이 조회하여 반환한다.
@@ -262,7 +261,6 @@ def get_distinct_regions() -> list[str]:
     except Exception:
         traceback.print_exc()
         return []
-
 
 def fetch_application_data_by_rn(rn: str) -> dict | None:
     """
@@ -588,7 +586,8 @@ def fetch_daily_status_counts() -> dict:
                     COUNT(DISTINCT "RN") as total_pipeline,
                     COUNT(DISTINCT CASE WHEN status = '신청불가' THEN "RN" END) as impossible_count,
                     COUNT(DISTINCT CASE WHEN status = '처리완료' THEN "RN" END) as completed_count,
-                    COUNT(DISTINCT CASE WHEN status IN ('서류미비 요청', '서류미비 도착', 'EV 보완요청') THEN "RN" END) as deferred_count
+                    COUNT(DISTINCT CASE WHEN status IN ('서류미비 요청', '서류미비 도착', 'EV 보완요청', '중복메일') THEN "RN" END) as deferred_count,
+                    COUNT(DISTINCT CASE WHEN status = '추후 신청' THEN "RN" END) as future_apply_count
                 FROM rns 
                 WHERE original_received_date::date = %s
             """
@@ -601,9 +600,10 @@ def fetch_daily_status_counts() -> dict:
                 impossible = row[1] if row and row[1] else 0
                 completed = row[2] if row and row[2] else 0
                 deferred = row[3] if row and row[3] else 0
+                future_apply = row[4] if row and row[4] else 0
                 
                 # 나머지는 모두 처리중으로 간주
-                processing = total - (impossible + completed + deferred)
+                processing = total - (impossible + completed + deferred + future_apply)
                 if processing < 0: processing = 0
                 
                 return {
@@ -611,7 +611,8 @@ def fetch_daily_status_counts() -> dict:
                     'processing': processing,
                     'completed': completed,
                     'deferred': deferred,
-                    'impossible': impossible
+                    'impossible': impossible,
+                    'future_apply': future_apply
                 }
     except Exception:
         traceback.print_exc()
@@ -2329,10 +2330,10 @@ def fetch_today_completed_worker_stats() -> dict:
 
 def fetch_today_impossible_list() -> list[dict]:
     """
-    금일 '신청불가'로 처리된 건들의 목록(RN, 사유)을 조회한다. (PostgreSQL 버전)
+    금일 '신청불가'로 처리된 건들의 목록(RN, 지역, 사유)을 조회한다. (PostgreSQL 버전)
     
     Returns:
-        list[dict]: [{'RN': str, 'reason': str}, ...]
+        list[dict]: [{'RN': str, 'region': str, 'reason': str}, ...]
     """
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
@@ -2340,7 +2341,7 @@ def fetch_today_impossible_list() -> list[dict]:
             today_str = datetime.now(kst).strftime('%Y-%m-%d')
             
             query = """
-                SELECT i."RN", i.reason
+                SELECT i."RN", r.region, i.reason
                 FROM impossible_apply i
                 JOIN rns r ON i."RN" = r."RN"
                 WHERE r.original_received_date::date = %s
@@ -2351,7 +2352,38 @@ def fetch_today_impossible_list() -> list[dict]:
                 cursor.execute(query, (today_str,))
                 rows = cursor.fetchall()
                 
-                return [{'RN': row[0], 'reason': row[1]} for row in rows]
+                return [{'RN': row[0], 'region': row[1], 'reason': row[2]} for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
+
+def fetch_today_future_apply_stats() -> list[dict]:
+    """
+    금일 '추후 신청'으로 처리된 건들의 지역별 개수를 조회한다. (PostgreSQL 버전)
+    
+    Returns:
+        list[dict]: [{'region': str, 'count': int}, ...] (개수 내림차순)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT region, COUNT(*) as count
+                FROM rns
+                WHERE original_received_date::date = %s
+                  AND status = '추후 신청'
+                GROUP BY region
+                ORDER BY count DESC
+            """
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                
+                return [{'region': row[0], 'count': row[1]} for row in rows]
     except Exception:
         traceback.print_exc()
         return []
