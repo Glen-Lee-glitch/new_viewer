@@ -226,7 +226,7 @@ class MainWindow(QMainWindow):
         
         self.menu_view.addSeparator()
         
-        self.worker_progress_action = QAction("작업자 현황", self)
+        self.worker_progress_action = QAction("현황판", self)
         self.worker_progress_action.triggered.connect(self._open_worker_progress_dialog)
         self.menu_view.addAction(self.worker_progress_action)
 

@@ -571,9 +571,9 @@ def fetch_daily_status_counts() -> dict:
     Returns:
         dict: {
             'pipeline': int,      # 금일 전체 접수 건수
-            'processing': int,    # (미구현)
+            'processing': int,    # 처리중 (전체 - 완료 - 미비 - 불가)
             'completed': int,     # 금일 접수 건 중 '처리완료' 상태 건수
-            'deferred': int,      # (미구현)
+            'deferred': int,      # 금일 접수 건 중 '미비/보류' 상태 건수
             'impossible': int     # 금일 접수 건 중 '신청불가' 상태 건수
         }
     """
@@ -587,7 +587,8 @@ def fetch_daily_status_counts() -> dict:
                 SELECT 
                     COUNT(DISTINCT "RN") as total_pipeline,
                     COUNT(DISTINCT CASE WHEN status = '신청불가' THEN "RN" END) as impossible_count,
-                    COUNT(DISTINCT CASE WHEN status = '처리완료' THEN "RN" END) as completed_count
+                    COUNT(DISTINCT CASE WHEN status = '처리완료' THEN "RN" END) as completed_count,
+                    COUNT(DISTINCT CASE WHEN status IN ('서류미비 요청', '서류미비 도착', 'EV 보완요청') THEN "RN" END) as deferred_count
                 FROM rns 
                 WHERE original_received_date::date = %s
             """
@@ -596,12 +597,21 @@ def fetch_daily_status_counts() -> dict:
                 cursor.execute(query, (today_str,))
                 row = cursor.fetchone()
                 
+                total = row[0] if row and row[0] else 0
+                impossible = row[1] if row and row[1] else 0
+                completed = row[2] if row and row[2] else 0
+                deferred = row[3] if row and row[3] else 0
+                
+                # 나머지는 모두 처리중으로 간주
+                processing = total - (impossible + completed + deferred)
+                if processing < 0: processing = 0
+                
                 return {
-                    'pipeline': row[0] if row and row[0] else 0,
-                    'processing': 0, # 추후 구현
-                    'completed': row[2] if row and row[2] else 0,
-                    'deferred': 0,   # 추후 구현
-                    'impossible': row[1] if row and row[1] else 0
+                    'pipeline': total,
+                    'processing': processing,
+                    'completed': completed,
+                    'deferred': deferred,
+                    'impossible': impossible
                 }
     except Exception:
         traceback.print_exc()
