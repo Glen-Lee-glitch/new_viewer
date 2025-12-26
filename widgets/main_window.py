@@ -151,65 +151,22 @@ class MainWindow(QMainWindow):
 
     def _setup_ui_containers(self):
         """UI 컨테이너에 위젯들을 배치한다."""
-
-        # QSplitter 설정 및 중앙 영역 최소 너비 보장
-        if hasattr(self, 'ui_main_splitter'):
-            self.ui_main_splitter.setHandleWidth(6)
-            
-            # 스타일시트로 핸들에 '가는 선 두 줄' 시각적 효과 적용
-            self.ui_main_splitter.setStyleSheet("""
-                QSplitter::handle {
-                    background-color: transparent;
-                }
-                QSplitter::handle:horizontal {
-                    width: 6px;
-                    margin: 10px 1px; /* 상하 여백 10px, 좌우 여백 1px */
-                    border-left: 1px solid #555555;  /* 왼쪽 선 */
-                    border-right: 1px solid #555555; /* 오른쪽 선 */
-                }
-            """)
-            
-            # 중앙 컨테이너 최소 너비 설정 (사용자 요청: tablewidget 너비 보장)
-            self.ui_content_container.setMinimumWidth(600)
-            # 좌우 패널도 너무 작아지지 않도록 최소 너비 설정
-            self.ui_thumbnail_container.setMinimumWidth(200)
-            self.ui_info_panel_container.setMinimumWidth(300)
-
-        if hasattr(self, 'ui_main_layout'):
-            self.ui_main_layout.setSpacing(0)
-            self.ui_main_layout.setContentsMargins(0, 0, 0, 0)
-
-        # 썸네일
-        from PyQt6.QtWidgets import QVBoxLayout
-        thumbnail_layout = QVBoxLayout(self.ui_thumbnail_container)
-        thumbnail_layout.setContentsMargins(0, 0, 0, 0)
-        thumbnail_layout.setSpacing(0)
-        thumbnail_layout.addWidget(self._necessary_widget)
-        thumbnail_layout.addWidget(self._thumbnail_viewer)
+        # 레이아웃 객체 이름으로 직접 접근하여 위젯 추가
         
-        # 콘텐츠 영역 (load와 view를 같은 공간에 배치)
-        content_layout = QHBoxLayout(self.ui_content_container)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(0)
-        content_layout.addWidget(self._pdf_load_widget)
-        content_layout.addWidget(self._pdf_view_widget)
+        # 썸네일 영역 (thumbnail_layout)
+        if hasattr(self, 'thumbnail_layout'):
+            self.thumbnail_layout.addWidget(self._necessary_widget)
+            self.thumbnail_layout.addWidget(self._thumbnail_viewer)
         
-        # 정보 패널 컨테이너에 배치 (VBoxLayout으로 변경하여 alarm_widget과 info_panel을 수직으로 배치)
-        info_panel_layout = QVBoxLayout(self.ui_info_panel_container)
-        info_panel_layout.setContentsMargins(0, 0, 0, 0)
-        info_panel_layout.setSpacing(0)
+        # 콘텐츠 영역 (content_layout)
+        if hasattr(self, 'content_layout'):
+            self.content_layout.addWidget(self._pdf_load_widget)
+            self.content_layout.addWidget(self._pdf_view_widget)
         
-        # alarm_widget 추가 (상단)
-        info_panel_layout.addWidget(self._alarm_widget)
-        
-        # info_panel은 나중에 표시될 때 사용 (초기에는 숨김)
-        info_panel_layout.addWidget(self._info_panel)
-        
-        # 스플리터 크기 설정
-        # self.ui_main_splitter.setSizes([600, 600])
-
-        # QHBoxLayout 구조에서는 각 컨테이너의 사이즈 정책으로 제어
-        # UI 파일에서 horstretch 값으로 기본 비율이 설정되어 있음
+        # 정보 패널 영역 (info_panel_layout)
+        if hasattr(self, 'info_panel_layout'):
+            self.info_panel_layout.addWidget(self._alarm_widget)
+            self.info_panel_layout.addWidget(self._info_panel)
 
     def _setup_menus(self):
         """메뉴바를 설정합니다."""
@@ -469,15 +426,15 @@ class MainWindow(QMainWindow):
     def _show_login_dialog(self):
         """로그인 다이얼로그를 표시하고 작업자 이름을 설정한다."""
         if self._login_dialog.exec() == QDialog.DialogCode.Accepted:
-            # 로그인 창이 있던 모니터(스크린)를 감지하여 메인 윈도우를 해당 모니터로 이동
-            # 이렇게 해야 showEvent 시 해당 모니터 해상도 기준으로 크기가 계산됨
+            # 로그인 창이 있던 모니터(스크린)를 감지하여 메인 윈도우를 해당 모니터로 이동하고 포지션 조정
             target_screen = self._login_dialog.screen()
             self.setScreen(target_screen)
             self.move(target_screen.geometry().topLeft())
 
-            self._worker_name = self._login_dialog.get_worker_name()
-            self._worker_id = self._login_dialog.get_worker_id()
+            self._worker_name = self._login_dialog.get_worker_name() # 작업자 이름 설정
+            self._worker_id = self._login_dialog.get_worker_id() # 작업자 ID 설정
             self._update_worker_label()
+            
             # 로그인 후 알람 위젯 업데이트
             if hasattr(self, '_alarm_widget'):
                 self._alarm_widget._worker_name = self._worker_name
@@ -1708,7 +1665,7 @@ class MainWindow(QMainWindow):
     def _update_worker_label(self):
         """worker_label_2에 작업자 이름을 표시하고, 관리자 권한에 따라 버튼 가시성을 설정한다."""
         # 관리자 작업자 목록
-        admin_workers = ['이경구', '이호형', '백주현']
+        admin_workers = ['이경구', '이호형']
         is_admin = self._worker_name in admin_workers
         
         # 작업자 현황 버튼 가시성 설정
