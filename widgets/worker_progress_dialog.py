@@ -7,7 +7,7 @@ from datetime import datetime
 from core.sql_manager import get_daily_worker_progress, get_daily_worker_payment_progress
 
 class WorkerProgressDialog(QDialog):
-    """작업자 현황 다이얼로그"""
+    """전체 업무 현황판 다이얼로그"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -17,20 +17,62 @@ class WorkerProgressDialog(QDialog):
         uic.loadUi(str(ui_path), self)
         
         # 다이얼로그 설정
-        self.setWindowTitle("작업자 현황")
+        self.setWindowTitle("전체 업무 현황판")
         self.setModal(True)
         
         # 초기화
         self._setup_ui()
-        self._load_worker_progress()
+        self._load_overall_status()
     
     def _setup_ui(self):
         """UI 컴포넌트를 설정한다."""
         # 닫기 버튼 연결
         self.close_button.clicked.connect(self.accept)
+        
+        # 요약 정보 레이아웃 초기화
+        self._clear_layout(self.summary_layout)
+        self._add_summary_item("접수", "0", "#3498db")
+        self._add_summary_item("처리중", "0", "#f1c40f")
+        self._add_summary_item("완료", "0", "#2ecc71")
+        self._add_summary_item("미비/보류", "0", "#e74c3c")
+    
+    def _clear_layout(self, layout):
+        """레이아웃 내의 모든 위젯을 제거한다."""
+        if layout:
+            while layout.count():
+                child = layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+                elif child.layout():
+                    self._clear_layout(child.layout())
+
+    def _add_summary_item(self, label: str, value: str, color: str):
+        """상단 요약 영역에 항목을 추가한다."""
+        item_widget = QWidget()
+        item_layout = QVBoxLayout(item_widget)
+        item_layout.setContentsMargins(10, 5, 10, 5)
+        item_layout.setSpacing(2)
+        
+        val_label = QLabel(value)
+        val_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        val_label.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {color};")
+        
+        txt_label = QLabel(label)
+        txt_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        txt_label.setStyleSheet("font-size: 13px; color: #ecf0f1;")
+        
+        item_layout.addWidget(val_label)
+        item_layout.addWidget(txt_label)
+        
+        self.summary_layout.addWidget(item_widget)
+
+    def _load_overall_status(self):
+        """전체 업무 현황 데이터를 로드한다. (현재는 UI 구성만 수행)"""
+        # TODO: PostgreSQL 기반의 새로운 통계 쿼리로 교체 필요
+        pass
     
     def _load_worker_progress(self):
-        """작업자 현황 데이터를 로드하고 차트를 생성한다."""
+        """이전 작업자 현황 로드 로직 (필요 시 현황판 하단 차트용으로 재구성 가능)"""
         try:
             # 데이터베이스에서 지원 및 지급 데이터 조회
             support_df = get_daily_worker_progress()
