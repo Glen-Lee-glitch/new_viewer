@@ -35,8 +35,9 @@ class WorkerProgressDialog(QDialog):
 
     def _setup_ui(self):
         """UI 컴포넌트를 설정한다."""
-        # 닫기 버튼 연결
+        # 버튼 연결
         self.close_button.clicked.connect(self.accept)
+        self.refresh_button.clicked.connect(self._load_overall_status)
         
         # 요약 정보 레이아웃 초기화 (Placeholders)
         self._refresh_summary_ui()
@@ -61,24 +62,33 @@ class WorkerProgressDialog(QDialog):
                     self._clear_layout(child.layout())
 
     def _add_summary_item(self, label: str, value: str, color: str):
-        # ... (기존 코드와 동일)
-        item_widget = QWidget()
-        item_layout = QVBoxLayout(item_widget)
-        item_layout.setContentsMargins(10, 5, 10, 5)
-        item_layout.setSpacing(2)
+        """상단 요약 영역에 카드 형태의 항목을 추가한다."""
+        card = QWidget()
+        card.setStyleSheet(f"""
+            QWidget {{
+                background-color: #2c3e50;
+                border-radius: 10px;
+                border: 1px solid #3e5871;
+            }}
+        """)
+        card.setMinimumHeight(100)
+        
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(15, 15, 15, 15)
+        card_layout.setSpacing(5)
         
         val_label = QLabel(value)
         val_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        val_label.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {color};")
+        val_label.setStyleSheet(f"font-size: 28px; font-weight: bold; color: {color}; border: none; background: transparent;")
         
         txt_label = QLabel(label)
         txt_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        txt_label.setStyleSheet("font-size: 13px; color: #ecf0f1;")
+        txt_label.setStyleSheet("font-size: 14px; color: #bdc3c7; border: none; background: transparent;")
         
-        item_layout.addWidget(val_label)
-        item_layout.addWidget(txt_label)
+        card_layout.addWidget(val_label)
+        card_layout.addWidget(txt_label)
         
-        self.summary_layout.addWidget(item_widget)
+        self.summary_layout.addWidget(card)
 
     def _load_overall_status(self):
         """전체 업무 현황 데이터를 로드한다."""
