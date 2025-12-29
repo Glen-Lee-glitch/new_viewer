@@ -47,71 +47,40 @@ class PdfRender:
             traceback.print_exc()
             raise ValueError(f"전처리된 문서 로딩 중 오류 발생: {exc}")
 
-    def load_pdf(self, paths: list) -> None:
-        """여러 PDF 및 이미지 파일을 병합하고, 모든 페이지를 A4 규격으로 변환하여 메모리에 저장한다."""
-        if not paths:
+    def load_pdf(self, path: str) -> None:
+        """단일 PDF 파일을 A4 규격으로 변환하여 메모리에 저장한다."""
+        if not path:
             raise ValueError("입력 파일 경로가 없습니다.")
 
-        # 분할 파일 감지 및 병합된 경로 리스트 생성
-        processed_paths = self._detect_and_merge_split_files(paths)
+        if not Path(path).exists():
+            raise FileNotFoundError(f"파일을 찾을 수 없습니다: {path}")
         
-        merged_doc = None
+        source_doc = None
         new_doc = None
-        source_doc_for_a4 = None
         
         try:
-            # --- 1단계: 모든 입력 파일을 하나의 PDF로 병합 ---
-            merged_doc = pymupdf.open()
-            print("입력 파일 병합 시작...")
-            for path in processed_paths:
-                ext = os.path.splitext(path)[1].lower()
-                
-                if ext == '.pdf':
-                    try:
-                        with pymupdf.open(path) as temp_doc:
-                            merged_doc.insert_pdf(temp_doc)
-                        print(f"  - PDF 병합 성공: {path}")
-                    except Exception as e:
-                        print(f"  - PDF 병합 실패, 재시도...: {path} ({e})")
-                        try: # 정리하여 재시도
-                            with pymupdf.open(path) as temp_doc:
-                                buffer = temp_doc.write(garbage=4, clean=True)
-                            with pymupdf.open("pdf", buffer) as cleaned_doc:
-                                merged_doc.insert_pdf(cleaned_doc)
-                            print(f"  - PDF 병합 재시도 성공: {path}")
-                        except Exception as e2:
-                            print(f"  - PDF 병합 최종 실패: {path} ({e2})")
-
-                elif ext in ['.png', '.jpg', '.jpeg']:
-                    try:
-                        with Image.open(path).convert("RGB") as img:
-                            img_bytes = io.BytesIO()
-                            img.save(img_bytes, format="PDF")
-                            img_bytes.seek(0)
-                            with pymupdf.open("pdf", img_bytes.read()) as img_doc:
-                                merged_doc.insert_pdf(img_doc)
-                            print(f"  - 이미지 -> PDF 변환 및 병합 성공: {path}")
-                    except Exception as e:
-                        print(f"  - 이미지 병합 실패: {path} ({e}")
-
-            if merged_doc.page_count == 0:
-                raise ValueError("병합할 수 있는 유효한 페이지가 없습니다.")
+            print(f"🔄 A4 변환 시작: {Path(path).name}")
             
-            print(f"모든 파일 병합 완료. 총 {merged_doc.page_count} 페이지.")
+            # 원본 PDF 열기
+            source_doc = pymupdf.open(path)
+            if source_doc.page_count == 0:
+                raise ValueError("처리할 수 있는 유효한 페이지가 없습니다.")
+            
+            print(f"원본 문서 로드 완료. 총 {source_doc.page_count} 페이지.")
 
-            # --- 2단계: 병합된 PDF를 A4 규격으로 변환 ---
-            print("\nA4 규격으로 변환 시작...")
+            # A4 규격으로 변환
+            print("A4 규격으로 변환 중...")
             new_doc = pymupdf.open()
-            source_doc_for_a4 = merged_doc # A4 변환의 소스는 병합된 문서
             TARGET_DPI = 200
 
-            for page in source_doc_for_a4:
-                # (기존의 최적화된 A4 변환 로직과 동일)
+            for page in source_doc:
                 bounds = page.bound()
                 is_landscape = bounds.width > bounds.height
                 
-                if is_landscape: a4_rect = pymupdf.paper_rect("a4-l")
-                else: a4_rect = pymupdf.paper_rect("a4")
+                if is_landscape: 
+                    a4_rect = pymupdf.paper_rect("a4-l")
+                else: 
+                    a4_rect = pymupdf.paper_rect("a4")
                 
                 target_pixel_width = a4_rect.width / 72 * TARGET_DPI
                 target_pixel_height = a4_rect.height / 72 * TARGET_DPI
@@ -139,164 +108,19 @@ class PdfRender:
             if not self.pdf_bytes:
                 raise ValueError("최종 PDF 바이트 스트림 생성에 실패했습니다.")
             
-            print(f"최종 문서 생성 성공 (크기: {len(self.pdf_bytes)} bytes).")
+            print(f"✅ A4 변환 완료 (크기: {len(self.pdf_bytes)} bytes).")
             
             self.doc = pymupdf.open(stream=self.pdf_bytes, filetype="pdf")
-            self.pdf_path = processed_paths[0] # 첫 번째 파일을 대표 경로로 사용
+            self.pdf_path = path
             self.page_count = len(self.doc)
 
         except Exception as exc:
             traceback.print_exc()
             raise ValueError(f"문서 처리 중 오류 발생: {exc}")
         finally:
-            if merged_doc: merged_doc.close()
+            if source_doc: source_doc.close()
             if new_doc: new_doc.close()
 
-    def _detect_and_merge_split_files(self, paths: list) -> list:
-        """분할된 파일들을 감지하고 병합된 경로 리스트를 반환한다."""
-        import re
-        from collections import defaultdict
-        import tempfile
-        
-        processed_paths = []
-        processed_files = set()
-        file_groups = defaultdict(list)
-        
-        for path in paths:
-            if path in processed_files:
-                continue
-                
-            filename = os.path.basename(path)
-            dir_path = os.path.dirname(path)
-            
-            # _숫자 패턴 감지 (예: document_1.pdf, document_2.pdf)
-            match = re.match(r'^(.+)_(\d+)(\.[^.]+)$', filename)
-            if match:
-                base_name = match.group(1)
-                number = int(match.group(2))
-                extension = match.group(3)
-                
-                # 원본 파일명 생성
-                original_filename = f"{base_name}{extension}"
-                original_path = os.path.join(dir_path, original_filename)
-                
-                # 원본 파일이 존재하는지 확인
-                if os.path.exists(original_path):
-                    file_groups[original_path].append((original_path, 0))
-                    processed_files.add(original_path)
-                
-                # 분할 파일들을 그룹에 추가
-                file_groups[original_path].append((path, number))
-                processed_files.add(path)
-                
-                # 같은 그룹의 다른 분할 파일들도 찾기
-                counter = 1
-                while True:
-                    split_filename = f"{base_name}_{counter}{extension}"
-                    split_path = os.path.join(dir_path, split_filename)
-                    if os.path.exists(split_path) and split_path not in processed_files:
-                        file_groups[original_path].append((split_path, counter))
-                        processed_files.add(split_path)
-                        counter += 1
-                    else:
-                        break
-            else:
-                # 분할 파일이 아닌 경우 - 원본 파일인지 확인
-                base_name = os.path.splitext(filename)[0]
-                extension = os.path.splitext(filename)[1]
-                
-                # 해당 파일이 존재하지 않으면 분할 파일들을 찾아보기
-                if not os.path.exists(path):
-                    found_split_files = []
-                    counter = 1
-                    while True:
-                        split_filename = f"{base_name}_{counter}{extension}"
-                        split_path = os.path.join(dir_path, split_filename)
-                        if os.path.exists(split_path):
-                            found_split_files.append((split_path, counter))
-                            counter += 1
-                        else:
-                            break
-                    
-                    if found_split_files:
-                        # 분할 파일들을 그룹으로 처리
-                        group_key = f"{dir_path}/{base_name}_split_group"
-                        file_groups[group_key] = found_split_files
-                        processed_files.add(path)
-                        for split_path, _ in found_split_files:
-                            processed_files.add(split_path)
-                    else:
-                        # 분할 파일도 없으면 그대로 추가 (나중에 오류 처리)
-                        processed_paths.append(path)
-                        processed_files.add(path)
-                else:
-                    # 원본 파일이 존재하는 경우 - 분할 파일들도 확인
-                    found_split_files = []
-                    counter = 1
-                    while True:
-                        split_filename = f"{base_name}_{counter}{extension}"
-                        split_path = os.path.join(dir_path, split_filename)
-                        if os.path.exists(split_path):
-                            found_split_files.append((split_path, counter))
-                            counter += 1
-                        else:
-                            break
-                    
-                    if found_split_files:
-                        # 원본 + 분할 파일들을 그룹으로 처리
-                        group_key = path
-                        file_groups[group_key] = [(path, 0)]  # 원본 파일을 0번으로
-                        for split_path, counter in found_split_files:
-                            file_groups[group_key].append((split_path, counter))
-                            processed_files.add(split_path)
-                        processed_files.add(path)
-                    else:
-                        # 분할 파일이 없으면 그대로 추가
-                        processed_paths.append(path)
-                        processed_files.add(path)
-        
-        # 각 그룹별로 병합 처리
-        for group_key, file_list in file_groups.items():
-            if len(file_list) <= 1:
-                processed_paths.append(file_list[0][0])
-                continue
-            
-            # 숫자 순으로 정렬
-            file_list.sort(key=lambda x: x[1])
-            
-            try:
-                # 임시 파일에 병합된 PDF 생성
-                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
-                    temp_path = temp_file.name
-                
-                merged_doc = pymupdf.open()
-                
-                for file_path, _ in file_list:
-                    ext = os.path.splitext(file_path)[1].lower()
-                    if ext == '.pdf':
-                        with pymupdf.open(file_path) as doc:
-                            merged_doc.insert_pdf(doc)
-                    elif ext in ['.png', '.jpg', '.jpeg']:
-                        with Image.open(file_path).convert("RGB") as img:
-                            img_bytes = io.BytesIO()
-                            img.save(img_bytes, format="PDF")
-                            img_bytes.seek(0)
-                            with pymupdf.open("pdf", img_bytes.read()) as img_doc:
-                                merged_doc.insert_pdf(img_doc)
-                
-                merged_doc.save(temp_path)
-                merged_doc.close()
-                
-                processed_paths.append(temp_path)
-                print(f"  ✅ 분할 파일 병합 완료: {len(file_list)}개 파일 → {temp_path}")
-                
-            except Exception as e:
-                print(f"  ⚠️ 분할 파일 병합 실패 {group_key}: {e}")
-                for file_path, _ in file_list:
-                    if file_path not in processed_paths:
-                        processed_paths.append(file_path)
-        
-        return processed_paths
 
     def get_pdf_bytes(self) -> bytes | None:
         """변환된 PDF의 바이트 데이터를 반환한다."""

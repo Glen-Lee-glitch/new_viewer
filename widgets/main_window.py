@@ -593,9 +593,9 @@ class MainWindow(QMainWindow):
             # 고속 로딩: 전처리된 단일 파일
             if is_preprocessed and len(pdf_paths) == 1:
                 self.renderer.load_preprocessed_pdf(pdf_paths[0])
-            # 일반 로딩: 전처리 안됐거나 여러 파일
+            # 일반 로딩: A4 변환 필요한 파일
             else:
-                self.renderer.load_pdf(pdf_paths)
+                self.renderer.load_pdf(pdf_paths[0])  # 이미 병합된 단일 파일
                 
         except Exception as e:
             QMessageBox.critical(self, "오류", f"문서를 여는 데 실패했습니다: {e}")
