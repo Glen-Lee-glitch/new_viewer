@@ -933,45 +933,10 @@ class MainWindow(QMainWindow):
         admin_workers = ['이경구', '이호형']
         is_admin = self._worker_name in admin_workers
         
-        # ev_complement 모드 처리를 위한 함수 import
-        from core.sql_manager import fetch_ev_complement_memo
-        
         # 이미 작업자가 배정되어 있고, 현재 로그인 사용자가 관리자인 경우 조회 모드로 진행
         if existing_worker and is_admin:
             print(f"[관리자 조회 모드] 작업자: {existing_worker}, 관리자: {self._worker_name}")
-            self._pending_basic_info = normalize_basic_info(metadata)
-            
-            # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
-            outlier_value = metadata.get('outlier', '')
-            if outlier_value == 'O': # outlier 값이 'O'이면 이상치 체크 플래그 설정
-                self._pending_outlier_check = True
-                self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
-                # print(f"[디버그 main_window] _handle_work_started - 저장된 _pending_outlier_metadata: {self._pending_outlier_metadata}")
-            else:
-                self._pending_outlier_check = False # outlier가 'O'가 아니면 플래그 리셋
-                self._pending_outlier_metadata = None
-            
-            self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
-            
-            # ev_complement 모드 체크 및 설정
-            if rn_value:
-                ev_memo = fetch_ev_complement_memo(rn_value)
-                # 알람 위젯 플래그 또는 DB 메모 존재 여부로 판단
-                is_ev = self._is_ev_complement_work or (ev_memo is not None)
-                self._info_panel.set_ev_complement_mode(is_ev, ev_memo if ev_memo else "")
-                self._pdf_view_widget.set_ev_complement_mode(is_ev)
-            else:
-                self._info_panel.set_ev_complement_mode(False)
-                self._pdf_view_widget.set_ev_complement_mode(False)
-            
-            # PDF 로드 후 RN을 PdfViewWidget에 전달
-            if rn_value:
-                self._pdf_view_widget.set_current_rn(rn_value)
-            
-            # PDF 로드 후 메일 content 표시
-            if mail_content:
-                self._pdf_view_widget.set_mail_content(mail_content)
-            
+            self._initialize_work_session(pdf_paths, metadata, is_preprocessed, rn_value, mail_content)
             return
 
         # 일반 사용자가 이미 할당된 RN번호를 시작하려고 하는 경우 오류 메시지 표시 및 진행 불가
@@ -988,6 +953,13 @@ class MainWindow(QMainWindow):
             msg_box.exec()
             return
 
+        # 작업 시작 (공통 로직 호출)
+        self._initialize_work_session(pdf_paths, metadata, is_preprocessed, rn_value, mail_content)
+
+    def _initialize_work_session(self, pdf_paths: list, metadata: dict, is_preprocessed: bool, rn_value: str, mail_content: str):
+        """작업 세션을 초기화하고 문서를 로드하는 공통 로직을 수행한다."""
+        from core.sql_manager import fetch_ev_complement_memo
+
         self._pending_basic_info = normalize_basic_info(metadata)
         
         # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
@@ -995,7 +967,6 @@ class MainWindow(QMainWindow):
         if outlier_value == 'O': # outlier 값이 'O'이면 이상치 체크 플래그 설정
             self._pending_outlier_check = True
             self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
-            # print(f"[디버그 main_window] _handle_work_started - 저장된 _pending_outlier_metadata (두 번째 블록): {self._pending_outlier_metadata}")
         else:
             self._pending_outlier_check = False # outlier가 'O'가 아니면 플래그 리셋
             self._pending_outlier_metadata = None
@@ -1013,7 +984,7 @@ class MainWindow(QMainWindow):
             self._info_panel.set_ev_complement_mode(False)
             self._pdf_view_widget.set_ev_complement_mode(False)
         
-        # PDF 로드 후 RN을 PdfViewWidget에 전달 (추가)
+        # PDF 로드 후 RN을 PdfViewWidget에 전달
         if rn_value:
             self._pdf_view_widget.set_current_rn(rn_value)
         

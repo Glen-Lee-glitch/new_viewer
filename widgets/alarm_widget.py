@@ -132,15 +132,19 @@ class AlarmWidget(QWidget):
         if text in ["내역 없음", "로드 실패"]:
             return
 
-        # (EV) 항목인지 확인
+        # (EV) 또는 (요청) 항목인지 확인
         is_ev = text.startswith("(EV) ")
+        is_ce = text.startswith("(요청) ")
+        
         if is_ev:
             print(f"[DEBUG] EV Complement 작업 플래그 활성화 (항목: {text})")
+        elif is_ce:
+            print(f"[DEBUG] CE(Chained Emails) 작업 플래그 활성화 (항목: {text})")
             
         # 접두어 제거하고 RN만 추출
         rn = text.replace("(EV) ", "").replace("(요청) ", "").strip()
         if rn:
-            self.rn_work_requested.emit(rn, is_ev)
+            self.rn_work_requested.emit(rn, is_ev, is_ce)
     
     def _load_completed_regions(self):
         """
