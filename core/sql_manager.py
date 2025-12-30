@@ -2129,7 +2129,7 @@ def update_subsidy_status(rn: str, status: str) -> bool:
                     row = cursor.fetchone()
                     if row:
                         current_status = row[0]
-                        if current_status in ('서류미비 요청', '서류미비 도착'):
+                        if current_status in ('서류미비 요청'):
                             print(f"[update_subsidy_status] '{current_status}' 상태에서는 '{status}'로 업데이트할 수 없습니다. (RN: {rn})")
                             return False
 

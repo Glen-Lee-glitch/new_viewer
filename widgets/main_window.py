@@ -99,6 +99,7 @@ class MainWindow(QMainWindow):
         self._pending_outlier_metadata_copy = None
         self._outlier_queue = []
         self._original_outlier_types = []
+        self._pending_open_file_after_save = False
 
     def _create_widgets(self):
         """자식 위젯들을 생성한다."""
@@ -174,7 +175,7 @@ class MainWindow(QMainWindow):
         # 파일 메뉴
         open_action = QAction("PDF 열기", self)
         open_action.setShortcut(QKeySequence.StandardKey.Open)
-        open_action.triggered.connect(self._pdf_load_widget.open_pdf_file)
+        open_action.triggered.connect(self._prompt_save_before_open_file)
         self.menu_file.addAction(open_action)
         
         self.menu_file.addSeparator()
@@ -1178,6 +1179,12 @@ class MainWindow(QMainWindow):
             # 메인화면으로 돌아갈 때 데이터 새로고침
             self._refresh_all_data()
 
+            # 저장 후 파일 열기 대기 중이었다면 파일 선택창 띄우기
+            if hasattr(self, '_pending_open_file_after_save') and self._pending_open_file_after_save:
+                self._pending_open_file_after_save = False
+                # 메인 화면으로 돌아간 직후 파일 선택창 띄우기
+                QTimer.singleShot(100, self._pdf_load_widget.open_pdf_file)
+
     def show_load_view(self):
         """PDF 뷰어를 닫고 초기 로드 화면으로 전환하며 모든 관련 리소스를 정리한다."""
         # PDF 편집 모드 타이머 중지
@@ -1795,6 +1802,42 @@ class MainWindow(QMainWindow):
             # 저장 후 메인화면으로 돌아갈 때도 데이터 새로고침
             self._refresh_all_data()
         # 취소 버튼을 누르면 아무것도 하지 않고 대화상자만 닫힘
+
+    def _prompt_save_before_open_file(self):
+        """새 PDF 파일을 열기 전 저장 여부를 묻는다."""
+        if not self.renderer:
+            # 렌더러가 없으면(편집 중이 아니면) 바로 파일 열기
+            self._pdf_load_widget.open_pdf_file()
+            return
+
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Question)
+        msg_box.setWindowTitle("새 파일 열기")
+        msg_box.setText("현재 문서를 저장하시겠습니까?")
+        msg_box.setInformativeText("저장하지 않으면 변경사항이 사라집니다.")
+
+        # 사용자 요청에 따른 버튼 생성
+        no_save_button = msg_box.addButton("저장 안함", QMessageBox.ButtonRole.DestructiveRole)
+        save_button = msg_box.addButton("저장", QMessageBox.ButtonRole.AcceptRole)
+        cancel_button = msg_box.addButton("취소", QMessageBox.ButtonRole.RejectRole)
+        
+        msg_box.setDefaultButton(save_button)
+        msg_box.exec()
+        
+        clicked_button = msg_box.clickedButton()
+        
+        if clicked_button == cancel_button:
+            return # 취소 시 아무것도 하지 않음
+            
+        if clicked_button == save_button:
+            # 저장 후 파일 열기 플래그 설정
+            self._pending_open_file_after_save = True
+            self._save_document()
+            
+        elif clicked_button == no_save_button:
+            # 저장 안 함: 바로 파일 열기 창 호출
+            # (사용자가 파일을 선택하고 로드하면 기존 렌더러가 닫힘)
+            self._pdf_load_widget.open_pdf_file()
 
     def _handle_undo_request(self):
         """썸네일에서 Undo 요청이 왔을 때 PDF 뷰어의 되돌리기를 실행한다."""
