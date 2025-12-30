@@ -10,8 +10,8 @@ from widgets.special_note_dialog import SpecialNoteDialog
 class AlarmWidget(QWidget):
     """알림 위젯 - PDF 불러오기 전 표시되는 위젯"""
     
-    # RN 작업 요청 시그널: (RN 번호, EV 보완 여부)
-    rn_work_requested = pyqtSignal(str, bool)  # RN 번호와 EV 보완 여부를 인자로 전달
+    # RN 작업 요청 시그널: (RN 번호, EV 보완 여부, CE 요청 여부)
+    rn_work_requested = pyqtSignal(str, bool, bool)  # RN 번호, EV 보완 여부, CE 요청 여부를 인자로 전달
     
     def __init__(self, worker_name: str = None, parent=None):
         super().__init__(parent)

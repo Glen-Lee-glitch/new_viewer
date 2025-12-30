@@ -696,7 +696,7 @@ class MainWindow(QMainWindow):
             self.menu_additional_documents.menuAction().setEnabled(False)
         self.load_document(pdf_paths)
 
-    def _handle_alarm_rn_clicked(self, rn: str, is_ev: bool = False):
+    def _handle_alarm_rn_clicked(self, rn: str, is_ev: bool = False, is_ce: bool = False):
         """알람 위젯에서 RN 버튼 클릭 시 호출되는 핸들러.
         
         RN의 rns.file_path와 chained_emails.chained_file_path를 병합하여 작업을 시작한다.
@@ -707,8 +707,12 @@ class MainWindow(QMainWindow):
         
         # EV 보완 작업 플래그 설정
         self._is_ev_complement_work = is_ev
+        self._is_ce_work = is_ce
+        
         if is_ev:
             print(f"[MainWindow] EV 보완 작업 모드로 시작 (RN: {rn})")
+        if is_ce:
+            print(f"[MainWindow] CE(Chained Emails) 작업 모드로 시작 (RN: {rn})")
         
         from core.sql_manager import (
             get_recent_thread_id_by_rn, 
