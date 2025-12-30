@@ -136,7 +136,7 @@ class PdfLoadWidget(QWidget):
         table = self.complement_table_widget
         # 컬럼 수 6개로 증가 (기존 5개 + 버튼 컬럼)
         table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '결과', 'AI', 'PDF열기'])
+        table.setHorizontalHeaderLabels(['지역', 'RN', '작업자', '상태', 'AI', 'PDF열기'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
