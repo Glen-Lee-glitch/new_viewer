@@ -421,7 +421,7 @@ class PdfRender:
         """파일(PDF/이미지)을 현재 문서의 끝에 추가한다 (A4 변환 적용)."""
         if not self.pdf_bytes:
             # 현재 문서가 없으면 그냥 로드
-            self.load_pdf([file_path])
+            self.load_pdf(file_path)
             return
 
         try:
