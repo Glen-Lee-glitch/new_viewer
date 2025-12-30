@@ -60,9 +60,8 @@ class AlarmWidget(QWidget):
             
             # 리스트 위젯 생성 및 추가
             self._finished_list = QListWidget()
-            # 높이 조정 (항목당 약 24px로 계산, 3~4개 보이도록 축소)
-            self._finished_list.setMinimumHeight(60)  
-            self._finished_list.setMaximumHeight(80)
+            # 고정 높이 제한을 제거하여 영역을 가득 채우도록 설정
+            self._finished_list.setMinimumHeight(60)
 
             # 폰트 크기 조정 (1pt 줄이기)
             font = self._finished_list.font()
@@ -88,7 +87,7 @@ class AlarmWidget(QWidget):
             
             # 리스트 위젯 생성
             self._ev_required_list = QListWidget()
-            self._ev_required_list.setMaximumHeight(80)
+            # 고정 높이 제한을 제거하여 영역을 가득 채우도록 설정
             
             # 폰트 크기 조정
             font = self._ev_required_list.font()
@@ -185,8 +184,7 @@ class AlarmWidget(QWidget):
             
             # 리스트 위젯 생성
             self._da_request_list = QListWidget()
-            # 높이 조정 (적절히 조절)
-            self._da_request_list.setMaximumHeight(80) 
+            # 고정 높이 제한을 제거하여 영역을 가득 채우도록 설정
             
             # 폰트 크기 조정
             font = self._da_request_list.font()
