@@ -2114,14 +2114,26 @@ def fetch_today_completed_worker_stats() -> dict:
 def update_subsidy_status(rn: str, status: str) -> bool:
     """
     rns 테이블에서 해당 RN의 status를 업데이트한다. (PostgreSQL 버전)
+    단, 'pdf 전처리'로 업데이트하려는 경우, 현재 상태가 '서류미비 요청' 또는 '서류미비 도착'이면 업데이트를 막는다.
     """
     if not rn:
         return False
         
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            query = "UPDATE rns SET status = %s WHERE \"RN\" = %s"
             with connection.cursor() as cursor:
+                # 조건부 체크: 'pdf 전처리'로 업데이트 하려는 경우
+                if status == 'pdf 전처리':
+                    check_query = 'SELECT status FROM rns WHERE "RN" = %s'
+                    cursor.execute(check_query, (rn,))
+                    row = cursor.fetchone()
+                    if row:
+                        current_status = row[0]
+                        if current_status in ('서류미비 요청', '서류미비 도착'):
+                            print(f"[update_subsidy_status] '{current_status}' 상태에서는 '{status}'로 업데이트할 수 없습니다. (RN: {rn})")
+                            return False
+
+                query = "UPDATE rns SET status = %s WHERE \"RN\" = %s"
                 cursor.execute(query, (status, rn))
                 connection.commit()
                 return True
