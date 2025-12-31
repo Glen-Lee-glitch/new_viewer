@@ -4,6 +4,7 @@ from PyQt6.QtGui import QCloseEvent
 from PyQt6 import uic
 from pathlib import Path
 from core.sql_manager import fetch_after_apply_counts, get_worker_names, get_worker_id_by_name
+from core.data_manage import set_use_sample_data
 
 class LoginDialog(QDialog):
     def __init__(self, parent=None):
@@ -56,6 +57,9 @@ class LoginDialog(QDialog):
     
     def _validate_and_accept(self):
         """작업자 이름을 검증하고 유효하면 다이얼로그를 승인한다."""
+        # 0. 샘플 데이터 모드 설정 반영
+        set_use_sample_data(self.rb_sample_data.isChecked())
+        
         worker_name = self.lineEdit_worker.text().strip()
         
         # 빈 입력 체크

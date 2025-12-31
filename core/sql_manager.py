@@ -1,7 +1,7 @@
 import pymysql
 import psycopg2
 import psycopg2.extras
-from core.data_manage import DB_CONFIG
+from core.data_manage import DB_CONFIG, is_sample_data_mode, get_sample_data
 from datetime import datetime, date, time, timedelta
 import pytz
 import pandas as pd
@@ -184,20 +184,50 @@ def fetch_subsidy_applications(
 ) -> pd.DataFrame:
     """
     지원금 신청 데이터를 필터링 및 페이징하여 조회한다. (PostgreSQL 버전)
-    
-    Args:
-        worker_id: 작업자 ID (filter_type='mine'일 때 사용)
-        filter_type: 필터 종류 ('all', 'mine', 'unfinished', 'uncompleted')
-        start_date: 조회 시작 날짜 (YYYY-MM-DD HH:MM:SS)
-        end_date: 조회 종료 날짜 (YYYY-MM-DD HH:MM:SS)
-        show_only_deferred: '추후 신청' 상태인 건만 조회할지 여부
-        regions: 지역 필터 리스트 (예: ['서울시', '부산시'])
-        limit: 조회 건수 제한
-        offset: 조회 시작 위치
-        
-    Returns:
-        조회된 데이터의 DataFrame
     """
+    if is_sample_data_mode():
+        data = get_sample_data()
+        rns = data.get('rns', [])
+        emails = {e['thread_id']: e for e in data.get('emails', [])}
+        workers = {w['worker_id']: w for w in data.get('workers', [])}
+        
+        rows = []
+        for r in rns:
+            # 기본 조인 데이터 준비
+            email = emails.get(r['recent_thread_id'], {})
+            worker = workers.get(r['worker_id'], {})
+            
+            # SQL 쿼리 컬럼 구조와 동일하게 매핑
+            row = {
+                'RN': r['RN'],
+                'region': r['region'],
+                'worker': worker.get('worker_name'),
+                'name': r['customer'],
+                'special_note': ', '.join(r['special']) if r['special'] else '',
+                'recent_received_date': r['last_received_date'],
+                'finished_file_path': r['file_path'],
+                'original_filepath': email.get('original_pdf_path'),
+                'recent_thread_id': r['recent_thread_id'],
+                'file_rendered': 0,
+                '구매계약서': 0, '초본': 0, '공동명의': 0, '다자녀': 0,
+                'urgent': 1 if r['is_urgent'] else 0,
+                'mail_count': r['mail_count'],
+                'all_ai': 1 if r['all_ai'] else 0,
+                'result': r['status'],
+                '차종': r['model']
+            }
+            # 필터링 로직 (단순 구현)
+            if filter_type == 'mine' and r['worker_id'] != worker_id: continue
+            if filter_type == 'unfinished' and r['worker_id'] is not None: continue
+            if filter_type == 'uncompleted' and r['status'] == '처리완료': continue
+            if regions and r['region'] not in regions: continue
+            
+            rows.append(row)
+        
+        df = pd.DataFrame(rows)
+        # 페이징 처리
+        return df.iloc[offset : offset + limit] if not df.empty else df
+
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             base_query = _build_subsidy_query_base()
@@ -265,10 +295,35 @@ def get_distinct_regions() -> list[str]:
 def fetch_application_data_by_rn(rn: str) -> dict | None:
     """
     특정 RN 번호로 지원금 신청 및 이메일 정보를 조회하여 딕셔너리로 반환한다.
-    (PdfLoadWidget에서 직접 열기 기능용)
     """
     if not rn:
         return None
+
+    if is_sample_data_mode():
+        data = get_sample_data()
+        rn_info = next((r for r in data.get('rns', []) if r['RN'] == rn), None)
+        if not rn_info: return None
+        
+        email = next((e for e in data.get('emails', []) if e['thread_id'] == rn_info['recent_thread_id']), {})
+        analysis = next((a for a in data.get('analysis_results', []) if a['RN'] == rn), {})
+        
+        # 기본 필드 구성 (SQL 쿼리 결과와 구조 맞춤)
+        result = {
+            'RN': rn_info['RN'],
+            'region': rn_info['region'],
+            'worker': next((w['worker_name'] for w in data.get('workers', []) if w['worker_id'] == rn_info['worker_id']), None),
+            'name': rn_info['customer'],
+            'special_note': ', '.join(rn_info['special']) if rn_info['special'] else '',
+            'finished_file_path': rn_info['file_path'],
+            'original_filepath': email.get('original_pdf_path'),
+            'recent_thread_id': rn_info['recent_thread_id'],
+            'file_rendered': 0,
+            'urgent': 1 if rn_info['is_urgent'] else 0,
+            'mail_count': rn_info['mail_count'],
+            'outlier': '',
+            'is_법인': analysis.get('사업자등록증', {}).get('is_corporation', False) if analysis.get('사업자등록증') else False
+        }
+        return result
 
     try:
         with closing(pymysql.connect(**DB_CONFIG)) as connection:
@@ -402,6 +457,10 @@ def get_worker_names():
     """
     workers 테이블에서 모든 작업자 이름(worker_name) 리스트를 반환한다. (PostgreSQL 버전)
     """
+    if is_sample_data_mode():
+        data = get_sample_data()
+        return [w['worker_name'] for w in data.get('workers', [])]
+    
     workers = []
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
@@ -417,14 +476,15 @@ def get_worker_names():
 def get_worker_id_by_name(worker_name: str) -> int | None:
     """
     workers 테이블에서 작업자 이름(worker_name)으로 worker_id를 조회한다. (PostgreSQL 버전)
-    
-    Args:
-        worker_name: 작업자 이름
-        
-    Returns:
-        worker_id (int) 또는 None (존재하지 않는 경우)
     """
     if not worker_name:
+        return None
+    
+    if is_sample_data_mode():
+        data = get_sample_data()
+        for w in data.get('workers', []):
+            if w['worker_name'] == worker_name:
+                return w['worker_id']
         return None
     
     try:
@@ -654,6 +714,19 @@ def fetch_gemini_contract_results(rn: str) -> dict:
     if not rn:
         return {}
     
+    if is_sample_data_mode():
+        data = get_sample_data()
+        analysis = next((a for a in data.get('analysis_results', []) if a['RN'] == rn), {})
+        res = analysis.get('구매계약서', {})
+        if not res: return {}
+        return {
+            'ai_계약일자': res.get('order_date'),
+            'ai_이름': res.get('customer_name'),
+            '전화번호': res.get('phone_number'),
+            '이메일': res.get('email'),
+            'vehicle_config': res.get('vehicle_config')
+        }
+
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             # JSONB에서 필드 추출
