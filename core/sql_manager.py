@@ -1998,6 +1998,51 @@ def fetch_ev_complement_rns(worker_name: str) -> list[str]:
         traceback.print_exc()
         return []
 
+def insert_user_memo(rn: str, worker_id: int, comment: str) -> bool:
+    """
+    user_memos 테이블에 새로운 메모를 삽입한다.
+    """
+    if not rn or not comment:
+        return False
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            with connection.cursor() as cursor:
+                query = """
+                    INSERT INTO user_memos ("RN", worker_id, comment)
+                    VALUES (%s, %s, %s)
+                """
+                cursor.execute(query, (rn, worker_id, comment))
+            connection.commit()
+            return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
+def fetch_user_memos(rn: str) -> list:
+    """
+    특정 RN에 대한 모든 메모를 조회한다.
+    """
+    if not rn:
+        return []
+    
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT m.id, m."RN", m.created_at, m.worker_id, w.worker_name, m.comment
+                FROM user_memos m
+                LEFT JOIN workers w ON m.worker_id = w.worker_id
+                WHERE m."RN" = %s
+                ORDER BY m.created_at DESC
+            """
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute(query, (rn,))
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 def fetch_chained_emails_rns(worker_name: str) -> list[str]:
     """
     chained_emails 테이블의 thread_id를 통해 rns 테이블과 조인하여 RN 목록을 조회한다.
