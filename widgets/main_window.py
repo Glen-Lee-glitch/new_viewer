@@ -442,6 +442,11 @@ class MainWindow(QMainWindow):
             if hasattr(self, '_alarm_widget'):
                 self._alarm_widget._worker_name = self._worker_name
                 self._alarm_widget.refresh_data()
+            
+            # 로그인 후 정보 패널에 작업자 정보 설정
+            if hasattr(self, '_info_panel'):
+                self._info_panel.set_worker_info(self._worker_id)
+                
             # 로그인 후 PDF 로드 위젯에 작업자 이름 및 ID 설정
             if hasattr(self, '_pdf_load_widget'):
                 self._pdf_load_widget.set_worker_name(self._worker_name)

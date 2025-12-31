@@ -51,6 +51,9 @@ class InfoPanelWidget(QWidget):
         self._current_rn: str = "" # 현재 표시 중인 RN 저장
         self._initial_error_items = set() # 최초 로드된 에러 항목 저장 (비교용)
         self._is_ev_complement_mode = False # EV 보완 모드 여부
+        
+        # 현재 로그인한 작업자 정보
+        self._worker_id: int | None = None
 
         # 자동 새로고침 타이머 설정 (20초)
         self._refresh_timer = QTimer(self)
@@ -174,6 +177,10 @@ class InfoPanelWidget(QWidget):
         """작업 리스트 레이아웃 내의 위젯들의 가시성을 설정한다."""
         for checkbox in self._dynamic_checkboxes:
             checkbox.setVisible(visible)
+
+    def set_worker_info(self, worker_id: int | None):
+        """현재 로그인한 작업자 정보를 설정한다."""
+        self._worker_id = worker_id
 
     def set_delivery_day_gap(self, day_gap: int | None):
         """출고예정일 계산을 위한 day_gap을 설정한다."""
