@@ -36,16 +36,34 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="groupBox_finished">
+    <widget class="QGroupBox" name="groupBox_memo_management">
      <property name="font">
       <font>
        <bold>true</bold>
       </font>
      </property>
      <property name="title">
-      <string>처리완료</string>
+      <string>메모관리</string>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout_2"/>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="QListWidget" name="listWidget_memos">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>80</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton_write_memo">
+        <property name="text">
+         <string>메모 작성</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
