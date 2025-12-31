@@ -471,13 +471,16 @@ class DetailFormDialog(QDialog):
         if flags.get('공동명의', False):
             joint_data = fetch_gemini_joint_results(rn)
             if joint_data:
+                # first_person 데이터가 있으면 공동명의 섹션 표시 (second_person이 없어도)
+                if joint_data.get('name'):
+                    has_joint = True
+
                 # second_person 정보 표시
                 second_person_name = joint_data.get('second_person_name')
                 second_person_birth_date = joint_data.get('second_person_birth_date')
                 
                 if second_person_name:
                     self.label_name_2.setText(str(second_person_name))
-                    has_joint = True
                 else:
                     self.label_name_2.setText("")
                 
@@ -487,7 +490,6 @@ class DetailFormDialog(QDialog):
                     else:
                         birth_date_str = second_person_birth_date
                     self.label_birth_date_2.setText(birth_date_str)
-                    has_joint = True
                 else:
                     self.label_birth_date_2.setText("")
             else:
