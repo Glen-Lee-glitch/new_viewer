@@ -5,7 +5,8 @@
 """
 import platform
 from pathlib import Path
-
+import sys
+from core.data_manage import is_sample_data_mode  # 추가
 
 def normalize_basic_info(metadata: dict | None) -> dict:
     """
@@ -60,6 +61,28 @@ def get_converted_path(path: str | Path) -> str:
             path_str = path_str[1:-1]
     
     path_str = path_str.strip()
+
+    # --- 샘플 데이터 모드 경로 처리 ---
+    if is_sample_data_mode():
+        # 경로 정규화 (슬래시/백슬래시 통일)
+        norm_path = path_str.replace('\\', '/')
+        if norm_path.startswith('sample/') or 'sample/' in norm_path:
+            # 파일명만 추출하거나 sample/ 이후의 경로를 사용
+            if 'sample/' in norm_path:
+                rel_path = norm_path[norm_path.index('sample/'):]
+            else:
+                rel_path = norm_path
+            
+            # 실행 환경에 따른 베이스 경로 설정
+            if hasattr(sys, '_MEIPASS'):
+                base_path = Path(sys._MEIPASS)
+            else:
+                base_path = Path(__file__).parent.parent
+            
+            # 절대 경로 반환
+            return str(base_path / rel_path)
+    # ----------------------------------
+
     system = platform.system()
     
     if system == 'Darwin':  # macOS

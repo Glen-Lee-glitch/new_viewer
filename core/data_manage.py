@@ -30,8 +30,17 @@ def is_sample_data_mode() -> bool:
 
 def get_sample_data() -> dict:
     """sample_data.json 파일을 읽어서 반환한다."""
-    # sample 폴더 내의 sample_data.json 경로
-    sample_path = Path(__file__).parent.parent / "sample" / "sample_data.json"
+    import sys
+    # PyInstaller 빌드 환경인지 확인
+    if hasattr(sys, '_MEIPASS'):
+        # 실행 파일 내부 (_internal 폴더 등)
+        base_path = Path(sys._MEIPASS)
+    else:
+        # 개발 환경
+        base_path = Path(__file__).parent.parent
+
+    sample_path = base_path / "sample" / "sample_data.json"
+    
     if not sample_path.exists():
         print(f"[ERROR] 샘플 데이터 파일을 찾을 수 없습니다: {sample_path}")
         return {"rns": [], "emails": [], "workers": [], "analysis_results": []}

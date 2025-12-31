@@ -32,13 +32,21 @@ if assets_dir.exists():
         if asset_file.is_file():
             assets_files.append((str(asset_file), 'assets'))
 
+# sample 파일들 수집
+sample_files = []
+sample_dir = project_root / 'sample'
+if sample_dir.exists():
+    for sample_file in sample_dir.glob('*'):
+        if sample_file.is_file():
+            sample_files.append((str(sample_file), 'sample'))
+
 # 데이터 파일들
 data_files = [
     (str(project_root / 'core' / 'region_data.json'), 'core'),
 ]
 
 # 모든 데이터 파일 추가
-datas = ui_files + assets_files + data_files
+datas = ui_files + assets_files + sample_files + data_files
 
 # 숨겨진 import들
 hiddenimports = [
