@@ -70,6 +70,10 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'radioButton_3'):
             self.radioButton_3.toggled.connect(self._on_radio_button_subsidy_toggled)
 
+        # 메모 저장 버튼 연결
+        if hasattr(self, 'pushButton_save_memo'):
+            self.pushButton_save_memo.clicked.connect(self._on_save_memo_clicked)
+
         # 지역 입력 필드 더블클릭 이벤트 필터 설치
         if hasattr(self, 'lineEdit_region'):
             self.lineEdit_region.installEventFilter(self)
@@ -82,6 +86,57 @@ class InfoPanelWidget(QWidget):
             self._on_region_double_clicked()
             return True
         return super().eventFilter(source, event)
+
+    def _on_save_memo_clicked(self):
+        """메모 저장 버튼 클릭 시 처리"""
+        if not self._current_rn:
+            QMessageBox.warning(self, "경고", "RN 정보가 없습니다.")
+            return
+        
+        if self._worker_id is None:
+            QMessageBox.warning(self, "경고", "작업자 정보가 없습니다. 다시 로그인해주세요.")
+            return
+
+        comment = self.textEdit_memo_input.toPlainText().strip()
+        if not comment:
+            return
+
+        from core.sql_manager import insert_user_memo
+        if insert_user_memo(self._current_rn, self._worker_id, comment):
+            self.textEdit_memo_input.clear()
+            self._refresh_memo_list()
+        else:
+            QMessageBox.critical(self, "오류", "메모 저장에 실패했습니다.")
+
+    def _refresh_memo_list(self):
+        """현재 RN의 메모 리스트를 새로고침한다."""
+        if not hasattr(self, 'listWidget_memos'):
+            return
+            
+        self.listWidget_memos.clear()
+        if not self._current_rn:
+            return
+
+        from core.sql_manager import fetch_user_memos
+        memos = fetch_user_memos(self._current_rn)
+        
+        for memo in memos:
+            # [12/31 14:20] 홍길동: 메모내용
+            created_at = memo['created_at']
+            if isinstance(created_at, datetime):
+                time_str = created_at.strftime("%m/%d %H:%M")
+            else:
+                time_str = str(created_at)
+                
+            worker_name = memo.get('worker_name') or "알 수 없음"
+            content = memo['comment']
+            
+            item_text = f"[{time_str}] {worker_name}: {content}"
+            self.listWidget_memos.addItem(item_text)
+            
+        # 가장 최근 메모가 위로 오도록 함 (이미 ORDER BY created_at DESC)
+        # 필요한 경우 스크롤을 맨 위로
+        self.listWidget_memos.scrollToTop()
 
     def _on_region_double_clicked(self):
         """지역 입력 필드 더블클릭 시 처리"""
@@ -267,7 +322,8 @@ class InfoPanelWidget(QWidget):
         # 작업 리스트 체크박스 초기화
         self.reset_task_checkboxes()
         
-        self.lineEdit_name.clear()
+        if hasattr(self, 'lineEdit_name'):
+            self.lineEdit_name.clear()
         self.lineEdit_region.clear()
         self.lineEdit_special.clear()
         self._current_rn = "" # RN 초기화
@@ -275,6 +331,12 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.clear()  # RN 필드도 초기화
             
+        # 메모 초기화
+        if hasattr(self, 'listWidget_memos'):
+            self.listWidget_memos.clear()
+        if hasattr(self, 'textEdit_memo_input'):
+            self.textEdit_memo_input.clear()
+
         # EV 보완 모드 초기화 (텍스트 에디트 숨김 등)
         self.set_ev_complement_mode(False)
 
@@ -305,7 +367,8 @@ class InfoPanelWidget(QWidget):
 
     def update_basic_info(self, name: str, region: str, special_note: str, rn: str = ""):
         """기본 정보를 업데이트한다."""
-        self.lineEdit_name.setText(name)
+        if hasattr(self, 'lineEdit_name'):
+            self.lineEdit_name.setText(name)
         self.lineEdit_region.setText(region)
         self.lineEdit_special.setText(special_note)
         if hasattr(self, 'lineEdit_rn_num'):
@@ -316,6 +379,9 @@ class InfoPanelWidget(QWidget):
         
         # RN 에러 데이터에 따라 작업 리스트 업데이트 (초기 로드)
         self.update_task_list(rn, is_initial_load=True)
+        
+        # 메모 리스트 업데이트
+        self._refresh_memo_list()
 
     def update_task_list(self, rn: str, is_initial_load: bool = False):
         """RN 에러 데이터(validation_errors)를 기반으로 작업 리스트 체크박스를 동적으로 업데이트한다."""
