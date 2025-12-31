@@ -170,6 +170,24 @@ class AlarmWidget(QWidget):
         self._load_completed_regions()
         self._update_ev_required_list()
         self._update_da_request_list()
+        self.update_selected_rn_display()
+
+    def update_selected_rn_display(self):
+        """PdfLoadWidget에서 선택된 RN을 가져와 라벨에 표시한다."""
+        if not hasattr(self, 'label_selected_rn'):
+            return
+            
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'pdf_load_widget'):
+                selected_rn = main_window.pdf_load_widget.get_selected_rn()
+                if selected_rn:
+                    self.label_selected_rn.setText(selected_rn)
+                    # RN이 바뀌었으니 메모 리스트도 함께 업데이트 (추후 구현)
+                else:
+                    self.label_selected_rn.setText("선택된 RN 없음")
+        except Exception as e:
+            print(f"RN 표시 업데이트 실패: {e}")
 
     def _setup_da_request_list(self):
         """DA 추가요청(수신) 그룹박스에 리스트 위젯을 설정한다."""
@@ -269,8 +287,8 @@ class AlarmWidget(QWidget):
                 if hasattr(self.window(), 'refresh_data'):
                     self.window().refresh_data()
             elif result == 3:
-                # 처리시작 시 작업 요청 시그널 발생
-                self.rn_work_requested.emit(rn, False)
+                # 처리시작 시 작업 요청 시그널 발생 (rn, is_ev=False, is_ce=False)
+                self.rn_work_requested.emit(rn, False, False)
             
         except Exception as e:
             print(f"이메일 확인 중 오류 발생: {e}")

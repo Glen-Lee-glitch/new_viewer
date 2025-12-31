@@ -47,12 +47,38 @@
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
+       <widget class="QLabel" name="label_selected_rn">
+        <property name="styleSheet">
+         <string>color: red; font-weight: bold;</string>
+        </property>
+        <property name="text">
+         <string>선택된 RN 없음</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QListWidget" name="listWidget_memos">
         <property name="minimumSize">
          <size>
           <width>0</width>
           <height>80</height>
          </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTextEdit" name="textEdit_memo_input">
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>60</height>
+         </size>
+        </property>
+        <property name="placeholderText">
+         <string>메모 입력...</string>
         </property>
        </widget>
       </item>

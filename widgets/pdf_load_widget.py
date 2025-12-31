@@ -91,6 +91,7 @@ class PdfLoadWidget(QWidget):
     """PDF 로드 영역 위젯"""
     pdf_selected = pyqtSignal(list, dict)  # 여러 파일 경로(리스트)와 메타데이터(딕셔너리) 전달
     work_started = pyqtSignal(list, dict)
+    rn_selected = pyqtSignal(str) # 추가
     ai_review_requested = pyqtSignal(str) # AI 검토 요청 시그널
     data_refreshed = pyqtSignal()  # 데이터 새로고침 완료 시그널
     
@@ -159,6 +160,8 @@ class PdfLoadWidget(QWidget):
         self.populate_recent_subsidy_rows()
         table.customContextMenuRequested.connect(self.show_context_menu)
         table.cellClicked.connect(self._handle_cell_clicked)
+        # 선택 변경 시그널 연결
+        table.itemSelectionChanged.connect(lambda: self.rn_selected.emit(self.get_selected_rn() or ""))
     
     def _handle_cell_clicked(self, row, column):
         """테이블 셀 클릭 시 처리"""

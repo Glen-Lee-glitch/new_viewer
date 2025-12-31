@@ -288,10 +288,12 @@ class MainWindow(QMainWindow):
         # 데이터 새로고침 시 시간 업데이트 및 알람 위젯 갱신
         self._pdf_load_widget.data_refreshed.connect(self._on_data_refreshed)
         
-        # 알람 위젯 RN 작업 요청 시그널 연결
+        # 알람 위젯 시그널 연결
         self._alarm_widget.rn_work_requested.connect(self._handle_alarm_rn_clicked)
-        
-        # 정보 패널 업데이트 연결
+        # RN 선택 시 알람 위젯의 RN 표시 업데이트
+        self._pdf_load_widget.rn_selected.connect(self._alarm_widget.update_selected_rn_display)
+
+        # 헬퍼 오버레이 위젯 생성
         self._pdf_view_widget.pdf_loaded.connect(self._info_panel.update_file_info)
         self._pdf_view_widget.page_info_updated.connect(self._info_panel.update_page_info)
         self._info_panel.text_stamp_requested.connect(self._pdf_view_widget.activate_text_stamp_mode)
