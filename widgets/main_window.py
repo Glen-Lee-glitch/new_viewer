@@ -20,6 +20,7 @@ from core.pdf_saved import compress_pdf_with_multiple_stages
 from core.sql_manager import claim_subsidy_work, get_original_pdf_path_by_rn
 from core.workers import BatchTestSignals, PdfBatchTestWorker
 from core.utility import normalize_basic_info, get_converted_path
+from core.data_manage import is_sample_data_mode
 from widgets.pdf_load_widget import PdfLoadWidget
 from widgets.pdf_view_widget import PdfViewWidget
 from widgets.thumbnail_view_widget import ThumbnailViewWidget
@@ -448,9 +449,12 @@ class MainWindow(QMainWindow):
                 # 프로그램 시작 시 체크박스 상태 초기화 (기본값: True)
                 self._pdf_load_widget.set_payment_request_load_enabled(True)
             
-            # 초기 새로고침 타이머 시작
-            refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
-            self._refresh_timer.start(refresh_interval * 1000)  # 초 단위이므로 1000을 곱함
+            # 초기 새로고침 타이머 시작 (샘플 모드가 아닐 때만)
+            if not is_sample_data_mode():
+                refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
+                self._refresh_timer.start(refresh_interval * 1000)  # 초 단위이므로 1000을 곱함
+            else:
+                print("[INFO] 샘플 데이터 모드이므로 자동 새로고침 타이머를 시작하지 않습니다.")
             
             # 로그인 직후 초기 시간 표시
             self._refresh_all_data()
@@ -468,10 +472,11 @@ class MainWindow(QMainWindow):
     def _open_config_dialog(self):
         """환경설정 다이얼로그를 연다."""
         if self._config_dialog.exec():
-            # 사용자가 OK를 누르면 변경된 새로고침 주기를 적용
-            refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
-            self._refresh_timer.stop()  # 기존 타이머 중지
-            self._refresh_timer.start(refresh_interval * 1000)  # 새 주기로 시작 (초 단위이므로 1000을 곱함)
+            # 사용자가 OK를 누르면 변경된 새로고침 주기를 적용 (샘플 모드가 아닐 때만)
+            if not is_sample_data_mode():
+                refresh_interval = self._config_dialog.settings.value("general/refresh_interval", 30, type=int)
+                self._refresh_timer.stop()  # 기존 타이머 중지
+                self._refresh_timer.start(refresh_interval * 1000)  # 새 주기로 시작 (초 단위이므로 1000을 곱함)
             
             # 지급신청 로드 체크박스 상태를 PdfLoadWidget에 설정
             payment_request_load_enabled = self._config_dialog.payment_request_load_enabled
