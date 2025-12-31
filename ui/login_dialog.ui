@@ -26,8 +26,8 @@
          <rect>
           <x>20</x>
           <y>30</y>
-          <width>135</width>
-          <height>46</height>
+          <width>160</width>
+          <height>100</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -40,6 +40,23 @@
          </item>
          <item>
           <widget class="QLineEdit" name="lineEdit_worker"/>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="rb_local_db">
+           <property name="text">
+            <string>로컬 데이터베이스</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="rb_sample_data">
+           <property name="text">
+            <string>샘플 데이터</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </widget>

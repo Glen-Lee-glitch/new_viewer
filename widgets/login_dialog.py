@@ -124,3 +124,7 @@ class LoginDialog(QDialog):
         if not worker_name:
             return None
         return get_worker_id_by_name(worker_name)
+
+    def is_sample_mode(self) -> bool:
+        """샘플 데이터 모드인지 확인한다."""
+        return self.rb_sample_data.isChecked()
