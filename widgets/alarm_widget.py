@@ -24,8 +24,8 @@ class AlarmWidget(QWidget):
         ui_path = Path(__file__).parent.parent / "ui" / "alarm_widget.ui"
         uic.loadUi(str(ui_path), self)
         
-        # 처리완료 리스트 위젯 설정
-        self._setup_finished_list()
+        # 메모 리스트 위젯 및 레이아웃 설정
+        self._setup_memo_list()
         
         # 서류미비 및 확인필요 리스트 설정
         self._setup_ev_required_list()
@@ -35,41 +35,100 @@ class AlarmWidget(QWidget):
         
         # 데이터 로드 (worker_name이 있을 때만)
         if self._worker_name:
-            self._load_completed_regions()
             self._update_ev_required_list()
             self._update_da_request_list()
         
         # 특이사항 입력 버튼 연결
         if hasattr(self, 'open_maildialog'):
             self.open_maildialog.clicked.connect(self._open_special_note_dialog)
+            
+        # 메모 작성 버튼 연결
+        if hasattr(self, 'pushButton_write_memo'):
+            self.pushButton_write_memo.clicked.connect(self._on_write_memo_clicked)
     
-    def _setup_finished_list(self):
-        """처리완료 그룹박스에 리스트 위젯을 추가한다."""
-        if hasattr(self, 'groupBox_finished'):
-            # 기존 레이아웃 가져오기
-            layout = self.groupBox_finished.layout()
-            if layout is None:
-                layout = QVBoxLayout(self.groupBox_finished)
-            
-            # 레이아웃 마진 및 간격 조정 (타이틀 공간 확보를 위해 상단 마진 추가)
-            layout.setContentsMargins(2, 15, 2, 2)
-            layout.setSpacing(0)
-            
-            # 스타일 시트 제거 (기본 테마 스타일 사용)
-            self.groupBox_finished.setStyleSheet("")
-            
-            # 리스트 위젯 생성 및 추가
-            self._finished_list = QListWidget()
-            # 고정 높이 제한을 제거하여 영역을 가득 채우도록 설정
-            self._finished_list.setMinimumHeight(60)
-
-            # 폰트 크기 조정 (1pt 줄이기)
-            font = self._finished_list.font()
+    def _setup_memo_list(self):
+        """메모관리 그룹박스의 리스트 위젯 스타일 및 레이아웃 설정"""
+        if hasattr(self, 'listWidget_memos'):
+            # 폰트 크기 조정
+            font = self.listWidget_memos.font()
             font.setPointSize(font.pointSize() - 2)
-            self._finished_list.setFont(font)
+            self.listWidget_memos.setFont(font)
+            
+            # 레이아웃 여백 조정
+            if hasattr(self, 'groupBox_memo_management'):
+                layout = self.groupBox_memo_management.layout()
+                if layout:
+                    layout.setContentsMargins(4, 15, 4, 4)
+                    layout.setSpacing(2)
 
-            layout.addWidget(self._finished_list)
-    
+    def _refresh_memo_list(self, rn: str):
+        """특정 RN의 메모 목록을 DB에서 가져와 리스트 위젯에 표시한다."""
+        if not hasattr(self, 'listWidget_memos') or not rn:
+            return
+            
+        self.listWidget_memos.clear()
+
+        from core.sql_manager import fetch_user_memos
+        try:
+            memos = fetch_user_memos(rn)
+            for memo in memos:
+                from datetime import datetime
+                created_at = memo['created_at']
+                time_str = created_at.strftime("%m/%d %H:%M") if isinstance(created_at, datetime) else str(created_at)
+                worker_name = memo.get('worker_name') or "알 수 없음"
+                content = memo['comment']
+                
+                self.listWidget_memos.addItem(f"[{time_str}] {worker_name}: {content}")
+            
+            self.listWidget_memos.scrollToTop()
+        except Exception as e:
+            print(f"메모 목록 로드 오류 (RN: {rn}): {e}")
+
+    def _on_write_memo_clicked(self):
+        """메모 작성 버튼 클릭 시 처리"""
+        # 현재 선택된 RN 확인
+        rn = ""
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'pdf_load_widget'):
+                rn = main_window.pdf_load_widget.get_selected_rn() or ""
+        except Exception:
+            pass
+            
+        if not rn:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "경고", "선택된 RN이 없습니다.")
+            return
+
+        # 입력 내용 확인
+        if not hasattr(self, 'textEdit_memo_input'):
+            return
+            
+        comment = self.textEdit_memo_input.toPlainText().strip()
+        if not comment:
+            return
+
+        # 작업자 ID 확인 (MainWindow에서 가져옴)
+        worker_id = None
+        try:
+            worker_id = getattr(self.window(), '_worker_id', None)
+        except Exception:
+            pass
+            
+        if worker_id is None:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "경고", "작업자 정보를 확인할 수 없습니다. 다시 로그인해주세요.")
+            return
+
+        # DB 저장
+        from core.sql_manager import insert_user_memo
+        if insert_user_memo(rn, worker_id, comment):
+            self.textEdit_memo_input.clear()
+            self._refresh_memo_list(rn)
+        else:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "오류", "메모 저장에 실패했습니다.")
+
     def _setup_ev_required_list(self):
         """서류미비 및 확인필요 그룹박스에 리스트 위젯을 설정한다."""
         if hasattr(self, 'groupBox_2'):
@@ -87,7 +146,6 @@ class AlarmWidget(QWidget):
             
             # 리스트 위젯 생성
             self._ev_required_list = QListWidget()
-            # 고정 높이 제한을 제거하여 영역을 가득 채우도록 설정
             
             # 폰트 크기 조정
             font = self._ev_required_list.font()
@@ -146,18 +204,6 @@ class AlarmWidget(QWidget):
         if rn:
             self.rn_work_requested.emit(rn, is_ev, is_ce)
     
-    def _load_completed_regions(self):
-        """
-        TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-        오늘 완료된 지역 목록을 로드한다.
-        """
-        if not hasattr(self, '_finished_list'):
-            return
-        
-        # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-        # 아무것도 표시하지 않도록 리스트만 클리어
-        self._finished_list.clear()
-    
     def _handle_ev_complement_click(self):
         """
         ev_complement 타입 버튼 클릭 시 호출되는 함수.
@@ -167,13 +213,12 @@ class AlarmWidget(QWidget):
     
     def refresh_data(self):
         """데이터를 수동으로 새로고침한다."""
-        self._load_completed_regions()
         self._update_ev_required_list()
         self._update_da_request_list()
         self.update_selected_rn_display()
 
     def update_selected_rn_display(self):
-        """PdfLoadWidget에서 선택된 RN을 가져와 라벨에 표시한다."""
+        """PdfLoadWidget에서 선택된 RN을 가져와 라벨에 표시하고 메모 리스트를 갱신한다."""
         if not hasattr(self, 'label_selected_rn'):
             return
             
@@ -183,9 +228,11 @@ class AlarmWidget(QWidget):
                 selected_rn = main_window.pdf_load_widget.get_selected_rn()
                 if selected_rn:
                     self.label_selected_rn.setText(selected_rn)
-                    # RN이 바뀌었으니 메모 리스트도 함께 업데이트 (추후 구현)
+                    self._refresh_memo_list(selected_rn)
                 else:
                     self.label_selected_rn.setText("선택된 RN 없음")
+                    if hasattr(self, 'listWidget_memos'):
+                        self.listWidget_memos.clear()
         except Exception as e:
             print(f"RN 표시 업데이트 실패: {e}")
 
@@ -206,7 +253,6 @@ class AlarmWidget(QWidget):
             
             # 리스트 위젯 생성
             self._da_request_list = QListWidget()
-            # 고정 높이 제한을 제거하여 영역을 가득 채우도록 설정
             
             # 폰트 크기 조정
             font = self._da_request_list.font()
@@ -312,4 +358,3 @@ class AlarmWidget(QWidget):
         self._special_note_dialog.show()
         self._special_note_dialog.raise_()
         self._special_note_dialog.activateWindow()
-
