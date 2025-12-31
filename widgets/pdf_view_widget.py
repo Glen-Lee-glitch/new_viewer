@@ -822,7 +822,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
     def _on_save_finished(self, output_path: str, success: bool):
         """PDF 저장이 완료되었을 때 호출된다."""
         if success:
-            QMessageBox.information(self, "저장 완료", f"'{output_path}'\n\n파일이 성공적으로 저장되었습니다.")
+            # QMessageBox.information(self, "저장 완료", f"'{output_path}'\n\n파일이 성공적으로 저장되었습니다.")
             
             # 지급 테이블 작업인 경우 give_works 테이블 업데이트
             if hasattr(self, '_saving_is_give_works'):
