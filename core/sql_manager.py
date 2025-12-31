@@ -1932,6 +1932,9 @@ def fetch_ev_required_rns(worker_name: str) -> list[str]:
     Returns:
         RN 목록 리스트
     """
+    if is_sample_data_mode():
+        return []
+
     if not worker_name:
         return []
     
@@ -1968,6 +1971,9 @@ def fetch_ev_complement_rns(worker_name: str) -> list[str]:
     Returns:
         RN 목록 리스트
     """
+    if is_sample_data_mode():
+        return []
+
     if not worker_name:
         return []
     
@@ -2003,6 +2009,9 @@ def fetch_chained_emails_rns(worker_name: str) -> list[str]:
     Returns:
         RN 목록 리스트
     """
+    if is_sample_data_mode():
+        return []
+
     if not worker_name:
         return []
     
