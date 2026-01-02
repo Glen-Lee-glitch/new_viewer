@@ -10,11 +10,12 @@ _active_toasts = []  # 토스트 알림 목록
 class Toast(QWidget):
     """화면 중앙 상단에 표시되는 토스트 알림 위젯"""
     
-    def __init__(self, title: str, message: str, parent=None, recent_received_date=None):
+    def __init__(self, title: str, message: str, parent=None, recent_received_date=None, sticky: bool = False):
         super().__init__(parent)
         self._opacity = 1.0
-        self._duration = 7000  # 4초 후 자동으로 사라짐
+        self._duration = 7000  # 7초 후 자동으로 사라짐
         self._recent_received_date = recent_received_date  # recent_received_date 저장
+        self._sticky = sticky  # sticky 모드 저장
         
         # 프레임리스, 항상 위에 표시
         self.setWindowFlags(
@@ -102,7 +103,7 @@ class Toast(QWidget):
         self._fade_animation.setEndValue(0.0)
         self._fade_animation.finished.connect(self.close)
         
-        # 자동 닫기 타이머
+        # 자동 닫기 타이머 (sticky가 아닐 때만 설정)
         self._close_timer = QTimer(self)
         self._close_timer.setSingleShot(True)
         self._close_timer.timeout.connect(self._start_fade_out)
@@ -126,8 +127,14 @@ class Toast(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setOpacity(self._opacity)
         
-        # 배경색 (빨간색 계열 - 경고 알림)
-        bg_color = QColor(220, 53, 69, 240)
+        # 배경색 설정
+        if self._sticky:
+            # Sticky 모드: 파란색 계열 (확인 요청)
+            bg_color = QColor(0, 123, 255, 240)
+        else:
+            # 일반 모드: 빨간색 계열 (경고 알림)
+            bg_color = QColor(220, 53, 69, 240)
+            
         painter.setBrush(bg_color)
         painter.setPen(Qt.PenStyle.NoPen)
         
@@ -142,7 +149,9 @@ class Toast(QWidget):
         """표시될 때 위치를 설정하고 타이머를 시작한다"""
         super().showEvent(event)
         self._position_toast()
-        self._close_timer.start(self._duration)
+        # sticky가 아닐 때만 자동 닫기 타이머 시작
+        if not self._sticky:
+            self._close_timer.start(self._duration)
     
     def _position_toast(self):
         """화면 중앙 상단에 토스트를 배치한다 (여러 개일 경우 쌓임)"""
@@ -223,7 +232,7 @@ def show_alert(title: str, message: str, parent=None):
     alert_box.show()
 
 
-def show_toast(title: str, message: str, parent=None, recent_received_date=None):
+def show_toast(title: str, message: str, parent=None, recent_received_date=None, sticky: bool = False):
     """
     화면 중앙 상단에 토스트 알림을 표시한다.
     최대 3개까지만 표시하며, recent_received_date가 더 최근인 것부터 우선적으로 표시한다.
@@ -233,6 +242,7 @@ def show_toast(title: str, message: str, parent=None, recent_received_date=None)
         message: 알림 메시지
         parent: 부모 위젯 (사용하지 않지만 호환성을 위해 유지)
         recent_received_date: 최근 접수 시간 (datetime 객체, 정렬 기준으로 사용)
+        sticky: 사용자가 닫기 전까지 사라지지 않는지 여부
     """
     global _active_toasts
     
@@ -262,7 +272,7 @@ def show_toast(title: str, message: str, parent=None, recent_received_date=None)
                 if oldest_toast in _active_toasts:
                     _active_toasts.remove(oldest_toast)
     
-    toast = Toast(title, message, parent, recent_received_date)
+    toast = Toast(title, message, parent, recent_received_date, sticky=sticky)
     
     # 닫힐 때 목록에서 제거
     def on_closed():

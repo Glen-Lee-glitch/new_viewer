@@ -19,6 +19,7 @@ class AlarmWidget(QWidget):
         # 현재 로그인한 작업자 이름 저장
         self._worker_name = worker_name
         self._special_note_dialog = None  # 비모달 다이얼로그 인스턴스 유지용
+        self._notified_chained_rns = set()  # 이미 알림을 띄운 (요청) RN 목록
         
         # UI 파일 로드
         ui_path = Path(__file__).parent.parent / "ui" / "alarm_widget.ui"
@@ -163,10 +164,14 @@ class AlarmWidget(QWidget):
             return
             
         from core.sql_manager import fetch_all_ev_required_rns
+        from widgets.alert_dialog import show_toast
+
         try:
             rn_data_list = fetch_all_ev_required_rns(self._worker_name)
             self._ev_required_list.clear()
             
+            current_chained_rns = set()
+
             if rn_data_list:
                 for rn, source_type in rn_data_list:
                     prefix = ""
@@ -174,16 +179,29 @@ class AlarmWidget(QWidget):
                         prefix = "(EV) "
                     elif source_type == 'chained_emails':
                         prefix = "(요청) "
+                        current_chained_rns.add(rn)
+                        
+                        # 새로운 (요청) 건인 경우 알림 띄우기
+                        if rn not in self._notified_chained_rns:
+                            show_toast(
+                                title="[확인 요청] 추가 메일 수신",
+                                message=f"RN: {rn}\n추가 서류 또는 문의 메일이 도착했습니다.",
+                                sticky=True
+                            )
+                            self._notified_chained_rns.add(rn)
                     
                     self._ev_required_list.addItem(f"{prefix}{rn}")
             else:
                 self._ev_required_list.addItem("내역 없음")
+            
+            # 리스트에 없는(처리된) RN은 알림 기록에서 제거 (나중에 다시 올 경우 알림을 위해)
+            # 단, 이 방식은 리스트에 있는 동안만 유지하길 원한다면 사용
+            # self._notified_chained_rns = self._notified_chained_rns.intersection(current_chained_rns)
                 
         except Exception as e:
             print(f"서류미비 목록 로드 중 오류: {e}")
             self._ev_required_list.clear()
             self._ev_required_list.addItem("로드 실패")
-
     def _on_ev_required_item_double_clicked(self, item):
         """서류미비 리스트 아이템 더블 클릭 시 작업 요청 시그널을 발생시킨다."""
         text = item.text()
