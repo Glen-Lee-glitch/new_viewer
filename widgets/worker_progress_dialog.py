@@ -14,7 +14,8 @@ from core.sql_manager import (
     fetch_today_completed_worker_stats,
     fetch_today_impossible_list,
     fetch_today_future_apply_stats,
-    fetch_today_email_count
+    fetch_today_email_count,
+    fetch_today_processing_list
 )
 
 class ClickableCard(QWidget):
@@ -181,7 +182,10 @@ class WorkerProgressDialog(QDialog):
             clickable=True, onClick=self._show_pipeline_stats,
             tooltip="고유 RN 수(중복 메일 포함 수)"
         )
-        self._create_summary_card("processing", "처리중", "#f1c40f")
+        self._create_summary_card(
+            "processing", "처리중", "#f1c40f",
+            clickable=True, onClick=self._show_processing_list
+        )
         self._create_summary_card(
             "completed", "완료", "#2ecc71", 
             clickable=True, onClick=self._show_completed_stats,
@@ -204,7 +208,7 @@ class WorkerProgressDialog(QDialog):
         if tooltip:
             card.setToolTip(tooltip)
         else:
-            card.setToolTip(f"<b>{label}</b> 상세 현황")
+            card.setToolTip(f"퇴근 시 있으면 안됌")
             
         card.setStyleSheet(f"""
             QWidget {{
@@ -339,6 +343,53 @@ class WorkerProgressDialog(QDialog):
             count = fetch_today_email_count()
             self._show_message_in_chart(f"금일 수신된 총 이메일 건수: {count}건")
             self.current_chart_type = 'pipeline'
+        except Exception as e:
+            self._show_message_in_chart(f"데이터 로드 실패: {str(e)}")
+            self.current_chart_type = None
+
+    def _show_processing_list(self):
+        """처리중 건에 대한 상세 목록을 보여준다 (토글 방식)."""
+        if self.current_chart_type == 'processing':
+            self._show_message_in_chart("상단의 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
+            self.current_chart_type = None
+            return
+            
+        try:
+            items = fetch_today_processing_list()
+            
+            self._clear_layout(self.chart_container.layout())
+            if self.chart_container.layout() is None:
+                layout = QVBoxLayout()
+                self.chart_container.setLayout(layout)
+            
+            if not items:
+                self._show_message_in_chart("처리 중인 데이터가 없습니다.")
+                self.current_chart_type = 'processing'
+                return
+            
+            table = QTableWidget()
+            table.setColumnCount(2)
+            table.setHorizontalHeaderLabels(["RN", "상태"])
+            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            
+            self._apply_table_style(table)
+            
+            table.setRowCount(len(items))
+            for i, item in enumerate(items):
+                rn_item = QTableWidgetItem(str(item.get('RN', '')))
+                rn_item.setFlags(rn_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                
+                status_item = QTableWidgetItem(str(item.get('status', '')))
+                status_item.setFlags(status_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                
+                table.setItem(i, 0, rn_item)
+                table.setItem(i, 1, status_item)
+            
+            self.chart_container.layout().addWidget(table)
+            self.current_chart_type = 'processing'
+            
         except Exception as e:
             self._show_message_in_chart(f"데이터 로드 실패: {str(e)}")
             self.current_chart_type = None

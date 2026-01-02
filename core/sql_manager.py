@@ -707,6 +707,34 @@ def fetch_daily_status_counts() -> dict:
             'email_pipeline': 0
         }
 
+def fetch_today_processing_list() -> list:
+    """
+    금일 접수된 건 중 '처리중' 상태인 건들의 리스트를 조회한다.
+    (처리완료, 신청불가, 미비/보류, 추후 신청이 아닌 모든 건)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT "RN", COALESCE(status, '신규') as status
+                FROM rns
+                WHERE original_received_date::date = %s
+                  AND (status IS NULL OR status NOT IN (
+                      '신청불가', '처리완료', '서류미비 요청', 
+                      '서류미비 도착', 'EV보완요청', '중복메일', '추후 신청'
+                  ))
+                ORDER BY "RN" ASC
+            """
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 def fetch_gemini_contract_results(rn: str) -> dict:
     """
     analysis_results 테이블의 '구매계약서' JSONB 컬럼에서 RN으로 데이터를 조회한다. (PostgreSQL 버전)
