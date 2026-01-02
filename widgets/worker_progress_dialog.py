@@ -116,6 +116,18 @@ class WorkerProgressDialog(QDialog):
 
     def _setup_ui(self):
         """UI 컴포넌트를 설정한다."""
+        # 전역 스타일시트 (툴팁 스타일 포함)
+        self.setStyleSheet(self.styleSheet() + """
+            QToolTip {
+                background-color: #2c3e50;
+                color: #ecf0f1;
+                border: 1px solid #3498db;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 12px;
+            }
+        """)
+
         # 버튼 연결
         self.close_button.clicked.connect(self.accept)
         self.refresh_button.clicked.connect(self._load_overall_status)
@@ -179,6 +191,9 @@ class WorkerProgressDialog(QDialog):
                 card.clicked.connect(onClick)
         else:
             card = QWidget()
+        
+        # 툴팁 기본 틀 설정 (내용은 나중에 구성)
+        card.setToolTip(f"<b>{label}</b> 상세 현황")
             
         card.setStyleSheet(f"""
             QWidget {{
@@ -191,11 +206,30 @@ class WorkerProgressDialog(QDialog):
                 background-color: {'#34495e' if clickable else '#2c3e50'};
             }}
         """)
-        card.setMinimumHeight(100)
+        card.setMinimumHeight(110) # 아이콘 추가로 인한 높이 확보
         
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(15, 15, 15, 15)
-        card_layout.setSpacing(5)
+        card_layout.setContentsMargins(12, 8, 8, 12) # 우상단 아이콘을 위해 마진 최적화
+        card_layout.setSpacing(0)
+        
+        # [추가] 우상단 '?' 도움말 아이콘
+        header_layout = QHBoxLayout()
+        header_layout.addStretch()
+        info_mark = QLabel("?")
+        info_mark.setFixedSize(18, 18)
+        info_mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_mark.setStyleSheet(f"""
+            QLabel {{
+                color: {color};
+                background-color: #1a1a1a;
+                border: 1px solid {color};
+                border-radius: 9px;
+                font-size: 11px;
+                font-weight: bold;
+            }}
+        """)
+        header_layout.addWidget(info_mark)
+        card_layout.addLayout(header_layout)
         
         val_label = QLabel("0")
         val_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
