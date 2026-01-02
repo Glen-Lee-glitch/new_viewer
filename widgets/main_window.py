@@ -135,8 +135,8 @@ class MainWindow(QMainWindow):
         self._alarm_widget.show()
         self._todo_widget.hide()
 
-        # 상태바에 네비게이션 위젯 추가
-        self.ui_status_bar.addPermanentWidget(self.ui_nav_widget)
+        # 상태바에 네비게이션 위젯 추가 (왼쪽부터 배치하고 남은 공간을 채우도록 stretch 부여)
+        self.ui_status_bar.insertWidget(0, self.ui_nav_widget, 1)
         
         # 라벨 포맷 설정
         if hasattr(self, 'database_updated_time_label'):
