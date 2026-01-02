@@ -176,33 +176,33 @@ class PdfLoadWidget(QWidget):
     
     def _handle_give_works_cell_clicked(self, row, column):
         """지급 테이블 셀 클릭 시 처리"""
-        # 버튼 컬럼(5번) 클릭 시 RN 출력 및 파일 검색
-        if column == 5:
+        # 버튼 컬럼(4번) 클릭 시 RN 출력 및 파일 검색
+        if column == 4:
             table = self.tableWidget
             rn_item = table.item(row, 0)  # RN은 0번 컬럼
             if rn_item:
                 rn = rn_item.text().strip()
                 print(f"[지급 시작] RN: {rn}")
                 
-                # 현재 작업자 이름으로 give_works 테이블 업데이트 (신청자가 비어있을 때만)
-                worker_item = table.item(row, 1)  # 신청자 컬럼(1번)
+                # 현재 작업자 이름으로 payments 테이블 업데이트 (작업자가 비어있을 때만)
+                worker_item = table.item(row, 1)  # 작업자 컬럼(1번)
                 existing_worker = worker_item.text().strip() if worker_item else ""
                 
                 if existing_worker:
-                    print(f"[지급 시작] 신청자 업데이트 건너뜀: 이미 '{existing_worker}'로 할당됨")
+                    print(f"[지급 시작] 작업자 업데이트 건너뜀: 이미 '{existing_worker}'로 할당됨")
                 elif self._worker_name:
+                    # sql_manager.py에서 업데이트된 PostgreSQL용 함수 사용
                     success = update_give_works_worker(rn, self._worker_name)
                     if success:
-                        print(f"[지급 시작] 신청자 업데이트 완료: {self._worker_name}")
-                        # 테이블의 신청자 컬럼(1번)도 업데이트
+                        print(f"[지급 시작] 작업자 업데이트 완료: {self._worker_name}")
                         if worker_item:
                             worker_item.setText(self._worker_name)
                     else:
-                        print(f"[지급 시작] 신청자 업데이트 실패")
+                        print(f"[지급 시작] 작업자 업데이트 실패")
                 else:
                     print(f"[지급 시작] 작업자 이름이 설정되지 않았습니다.")
                 
-                # 파일 경로 설정
+                # 파일 경로 설정 (기존 로직 유지)
                 search_dir = Path(get_converted_path(r"C:\Users\HP\Desktop\Tesla\24q4\지급\지급서류\merged"))
                 
                 # RN이 포함된 PDF 파일 검색
@@ -218,40 +218,16 @@ class PdfLoadWidget(QWidget):
     
     def _handle_give_works_cell_double_clicked(self, row, column):
         """지급 테이블 셀 더블 클릭 시 처리"""
-        # 메모 컬럼(4번) 더블 클릭 시 메모 다이얼로그 열기
-        if column == 4:
-            table = self.tableWidget
-            rn_item = table.item(row, 0)  # RN은 0번 컬럼
-            memo_item = table.item(row, 4)  # 메모 컬럼(4번)
-            
-            if rn_item:
-                rn = rn_item.text().strip()
-                # 전체 메모 가져오기 (UserRole에 저장된 전체 텍스트)
-                memo_full = ""
-                if memo_item:
-                    memo_full = memo_item.data(Qt.ItemDataRole.UserRole) or memo_item.text()
-                
-                # 메모 다이얼로그 열기
-                dialog = GiveMemoDialog(parent=self)
-                # RN 설정
-                dialog.set_rn(rn)
-                # RN 라벨에 RN 번호 설정
-                if hasattr(dialog, 'rn_label'):
-                    dialog.rn_label.setText(rn)
-                # textEdit에 전체 메모 표시
-                dialog.set_memo(memo_full)
-                dialog.exec()
-                
-                # 저장 후 테이블 새로고침
-                self.populate_give_works_rows()
+        # 메모 컬럼이 현재 구성에 없으므로 일단 패스 (나중에 필요시 추가)
+        pass
     
     def setup_give_works_table(self):
         """지급 테이블 위젯 초기 설정"""
         table = self.tableWidget
         
-        # 컬럼 수 6개로 증가 (기존 5개 + 버튼 컬럼)
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(['RN', '작업자', '지역', '상태', '메모', 'PDF열기'])
+        # 컬럼 수 5개로 조정 (RN, 작업자, 지역, 상태, PDF열기)
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(['RN', '작업자', '지역', '상태', 'PDF열기'])
 
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -259,8 +235,8 @@ class PdfLoadWidget(QWidget):
         # 셀 편집 비활성화
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         
-        # 마지막 컬럼(5번)에 버튼 델리게이트 적용
-        table.setItemDelegateForColumn(5, ButtonDelegate(table, "시작"))
+        # 마지막 컬럼(4번)에 버튼 델리게이트 적용
+        table.setItemDelegateForColumn(4, ButtonDelegate(table, "시작"))
         
         # 클릭 이벤트 연결
         table.cellClicked.connect(self._handle_give_works_cell_clicked)
@@ -271,13 +247,46 @@ class PdfLoadWidget(QWidget):
     
     def populate_give_works_rows(self):
         """
-        TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-        give_works 테이블 데이터를 지급 테이블 위젯에 채운다.
+        payments 테이블 데이터를 지급 테이블 위젯에 채운다.
         """
         table = self.tableWidget
-        # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-        # 아무것도 표시하지 않도록 테이블만 클리어
-        table.setRowCount(0)
+        try:
+            df = fetch_give_works()
+        except Exception as error:
+            print(f"지급 데이터 로드 실패: {error}")
+            table.setRowCount(0)
+            return
+
+        if df is None or df.empty:
+            print("[populate_give_works_rows] 조회된 지급 데이터 없음.")
+            table.setRowCount(0)
+            return
+
+        table.setRowCount(len(df))
+        for row_index, (_, row) in enumerate(df.iterrows()):
+            # 데이터 객체 생성
+            row_data = {
+                'rn': self._sanitize_text(row.get('RN', '')),
+                'worker': self._sanitize_text(row.get('worker', '')),
+                'region': self._sanitize_text(row.get('region', '')),
+                'status': self._sanitize_text(row.get('give_status', '')),
+                'memo': self._sanitize_text(row.get('memo', '')),
+                'give_file_path': self._sanitize_text(row.get('give_file_path', ''))
+            }
+            
+            # RN 아이템
+            rn_item = QTableWidgetItem(row_data['rn'])
+            rn_item.setData(Qt.ItemDataRole.UserRole, row_data) # 전체 데이터 저장
+            table.setItem(row_index, 0, rn_item)
+            
+            # 나머지 아이템
+            table.setItem(row_index, 1, QTableWidgetItem(row_data['worker']))
+            table.setItem(row_index, 2, QTableWidgetItem(row_data['region']))
+            table.setItem(row_index, 3, QTableWidgetItem(row_data['status']))
+            
+            # 버튼 컬럼 아이템 추가 (4번) - 델리게이트가 그려줌
+            button_item = QTableWidgetItem("")
+            table.setItem(row_index, 4, button_item)
 
     def populate_recent_subsidy_rows(self):
         """최근 지원금 신청 데이터를 테이블에 채운다."""

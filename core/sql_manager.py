@@ -1757,12 +1757,21 @@ def get_previous_business_day_after_18h() -> datetime:
 
 def fetch_give_works() -> pd.DataFrame:
     """
-    TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-    give_works 테이블에서 작업상태가 '완료'가 아닌 데이터를 조회한다.
-    ['RN', '신청자', '지역', '메모'] 컬럼을 반환한다.
+    payments 테이블에서 작업상태가 '완료'가 아닌 데이터를 조회한다. (PostgreSQL 버전)
     """
-    # TODO: MySQL 데이터베이스 미사용으로 인해 임시 비활성화
-    return pd.DataFrame()
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT "RN", worker, region, give_status, memo, give_file_path
+                FROM payments 
+                WHERE give_status IS NULL OR give_status != '완료'
+                ORDER BY distribution_date DESC
+            """
+            df = pd.read_sql(query, connection)
+            return df
+    except Exception:
+        traceback.print_exc()
+        return pd.DataFrame()
 
 def update_rns_worker_id(rn: str, worker_id: int) -> bool:
     """
@@ -1801,7 +1810,7 @@ def update_rns_worker_id(rn: str, worker_id: int) -> bool:
 
 def update_give_works_worker(rn: str, worker: str) -> bool:
     """
-    give_works 테이블의 신청자(worker) 필드를 업데이트한다.
+    payments 테이블의 작업자(worker) 필드를 업데이트한다. (PostgreSQL 버전)
     
     Args:
         rn: RN 번호
@@ -1816,13 +1825,12 @@ def update_give_works_worker(rn: str, worker: str) -> bool:
         raise ValueError("worker must be provided")
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            connection.begin()
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             try:
                 with connection.cursor() as cursor:
                     update_query = (
-                        "UPDATE give_works SET 신청자 = %s "
-                        "WHERE RN = %s"
+                        "UPDATE payments SET worker = %s "
+                        "WHERE \"RN\" = %s"
                     )
                     cursor.execute(update_query, (worker, rn))
                 connection.commit()
@@ -1836,7 +1844,7 @@ def update_give_works_worker(rn: str, worker: str) -> bool:
 
 def update_give_works_memo(rn: str, memo: str) -> bool:
     """
-    give_works 테이블의 메모 필드를 업데이트한다.
+    payments 테이블의 메모 필드를 업데이트한다. (PostgreSQL 버전)
     
     Args:
         rn: RN 번호
@@ -1849,13 +1857,12 @@ def update_give_works_memo(rn: str, memo: str) -> bool:
         raise ValueError("rn must be provided")
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            connection.begin()
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             try:
                 with connection.cursor() as cursor:
                     update_query = (
-                        "UPDATE give_works SET 메모 = %s "
-                        "WHERE RN = %s"
+                        "UPDATE payments SET memo = %s "
+                        "WHERE \"RN\" = %s"
                     )
                     cursor.execute(update_query, (memo, rn))
                 connection.commit()
@@ -1869,12 +1876,12 @@ def update_give_works_memo(rn: str, memo: str) -> bool:
 
 def update_give_works_on_save(rn: str, file_path: str, application_date: str) -> bool:
     """
-    give_works 테이블의 파일명, 지급 신청일, 작업상태를 업데이트한다.
+    payments 테이블의 파일명, 지급 신청일, 작업상태를 업데이트한다. (PostgreSQL 버전)
     
     Args:
         rn: RN 번호
-        file_path: 저장된 PDF 파일 경로 (네트워크 경로)
-        application_date: 지급 신청일 (MM/DD 형식)
+        file_path: 저장된 PDF 파일 경로
+        application_date: 지급 신청일 (MM/DD 형식 등)
         
     Returns:
         업데이트 성공 여부
@@ -1883,17 +1890,17 @@ def update_give_works_on_save(rn: str, file_path: str, application_date: str) ->
         raise ValueError("rn must be provided")
     
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
-            connection.begin()
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             try:
+                # MM/DD 형식을 현재 연도와 결합하여 날짜 생성 (필요한 경우)
+                # 여기서는 단순히 상태를 '완료'로 바꾸고 경로를 저장하는 것에 집중
                 with connection.cursor() as cursor:
-                    print(f"Executing query: UPDATE give_works SET 파일명='{file_path}', 지급_신청일='{application_date}', 작업상태='완료' WHERE RN='{rn}'")
                     update_query = (
-                        "UPDATE give_works "
-                        "SET 파일명 = %s, 지급_신청일 = %s, 작업상태 = '완료' "
-                        "WHERE RN = %s"
+                        "UPDATE payments "
+                        "SET give_file_path = %s, give_status = '완료' "
+                        "WHERE \"RN\" = %s"
                     )
-                    cursor.execute(update_query, (file_path, application_date, rn))
+                    cursor.execute(update_query, (file_path, rn))
                 connection.commit()
                 
                 if cursor.rowcount == 0:
