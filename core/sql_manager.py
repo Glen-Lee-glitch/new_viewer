@@ -1332,7 +1332,7 @@ def get_chained_emails_content_by_thread_id(thread_id: str) -> str | None:
     
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            query = "SELECT content FROM chained_emails WHERE thread_id = %s LIMIT 1"
+            query = "SELECT content FROM chained_emails WHERE thread_id = %s ORDER BY received_date DESC LIMIT 1"
             with connection.cursor() as cursor:
                 cursor.execute(query, (thread_id,))
                 row = cursor.fetchone()
@@ -1356,7 +1356,7 @@ def get_chained_emails_file_path_by_thread_id(thread_id: str) -> str | None:
     
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
-            query = "SELECT chained_file_path FROM chained_emails WHERE thread_id = %s LIMIT 1"
+            query = "SELECT chained_file_path FROM chained_emails WHERE thread_id = %s ORDER BY received_date DESC LIMIT 1"
             with connection.cursor() as cursor:
                 cursor.execute(query, (thread_id,))
                 row = cursor.fetchone()
