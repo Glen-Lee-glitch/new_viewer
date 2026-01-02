@@ -1757,14 +1757,14 @@ def get_previous_business_day_after_18h() -> datetime:
 
 def fetch_give_works() -> pd.DataFrame:
     """
-    payments 테이블에서 작업상태가 '완료'가 아닌 데이터를 조회한다. (PostgreSQL 버전)
+    payments 테이블에서 작업상태가 '지급신청 완료'가 아닌 데이터를 조회한다. (PostgreSQL 버전)
     """
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = """
                 SELECT "RN", worker, region, give_status, memo, give_file_path
                 FROM payments 
-                WHERE give_status IS NULL OR give_status != '완료'
+                WHERE give_status IS NULL OR give_status NOT IN ('지급신청 완료')
                 ORDER BY distribution_date DESC
             """
             df = pd.read_sql(query, connection)
