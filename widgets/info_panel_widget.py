@@ -369,6 +369,8 @@ class InfoPanelWidget(QWidget):
 
     def update_basic_info(self, name: str, region: str, special_note: str, rn: str = "", address: str = ""):
         """기본 정보를 업데이트한다."""
+        self._current_rn = rn  # RN 저장
+        
         if hasattr(self, 'lineEdit_name'):
             self.lineEdit_name.setText(name)
         self.lineEdit_region.setText(region)
@@ -377,9 +379,19 @@ class InfoPanelWidget(QWidget):
             self.lineEdit_address.setText(address)
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.setText(rn)
+            
+        # RN이 있으면 작업 리스트 및 메모 업데이트
+        if rn:
+            self.update_task_list(rn, is_initial_load=True)
+            self._refresh_memo_list()
 
     def update_task_list(self, rn: str, is_initial_load: bool = False):
         """RN 에러 데이터(validation_errors)를 기반으로 작업 리스트 체크박스를 동적으로 업데이트한다."""
+        if not rn:
+            return
+            
+        self._current_rn = rn  # RN 업데이트 보장
+
         # EV 보완 모드일 경우 작업 리스트(체크박스) 업데이트를 건너뜀
         if self._is_ev_complement_mode:
             # 단, 내부 데이터 처리를 위해 필요한 경우 로직 분리 가능
@@ -400,9 +412,15 @@ class InfoPanelWidget(QWidget):
             error_rows = fetch_error_results(rn)
             
             for row in error_rows:
-                # validation_errors만 처리
+                # 1. null_fields 처리 (리스트 형태)
+                null_fields = row.get('null_fields', [])
+                if isinstance(null_fields, list) and null_fields:
+                    doc_type = row.get('document_type', '알 수 없는 서류')
+                    fields_str = ", ".join(null_fields)
+                    check_items.append(f"누락({doc_type}): {fields_str}")
+
+                # 2. validation_errors 처리 (딕셔너리 형태)
                 validation_errors = row.get('validation_errors', {})
-                
                 if isinstance(validation_errors, dict):
                     for err_type, err_details in validation_errors.items():
                         # 값이 리스트든 문자열이든 상관없이 하나의 항목으로 표시
