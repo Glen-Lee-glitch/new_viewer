@@ -176,14 +176,22 @@ class WorkerProgressDialog(QDialog):
         self.summary_widgets.clear()
         
         # 초기 카드 생성 및 참조 저장
-        self._create_summary_card("pipeline", "파이프라인", "#3498db", clickable=True, onClick=self._show_pipeline_stats)
+        self._create_summary_card(
+            "pipeline", "파이프라인", "#3498db", 
+            clickable=True, onClick=self._show_pipeline_stats,
+            tooltip="고유 RN 수(중복 메일 포함 수)"
+        )
         self._create_summary_card("processing", "처리중", "#f1c40f")
-        self._create_summary_card("completed", "완료", "#2ecc71", clickable=True, onClick=self._show_completed_stats)
+        self._create_summary_card(
+            "completed", "완료", "#2ecc71", 
+            clickable=True, onClick=self._show_completed_stats,
+            tooltip="작업자 상태 처리완료 수(금일 EV 상 신청완료 건)"
+        )
         self._create_summary_card("deferred", "미비/보류", "#e74c3c")
         self._create_summary_card("impossible", "신청불가", "#95a5a6", clickable=True, onClick=self._show_impossible_list)
         self._create_summary_card("future_apply", "추후 신청", "#9b59b6", clickable=True, onClick=self._show_future_apply_stats)
         
-    def _create_summary_card(self, key: str, label: str, color: str, clickable=False, onClick=None):
+    def _create_summary_card(self, key: str, label: str, color: str, clickable=False, onClick=None, tooltip=None):
         """요약 카드를 생성하고 레이아웃에 추가한다."""
         if clickable:
             card = ClickableCard()
@@ -192,8 +200,11 @@ class WorkerProgressDialog(QDialog):
         else:
             card = QWidget()
         
-        # 툴팁 기본 틀 설정 (내용은 나중에 구성)
-        card.setToolTip(f"<b>{label}</b> 상세 현황")
+        # 툴팁 설정
+        if tooltip:
+            card.setToolTip(tooltip)
+        else:
+            card.setToolTip(f"<b>{label}</b> 상세 현황")
             
         card.setStyleSheet(f"""
             QWidget {{
