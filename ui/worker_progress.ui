@@ -74,6 +74,53 @@ QPushButton:pressed {
        </property>
       </spacer>
      </item>
+     <item>
+      <widget class="QComboBox" name="period_combo">
+       <property name="minimumSize">
+        <size>
+         <width>120</width>
+         <height>35</height>
+        </size>
+       </property>
+       <property name="styleSheet">
+        <string>QComboBox {
+    background-color: #34495e;
+    color: white;
+    border-radius: 5px;
+    padding-left: 10px;
+    font-weight: bold;
+}
+QComboBox::drop-down {
+    border: none;
+}
+QComboBox QAbstractItemView {
+    background-color: #34495e;
+    color: white;
+    selection-background-color: #455a64;
+}</string>
+       </property>
+       <item>
+        <property name="text">
+         <string>금일</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>익일</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>최근5일</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>1분기</string>
+        </property>
+       </item>
+      </widget>
+     </item>
     </layout>
    </item>
    <item>
