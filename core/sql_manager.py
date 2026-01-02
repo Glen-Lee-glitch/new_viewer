@@ -1502,6 +1502,7 @@ def insert_additional_note(
                             requirements = EXCLUDED.requirements,
                             other_detail = EXCLUDED.other_detail,
                             detail_info = EXCLUDED.detail_info,
+                            successed = false,
                             updated_at = CURRENT_TIMESTAMP
                     """
                     cursor.execute(query, (
