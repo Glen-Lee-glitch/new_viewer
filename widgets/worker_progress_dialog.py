@@ -119,6 +119,7 @@ class WorkerProgressDialog(QDialog):
         # 버튼 연결
         self.close_button.clicked.connect(self.accept)
         self.refresh_button.clicked.connect(self._load_overall_status)
+        self.period_combo.currentTextChanged.connect(self._on_period_changed)
         
         # 요약 정보 위젯 참조 저장소
         self.summary_widgets = {}
@@ -127,6 +128,27 @@ class WorkerProgressDialog(QDialog):
         # 요약 정보 레이아웃 초기화 (Placeholders)
         self._init_summary_ui()
     
+    def _on_period_changed(self, text):
+        """기간 변경 시 UI 처리"""
+        if text == "1분기":
+            # 요약 섹션 비우기
+            self._clear_layout(self.summary_layout)
+            self.summary_widgets.clear()
+            
+            # 차트 섹션 비우기
+            if self.chart_container.layout():
+                self._clear_layout(self.chart_container.layout())
+            
+            # 타이틀 업데이트
+            self.title_label.setText("1분기 업무 현황")
+        else:
+            # 기존 UI 구조 복구 (없는 경우에만)
+            if not self.summary_widgets:
+                self._init_summary_ui()
+            
+            # 데이터 로드 (현재는 금일 데이터만 로드됨)
+            self._load_overall_status()
+
     def _init_summary_ui(self):
         """요약 UI 구조를 초기화한다."""
         self._clear_layout(self.summary_layout)
