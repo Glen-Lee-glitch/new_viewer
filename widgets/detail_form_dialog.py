@@ -518,11 +518,17 @@ class DetailFormDialog(QDialog):
             self.label_children.setText("")
             
         # 9. 하단 레이아웃 가시성 제어 (공동명의, 다자녀, 청년생애, 기타)
+        is_foreigner = flags.get('외국인', False)
+        if is_foreigner:
+            self.label_etc.setText("외국인")
+        else:
+            self.label_etc.setText("")
+
         self._set_bottom_layout_visibility(
             show_joint=has_joint,  # 공동명의 second_person 정보가 있으면 표시
             show_multichild=has_multichild, 
             show_youth=flags.get('청년생애', False), 
-            show_etc=False # 기타 (아직 로직 없음)
+            show_etc=is_foreigner # 기타 (외국인 등)
         )
         
         # 9. RN 필드 표시 (항상 맨 아래에 표시)

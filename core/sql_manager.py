@@ -776,7 +776,8 @@ def check_gemini_flags(rn: str) -> dict:
                     ('공동명의' = ANY(r.special) OR (a."초본" IS NOT NULL AND a."초본"->>'second_person' IS NOT NULL)) AS "공동명의",
                     a."초본" IS NOT NULL AS "초본",
                     ('개인사업자' = ANY(r.special)) AS "개인사업자",
-                    ('법인' = ANY(r.special) OR a."법인" IS NOT NULL) AS "법인"
+                    ('법인' = ANY(r.special) OR a."법인" IS NOT NULL) AS "법인",
+                    ('외국인' = ANY(r.special)) AS "외국인"
                 FROM analysis_results a
                 JOIN rns r ON a."RN" = r."RN"
                 WHERE a."RN" = %s
@@ -792,7 +793,8 @@ def check_gemini_flags(rn: str) -> dict:
                         '공동명의': bool(row[3]),
                         '초본': bool(row[4]),
                         '개인사업자': bool(row[5]),
-                        '법인': bool(row[6])
+                        '법인': bool(row[6]),
+                        '외국인': bool(row[7])
                     }
                 return {}
     except Exception:
