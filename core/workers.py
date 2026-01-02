@@ -2,6 +2,7 @@ from PyQt6.QtCore import QObject, QRunnable, pyqtSignal
 from PyQt6.QtGui import QPixmap
 import time
 from pathlib import Path
+import pandas as pd
 
 from core.pdf_render import PdfRender
 from core.pdf_saved import compress_pdf_with_multiple_stages
@@ -14,11 +15,15 @@ class WorkerSignals(QObject):
     - error: 렌더링 오류 시 (페이지 번호, 에러 메시지)
     - save_finished: 저장 완료 시 (경로, 성공 여부)
     - save_error: 저장 오류 시 (에러 메시지)
+    - fetched: DB 조회 완료 시 (결과 데이터)
+    - fetch_error: DB 조회 오류 시 (에러 메시지)
     """
     finished = pyqtSignal(int, QPixmap)
     error = pyqtSignal(int, str)
     save_finished = pyqtSignal(str, bool)
     save_error = pyqtSignal(str)
+    fetched = pyqtSignal(object) # DataFrame 또는 dict 등 범용 객체
+    fetch_error = pyqtSignal(str)
 
 class PdfRenderWorker(QRunnable):
     """단일 PDF 페이지를 렌더링하는 Worker 스레드"""
@@ -82,6 +87,27 @@ class PdfSaveWorker(QRunnable):
             self.signals.save_finished.emit(self.output_path, success)
         except Exception as e:
             self.signals.save_error.emit(str(e))
+
+
+class DbFetchWorker(QRunnable):
+    """DB 조회를 비동기적으로 수행하기 위한 Worker"""
+
+    def __init__(self, fetch_func, *args, **kwargs):
+        super().__init__()
+        self.fetch_func = fetch_func
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
+
+    def run(self):
+        """백그라운드 스레드에서 DB 조회 함수 실행."""
+        try:
+            result = self.fetch_func(*self.args, **self.kwargs)
+            self.signals.fetched.emit(result)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.signals.fetch_error.emit(str(e))
 
 
 class BatchTestSignals(QObject):

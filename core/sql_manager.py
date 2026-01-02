@@ -89,31 +89,32 @@ def _build_subsidy_query_base():
         '  e.original_pdf_path AS original_filepath, '
         '  r.recent_thread_id, '
         '  0 AS file_rendered, '
-        '  0 AS "구매계약서", '
-        '  0 AS "초본", '
-        '  0 AS "공동명의", '
-        '  0 AS "다자녀", '
+        '  CASE WHEN a."구매계약서" IS NOT NULL THEN 1 ELSE 0 END AS "구매계약서", '
+        '  CASE WHEN a."초본" IS NOT NULL THEN 1 ELSE 0 END AS "초본", '
+        '  CASE WHEN a."초본"->\'second_person\' IS NOT NULL OR \'공동명의\' = ANY(r.special) THEN 1 ELSE 0 END AS "공동명의", '
+        '  CASE WHEN a."다자녀" IS NOT NULL OR \'다자녀\' = ANY(r.special) THEN 1 ELSE 0 END AS "다자녀", '
         '  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, '
         '  r.mail_count, '
-        '  NULL AS child_birth_date, '
-        '  NULL AS issue_date, '
-        '  0 AS chobon, '
-        '  NULL AS ai_계약일자, '
-        '  NULL AS ai_이름, '
-        '  NULL AS 전화번호, '
-        '  NULL AS 이메일, '
+        '  a."다자녀"->\'child_birth_date\' AS child_birth_date, '
+        '  a."초본"->>\'issue_date\' AS issue_date, '
+        '  CASE WHEN a."초본" IS NOT NULL THEN 1 ELSE 0 END AS chobon, '
+        '  a."구매계약서"->>\'order_date\' AS ai_계약일자, '
+        '  a."구매계약서"->>\'customer_name\' AS ai_이름, '
+        '  a."구매계약서"->>\'phone_number\' AS 전화번호, '
+        '  a."구매계약서"->>\'email\' AS 이메일, '
         '  r.model AS 차종, '
-        '  NULL AS page_number, '
-        '  NULL AS chobon_name, '
-        '  NULL AS chobon_birth_date, '
-        '  NULL AS chobon_address_1, '
-        '  0 AS is_법인, '
+        '  a."구매계약서"->>\'page_number\' AS page_number, '
+        '  COALESCE(a."초본"->\'first_person\'->>\'name\', a."초본"->>\'name\') AS chobon_name, '
+        '  COALESCE(a."초본"->\'first_person\'->>\'birth_date\', a."초본"->>\'birth_date\') AS chobon_birth_date, '
+        '  COALESCE(a."초본"->\'first_person\'->>\'address_1\', a."초본"->>\'address_1\') AS chobon_address_1, '
+        '  CASE WHEN r.special @> \'{법인}\' OR a."사업자등록증"->>\'is_corporation\' = \'true\' THEN 1 ELSE 0 END AS is_법인, '
         '  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, '
         '  \'\' AS outlier, '
         '  COALESCE(r.status, \'\') AS result '
         'FROM rns r '
         'LEFT JOIN emails e ON r.recent_thread_id = e.thread_id '
         'LEFT JOIN workers w ON r.worker_id = w.worker_id '
+        'LEFT JOIN analysis_results a ON r."RN" = a."RN" '
     )
 
 def fetch_recent_subsidy_applications():
@@ -294,7 +295,7 @@ def get_distinct_regions() -> list[str]:
 
 def fetch_application_data_by_rn(rn: str) -> dict | None:
     """
-    특정 RN 번호로 지원금 신청 및 이메일 정보를 조회하여 딕셔너리로 반환한다.
+    특정 RN 번호로 지원금 신청 및 이메일 정보를 조회하여 딕셔너리로 반환한다. (PostgreSQL 버전)
     """
     if not rn:
         return None
@@ -326,74 +327,71 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
         return result
 
     try:
-        with closing(pymysql.connect(**DB_CONFIG)) as connection:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = (
-                "SELECT sa.RN, sa.region, sa.worker, sa.name, sa.special_note, "
-                "       sa.finished_file_path, "  # finished_file_path 추가
-                "       e.attached_file_path AS original_filepath, "
-                "       sa.recent_thread_id, "
-                "       e.file_rendered, "
-                "       sa.urgent, "
-                "       sa.mail_count, "
-                "       gr.구매계약서, gr.초본, gr.공동명의, gr.다자녀, "
-                "       d.child_birth_date, cb.issue_date AS issue_date, " # cb.issue_date를 issue_date로 명시적 앨리어싱
-                "       cb.chobon, "
-                "       c.ai_계약일자, c.ai_이름, c.전화번호, c.이메일, c.차종, c.page_number, "
-                "       cb.name AS chobon_name, cb.birth_date AS chobon_birth_date, cb.address_1 AS chobon_address_1, "
-                "       biz.is_법인 "
-                "FROM subsidy_applications sa "
-                "LEFT JOIN emails e ON sa.recent_thread_id = e.thread_id "
-                "LEFT JOIN gemini_results gr ON sa.RN COLLATE utf8mb4_unicode_ci = gr.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN test_ai_다자녀 d ON sa.RN COLLATE utf8mb4_unicode_ci = d.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN test_ai_초본 cb ON sa.RN COLLATE utf8mb4_unicode_ci = cb.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN test_ai_구매계약서 c ON sa.RN COLLATE utf8mb4_unicode_ci = c.RN COLLATE utf8mb4_unicode_ci "
-                "LEFT JOIN test_ai_사업자등록증 biz ON sa.RN COLLATE utf8mb4_unicode_ci = biz.RN COLLATE utf8mb4_unicode_ci "
-                "WHERE sa.RN = %s"
+                "SELECT "
+                "  r.\"RN\", r.region, w.worker_name AS worker, r.customer AS name, "
+                "  array_to_string(r.special, ', ') AS special_note, "
+                "  r.file_path AS finished_file_path, "
+                "  e.original_pdf_path AS original_filepath, "
+                "  r.recent_thread_id, "
+                "  0 AS file_rendered, "
+                "  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, "
+                "  r.mail_count, "
+                "  a.\"구매계약서\" IS NOT NULL AS \"구매계약서\", "
+                "  a.\"초본\" IS NOT NULL AS \"초본\", "
+                "  a.\"공동명의\" IS NOT NULL OR '공동명의' = ANY(r.special) AS \"공동명의\", "
+                "  a.\"다자녀\" IS NOT NULL OR '다자녀' = ANY(r.special) AS \"다자녀\", "
+                "  a.\"다자녀\"->'child_birth_date' AS child_birth_date, "
+                "  a.\"초본\"->>'issue_date' AS issue_date, "
+                "  a.\"초본\" IS NOT NULL AS chobon, "
+                "  a.\"구매계약서\"->>'order_date' AS ai_계약일자, "
+                "  a.\"구매계약서\"->>'customer_name' AS ai_이름, "
+                "  a.\"구매계약서\"->>'phone_number' AS 전화번호, "
+                "  a.\"구매계약서\"->>'email' AS 이메일, "
+                "  r.model AS 차종, "
+                "  a.\"구매계약서\"->>'page_number' AS page_number, "
+                "  COALESCE(a.\"초본\"->'first_person'->>'name', a.\"초본\"->>'name') AS chobon_name, "
+                "  COALESCE(a.\"초본\"->'first_person'->>'birth_date', a.\"초본\"->>'birth_date') AS chobon_birth_date, "
+                "  COALESCE(a.\"초본\"->'first_person'->>'address_1', a.\"초본\"->>'address_1') AS chobon_address_1, "
+                "  (r.special @> '{법인}' OR a.\"사업자등록증\"->>'is_corporation' = 'true') AS is_법인 "
+                "FROM rns r "
+                "LEFT JOIN emails e ON r.recent_thread_id = e.thread_id "
+                "LEFT JOIN workers w ON r.worker_id = w.worker_id "
+                "LEFT JOIN analysis_results a ON r.\"RN\" = a.\"RN\" "
+                "WHERE r.\"RN\" = %s"
             )
             
-            with connection.cursor() as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
                 cursor.execute(query, (rn,))
-                columns = [col[0].strip() for col in cursor.description]
                 row = cursor.fetchone()
                 
-                print(f"[디버그 sql_manager] fetch_application_data_by_rn - SQL Columns: {columns}")
-                print(f"[디버그 sql_manager] fetch_application_data_by_rn - SQL Row: {row}")
-
                 if not row:
                     return None
                 
-                result = dict(zip(columns, row))
+                result = dict(row)
                 
-                # 이상치(outlier) 계산 로직 (fetch_recent_subsidy_applications의 로직 간소화 적용)
-                # 필요하다면 여기서 outlier 계산 로직을 추가하거나, 기본값만 설정
+                # 이상치(outlier) 계산 로직
                 result['outlier'] = '' 
-                # print(f"[디버그 sql_manager] fetch_application_data_by_rn - 초기 result[outlier]: {result['outlier']}")
-                # print(f"[디버그 sql_manager] fetch_application_data_by_rn - issue_date in result: {'issue_date' in result}, issue_date value: {result.get('issue_date')}")
 
-                # 계약일자 이상치 체크
-                if result['outlier'] != 'O':
-                    try:
-                        ai_계약일자 = result.get('ai_계약일자')
-                        # print(f"[디버그 sql_manager] ai_계약일자: {ai_계약일자}")
-                        if ai_계약일자 and isinstance(ai_계약일자, (str, datetime, date, pd.Timestamp)):
-                            contract_date_obj = None
-                            if isinstance(ai_계약일자, str):
-                                try:
-                                    contract_date_obj = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
-                                except ValueError:
-                                    pass
-                            elif isinstance(ai_계약일자, (datetime, date)):
-                                contract_date_obj = ai_계약일자 if isinstance(ai_계약일자, date) else ai_계약일자.date()
-                            elif isinstance(ai_계약일자, pd.Timestamp):
-                                contract_date_obj = ai_계약일자.date()
-
-                            if contract_date_obj and contract_date_obj < date(2025, 1, 1):
-                                result['outlier'] = 'O'
-                    except Exception:
-                        traceback.print_exc()
+                # 1. 계약일자 이상치 체크
+                try:
+                    ai_계약일자 = result.get('ai_계약일자')
+                    if ai_계약일자:
+                        contract_date_obj = None
+                        if isinstance(ai_계약일자, str):
+                            try:
+                                contract_date_obj = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
+                            except ValueError:
+                                pass
+                        
+                        if contract_date_obj and contract_date_obj < date(2025, 1, 1):
+                            result['outlier'] = 'O'
+                except Exception:
+                    pass
 
                 # 2. 초본 issue_date 체크
-                if result['outlier'] != 'O' and result.get('초본') == 1 and result.get('issue_date'):
+                if result['outlier'] != 'O' and result.get('초본') and result.get('issue_date'):
                      try:
                         issue_date = result['issue_date']
                         kst = pytz.timezone('Asia/Seoul')
@@ -402,31 +400,22 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                         issue_date_obj = None
                         if isinstance(issue_date, str):
                             try:
-                                issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date() # ISO 형식 시도
+                                issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
                             except ValueError:
-                                try:
-                                    issue_date_obj = datetime.strptime(issue_date.split()[0], "%Y-%m-%d").date()
-                                except ValueError:
-                                    pass
-                        elif isinstance(issue_date, (datetime, date)):
-                            issue_date_obj = issue_date if isinstance(issue_date, date) else issue_date.date()
-                        elif isinstance(issue_date, pd.Timestamp):
-                            issue_date_obj = issue_date.date()
+                                pass
 
-                        # print(f"[디버그 sql_manager] 초본 issue_date 체크 - issue_date_obj: {issue_date_obj}, today: {today}")
                         if issue_date_obj:
                             days_diff = (today - issue_date_obj).days
-                            # print(f"[디버그 sql_manager] 초본 issue_date 체크 - days_diff: {days_diff}")
                             if days_diff >= 31:
                                 result['outlier'] = 'O'
-                                # print(f"[디버그 sql_manager] 초본 issue_date 체크 - outlier 설정됨: {result['outlier']}")
                      except Exception:
-                         traceback.print_exc()
-
-                # 3. 다자녀 이상치 체크 (2명 이상)
-                # ... existing code ...
+                         pass
 
                 return result
+
+    except Exception:
+        traceback.print_exc()
+        return None
 
     except Exception:
         traceback.print_exc()
