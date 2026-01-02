@@ -310,13 +310,6 @@ QSplitter::handle:horizontal {
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="ui_test_button">
-       <property name="text">
-        <string>테스트</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QPushButton" name="ui_push_button_prev">
        <property name="text">
         <string>이전</string>

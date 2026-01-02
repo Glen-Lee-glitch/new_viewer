@@ -18,7 +18,6 @@ from qt_material import apply_stylesheet
 from core.pdf_render import PdfRender
 from core.pdf_saved import compress_pdf_with_multiple_stages
 from core.sql_manager import claim_subsidy_work, get_original_pdf_path_by_rn
-from core.workers import BatchTestSignals, PdfBatchTestWorker
 from core.utility import normalize_basic_info, get_converted_path
 from core.data_manage import is_sample_data_mode
 from widgets.pdf_load_widget import PdfLoadWidget
@@ -305,9 +304,6 @@ class MainWindow(QMainWindow):
         self.ui_push_button_next.clicked.connect(lambda: self.change_page(1))
         self.ui_push_button_reset.clicked.connect(self._prompt_save_before_reset)
         
-        # 테스트 버튼 시그널 연결
-        self.ui_test_button.clicked.connect(self.start_batch_test)
-        
         # 작업자 현황 버튼 시그널 연결
         self.pushButton_worker_progress.clicked.connect(self._open_worker_progress_dialog)
         
@@ -405,10 +401,6 @@ class MainWindow(QMainWindow):
     @property
     def statusBar(self):
         return self.ui_status_bar
-    
-    @property
-    def test_button(self):
-        return self.ui_test_button
     
     @property
     def pushButton_prev(self):
@@ -1842,90 +1834,7 @@ class MainWindow(QMainWindow):
         return name, region, special_note, rn
 
     
-    # === 테스트 관련 함수 ===
-
-    def start_batch_test(self):
-        """PDF 일괄 테스트를 시작한다 (test.py의 로직 사용)."""
-        self.ui_status_bar.showMessage("PDF 일괄 테스트를 시작합니다...", 0)
-        
-        # test.py의 batch_process_pdfs 함수를 백그라운드에서 실행
-        import sys
-        from pathlib import Path as TestPath
-        
-        # test.py 모듈 임포트
-        test_dir = TestPath(__file__).parent.parent / "test"
-        if str(test_dir) not in sys.path:
-            sys.path.insert(0, str(test_dir))
-        
-        try:
-            from test import batch_process_pdfs
-            
-            input_dir = r'C:\Users\HP\Desktop\files\테스트PDF'
-            output_dir = r'C:\Users\HP\Desktop\files\결과'
-            
-            # 백그라운드 스레드에서 실행
-            import threading
-            def run_test():
-                try:
-                    batch_process_pdfs(input_dir, output_dir)
-                    self.ui_status_bar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
-                except Exception as e:
-                    self.ui_status_bar.showMessage(f"테스트 중 오류 발생: {e}", 10000)
-            
-            thread = threading.Thread(target=run_test, daemon=True)
-            thread.start()
-            
-        except ImportError as e:
-            QMessageBox.critical(self, "오류", f"test.py 모듈을 찾을 수 없습니다: {e}")
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"테스트 시작 중 오류: {e}")
-
-    def _rotate_90_maybe_for_test(self):
-        """10% 확률로 현재 페이지를 90도 회전(첫 페이지 기준)"""
-        try:
-            import random
-            if self.renderer and self.renderer.get_page_count() > 0:
-                if self._pdf_view_widget.current_page != 0:
-                    self.go_to_page(0)
-                if random.random() < 0.10:
-                    self._pdf_view_widget.rotate_current_page_by_90_sync()
-        except Exception as e:
-            if not self.test_worker._is_stopped and self._pdf_view_widget.get_current_pdf_path():
-                filename = Path(self._pdf_view_widget.get_current_pdf_path()).name
-                self.test_worker.signals.error.emit(filename, f"회전 처리 중 오류: {e}")
-
-    def _focus_page2_maybe_for_test(self):
-        """50% 확률로 2페이지로 포커스를 이동 (존재 시)"""
-        try:
-            import random
-            if self.renderer and self.renderer.get_page_count() >= 2:
-                if random.random() < 0.50:
-                    self.go_to_page(1)
-        except Exception as e:
-            if not self.test_worker._is_stopped and self._pdf_view_widget.get_current_pdf_path():
-                filename = Path(self._pdf_view_widget.get_current_pdf_path()).name
-                self.test_worker.signals.error.emit(filename, f"포커스 이동 중 오류: {e}")
-
-    def _on_batch_test_error(self, filename: str, error_msg: str):
-        """일괄 테스트 중 오류 발생 시 호출될 슬롯"""
-        # 워커를 중지시켜 더 이상 진행되지 않도록 함
-        if self.test_worker:
-            self.test_worker.stop()
-
-        if filename:
-            title = f"'{filename}' 처리 중 오류"
-            message = f"파일 '{filename}'을 처리하는 중 오류가 발생하여 테스트를 중단합니다.\n\n오류: {error_msg}"
-        else:
-            title = "테스트 설정 오류"
-            message = f"테스트를 시작하는 중 오류가 발생했습니다.\n\n오류: {error_msg}"
-        
-        self.ui_status_bar.showMessage(f"오류로 테스트가 중단되었습니다: {error_msg}", 10000)
-        QMessageBox.critical(self, title, message)
-
-    def _on_batch_test_finished(self):
-        """일괄 테스트 완료 시 호출될 슬롯"""
-        self.ui_status_bar.showMessage("모든 PDF 파일 테스트를 성공적으로 완료했습니다.", 8000)
-        QMessageBox.information(self, "테스트 완료", "지정된 모든 PDF 파일의 열기/저장 테스트를 성공적으로 완료했습니다.")
+    # 문서 불러오기 기타
 
     def _load_original_document(self):
         """현재 로드된 PDF의 원본 파일을 불러와 다시 렌더링한다."""
