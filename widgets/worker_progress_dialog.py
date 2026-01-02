@@ -120,6 +120,7 @@ class WorkerProgressDialog(QDialog):
         self.close_button.clicked.connect(self.accept)
         self.refresh_button.clicked.connect(self._load_overall_status)
         self.period_combo.currentTextChanged.connect(self._on_period_changed)
+        self.export_report_button.clicked.connect(self._on_export_report)
         
         # 요약 정보 위젯 참조 저장소
         self.summary_widgets = {}
@@ -130,6 +131,9 @@ class WorkerProgressDialog(QDialog):
     
     def _on_period_changed(self, text):
         """기간 변경 시 UI 처리"""
+        # 보고서 추출 버튼 가시성 제어
+        self.export_report_button.setVisible(text in ["금일", "1분기"])
+        
         if text == "1분기":
             # 요약 섹션 비우기
             self._clear_layout(self.summary_layout)
@@ -148,6 +152,11 @@ class WorkerProgressDialog(QDialog):
             
             # 데이터 로드 (현재는 금일 데이터만 로드됨)
             self._load_overall_status()
+
+    def _on_export_report(self):
+        """보고서 추출 버튼 클릭 시 처리"""
+        period = self.period_combo.currentText()
+        QMessageBox.information(self, "보고서 추출", f"'{period}' 보고서 추출 기능을 준비 중입니다.")
 
     def _init_summary_ui(self):
         """요약 UI 구조를 초기화한다."""

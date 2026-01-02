@@ -166,6 +166,33 @@ QComboBox QAbstractItemView {
    <item>
     <layout class="QHBoxLayout" name="bottom_layout">
      <item>
+      <widget class="QPushButton" name="export_report_button">
+       <property name="minimumSize">
+        <size>
+         <width>120</width>
+         <height>35</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>보고서 추출</string>
+       </property>
+       <property name="styleSheet">
+        <string>QPushButton {
+    background-color: #27ae60;
+    color: white;
+    border-radius: 5px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #2ecc71;
+}
+QPushButton:pressed {
+    background-color: #219150;
+}</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacer_bottom">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
