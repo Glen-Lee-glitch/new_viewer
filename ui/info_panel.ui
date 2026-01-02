@@ -134,6 +134,20 @@
         </item>
        </layout>
       </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_address">
+        <item>
+         <widget class="QLabel" name="label_address">
+          <property name="text">
+           <string>주소: </string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEdit_address"/>
+        </item>
+       </layout>
+      </item>
      </layout>
     </widget>
    </item>

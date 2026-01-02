@@ -596,8 +596,8 @@ class MainWindow(QMainWindow):
         # alarm_widget에서 info_panel_widget으로 전환될 때 체크박스 초기화
         self._info_panel.reset_task_checkboxes()
 
-        name, region, special_note, rn = self._collect_pending_basic_info()
-        self._info_panel.update_basic_info(name, region, special_note, rn)
+        name, region, special_note, rn, address = self._collect_pending_basic_info()
+        self._info_panel.update_basic_info(name, region, special_note, rn, address)
 
         # 텍스트 삽입 라디오 버튼을 '일반'으로 초기화
         self._info_panel.reset_text_radio_buttons()
@@ -655,7 +655,7 @@ class MainWindow(QMainWindow):
             # RN이 있으면 현재 RN 설정 (저장 시 사용 등)
             self._current_rn = self._give_works_rn
         
-        self._info_panel.update_basic_info("", "", "", "")
+        self._info_panel.update_basic_info("", "", "", "", "")
         # 로컬 파일 열기 시 '원본 불러오기' 및 '추가서류' 액션 비활성화
         if hasattr(self, 'load_original_action'):
             self.load_original_action.setEnabled(False)
@@ -925,9 +925,19 @@ class MainWindow(QMainWindow):
 
     def _initialize_work_session(self, pdf_paths: list, metadata: dict, is_preprocessed: bool, rn_value: str, mail_content: str):
         """작업 세션을 초기화하고 문서를 로드하는 공통 로직을 수행한다."""
-        from core.sql_manager import fetch_ev_complement_memo
+        from core.sql_manager import fetch_ev_complement_memo, fetch_gemini_chobon_results
 
         self._pending_basic_info = normalize_basic_info(metadata)
+        
+        # 주소 정보 가져오기 (초본 데이터)
+        if rn_value:
+            chobon_data = fetch_gemini_chobon_results(rn_value)
+            if chobon_data:
+                addr1 = chobon_data.get('address_1', '') or ''
+                addr2 = chobon_data.get('address_2', '') or ''
+                full_address = f"{addr1} {addr2}".strip()
+                if self._pending_basic_info:
+                    self._pending_basic_info['address'] = full_address
         
         # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
         outlier_value = metadata.get('outlier', '')
@@ -1823,15 +1833,16 @@ class MainWindow(QMainWindow):
 
     # === 유틸리티 및 헬퍼 ===
 
-    def _collect_pending_basic_info(self) -> tuple[str, str, str, str]:
+    def _collect_pending_basic_info(self) -> tuple[str, str, str, str, str]:
         """대기 중인 기본 정보를 추출하여 튜플로 반환한다."""
-        info = self._pending_basic_info or {'name': "", 'region': "", 'special_note': "", 'rn': ""}
+        info = self._pending_basic_info or {'name': "", 'region': "", 'special_note': "", 'rn': "", 'address': ""}
         name = info.get('name', "")
         region = info.get('region', "")
         special_note = info.get('special_note', "")
         rn = info.get('rn', "")
+        address = info.get('address', "")
         self._pending_basic_info = info
-        return name, region, special_note, rn
+        return name, region, special_note, rn, address
 
     
     # 문서 불러오기 기타
@@ -1883,8 +1894,8 @@ class MainWindow(QMainWindow):
             # 보존된 기본 정보 복원
             if saved_basic_info:
                 self._pending_basic_info = saved_basic_info
-                name, region, special_note, rn = self._collect_pending_basic_info()
-                self._info_panel.update_basic_info(name, region, special_note, rn)
+                name, region, special_note, rn, address = self._collect_pending_basic_info()
+                self._info_panel.update_basic_info(name, region, special_note, rn, address)
             
             # RN 복원
             if saved_current_rn:

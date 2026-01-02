@@ -326,6 +326,8 @@ class InfoPanelWidget(QWidget):
             self.lineEdit_name.clear()
         self.lineEdit_region.clear()
         self.lineEdit_special.clear()
+        if hasattr(self, 'lineEdit_address'):
+            self.lineEdit_address.clear()
         self._current_rn = "" # RN 초기화
         self._initial_error_items.clear() # 초기 항목 세트도 초기화
         if hasattr(self, 'lineEdit_rn_num'):
@@ -365,23 +367,16 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'radioButton_1'):
             self.radioButton_1.setChecked(True)
 
-    def update_basic_info(self, name: str, region: str, special_note: str, rn: str = ""):
+    def update_basic_info(self, name: str, region: str, special_note: str, rn: str = "", address: str = ""):
         """기본 정보를 업데이트한다."""
         if hasattr(self, 'lineEdit_name'):
             self.lineEdit_name.setText(name)
         self.lineEdit_region.setText(region)
         self.lineEdit_special.setText(special_note)
+        if hasattr(self, 'lineEdit_address'):
+            self.lineEdit_address.setText(address)
         if hasattr(self, 'lineEdit_rn_num'):
             self.lineEdit_rn_num.setText(rn)
-        
-        self._current_rn = rn # 현재 RN 저장
-        self._initial_error_items.clear() # 새 RN이 로드되면 초기 항목 리셋 준비
-        
-        # RN 에러 데이터에 따라 작업 리스트 업데이트 (초기 로드)
-        self.update_task_list(rn, is_initial_load=True)
-        
-        # 메모 리스트 업데이트
-        self._refresh_memo_list()
 
     def update_task_list(self, rn: str, is_initial_load: bool = False):
         """RN 에러 데이터(validation_errors)를 기반으로 작업 리스트 체크박스를 동적으로 업데이트한다."""
