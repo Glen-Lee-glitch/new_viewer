@@ -118,6 +118,11 @@ class RegionDataFormWidget(QWidget):
             self.extra_docs_list.clear()
             for doc in apply_data.get('extra_docs', []):
                 self.extra_docs_list.addItem(doc)
+
+            # 지급 서류 리스트
+            self.payment_docs_list.clear()
+            for doc in apply_data.get('payment_docs', []):
+                self.payment_docs_list.addItem(doc)
             
             # 서류 발급일
             self.doc_date_combo.setCurrentText(apply_data.get('document_date', '30'))
@@ -186,7 +191,7 @@ class RegionDataFormWidget(QWidget):
         category_label.setStyleSheet("font-weight: bold;")
         
         self.category_combo = QComboBox()
-        self.category_combo.addItems(["선택해주세요", "지원신청서류", "공동명의 조건", "거주요건 조건", "우선순위 조건"])
+        self.category_combo.addItems(["선택해주세요", "지원신청서류", "공동명의 조건", "거주요건 조건", "우선순위 조건", "지급신청서류"])
         self.category_combo.setCurrentIndex(1) # '지원신청서류' 디폴트 선택
         self.category_combo.currentIndexChanged.connect(self._on_category_changed)
         self.category_combo.setStyleSheet("""
@@ -211,6 +216,7 @@ class RegionDataFormWidget(QWidget):
         self.stack.addWidget(self._create_joint_owner_page())      # index 2: 공동명의
         self.stack.addWidget(self._create_residence_page())        # index 3: 거주요건
         self.stack.addWidget(self._create_priority_page())         # index 4: 우선순위
+        self.stack.addWidget(self._create_payment_docs_page())     # index 5: 지급신청서류
         
         layout.addWidget(self.stack, stretch=1)
 
@@ -291,6 +297,7 @@ class RegionDataFormWidget(QWidget):
             foreigner_input = self.foreigner_input.text().strip()
             
         extra_docs = [self.extra_docs_list.item(i).text() for i in range(self.extra_docs_list.count())]
+        payment_docs = [self.payment_docs_list.item(i).text() for i in range(self.payment_docs_list.count())]
         doc_date = self.doc_date_combo.currentText()
         
         # (2) 공동명의 데이터 수집 (라디오 버튼)
@@ -363,6 +370,7 @@ class RegionDataFormWidget(QWidget):
                     "foreigner_input": foreigner_input
                 },
                 "extra_docs": extra_docs,
+                "payment_docs": payment_docs,
                 "document_date": doc_date
             }
         }
@@ -409,6 +417,70 @@ class RegionDataFormWidget(QWidget):
             
         except Exception as e:
             QMessageBox.critical(self, "DB 저장 오류", f"데이터베이스 저장 중 오류가 발생했습니다:\n{str(e)}")
+
+    def _create_payment_docs_page(self):
+        """지급신청서류 입력 페이지"""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        
+        group = QGroupBox("보조금 지급 신청 시 필요 서류")
+        g_layout = QVBoxLayout(group)
+        
+        self.payment_docs_list = QListWidget()
+        
+        # 항목 추가 레이아웃
+        add_layout = QHBoxLayout()
+        self.payment_input = QLineEdit()
+        self.payment_input.setPlaceholderText("서류 명칭 입력 (예: 통장사본, 지급신청서...)")
+        
+        add_btn = QPushButton("추가")
+        add_btn.setFixedWidth(60)
+        add_btn.clicked.connect(lambda: self._add_to_list(self.payment_input, self.payment_docs_list))
+        self.payment_input.returnPressed.connect(lambda: self._add_to_list(self.payment_input, self.payment_docs_list))
+        
+        add_layout.addWidget(self.payment_input)
+        add_layout.addWidget(add_btn)
+        
+        # 빠른 추가 (자주 쓰는 지급 서류)
+        quick_layout = QHBoxLayout()
+        common_payments = ["보조금 지급신청서", "통장사본", "차량등록증", "지방세 납세증명서"]
+        for name in common_payments:
+            btn = QPushButton(name)
+            btn.setStyleSheet("""
+                QPushButton { font-size: 11px; color: #0078d4; background: transparent; 
+                border: 1px solid #0078d4; border-radius: 10px; padding: 2px 10px; }
+            """)
+            btn.clicked.connect(lambda checked, n=name: self._add_to_list(None, self.payment_docs_list, n))
+            quick_layout.addWidget(btn)
+        quick_layout.addStretch()
+        
+        g_layout.addWidget(self.payment_docs_list)
+        g_layout.addLayout(add_layout)
+        g_layout.addLayout(quick_layout)
+        
+        tip = QLabel("※ 더블클릭하여 항목을 삭제할 수 있습니다.")
+        tip.setStyleSheet("color: #999; font-size: 11px;")
+        g_layout.addWidget(tip)
+        
+        self.payment_docs_list.itemDoubleClicked.connect(
+            lambda item: self.payment_docs_list.takeItem(self.payment_docs_list.row(item))
+        )
+        
+        layout.addWidget(group)
+        layout.addStretch()
+        return page
+
+    def _add_to_list(self, input_field, list_widget, text=None):
+        """리스트 위젯에 항목을 추가하는 공통 유틸리티"""
+        if text is None and input_field:
+            text = input_field.text().strip()
+            if input_field: input_field.clear()
+            
+        if text:
+            # 중복 체크
+            existing = [list_widget.item(i).text() for i in range(list_widget.count())]
+            if text not in existing:
+                list_widget.addItem(text)
 
     def _create_empty_page(self):
         page = QWidget()
