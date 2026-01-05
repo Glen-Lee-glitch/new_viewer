@@ -60,7 +60,7 @@ class DataEntryDialog(QDialog):
         category_label.setStyleSheet("font-weight: bold;")
         
         self.category_combo = QComboBox()
-        self.category_combo.addItems(["선택해주세요", "공통 사항", "개인/개인사업자", "법인/공공기관", "특수 조건(취약계층 등)"])
+        self.category_combo.addItems(["선택해주세요", "지원신청서류", "공동명의 조건", "거주요건 조건", "우선순위 조건"])
         self.category_combo.currentIndexChanged.connect(self._on_category_changed)
         self.category_combo.setStyleSheet("""
             QComboBox {
