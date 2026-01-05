@@ -23,6 +23,27 @@ from PyQt6.QtCore import Qt
 
 from core.data_manage import DB_CONFIG
 
+class DataEntryDialog(QDialog):
+    """공고문을 보며 데이터를 입력하는 창 (현재는 빈 오브젝트 placeholder)"""
+    def __init__(self, file_path, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("공고문 데이터 입력")
+        self.resize(400, 300)
+        
+        layout = QVBoxLayout(self)
+        self.label = QLabel(f"현재 확인 중인 파일:\n{os.path.basename(file_path)}")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label.setWordWrap(True)
+        
+        # '빈 오브젝트' 역할을 할 위젯 (나중에 입력 폼으로 대체될 영역)
+        self.placeholder_widget = QWidget()
+        self.placeholder_widget.setMinimumHeight(100)
+        self.placeholder_widget.setStyleSheet("border: 2px dashed #cccccc; background: #f9f9f9;")
+        
+        layout.addWidget(self.label)
+        layout.addWidget(self.placeholder_widget)
+        layout.addWidget(QLabel("데이터 입력 필드가 여기에 위치할 예정입니다."))
+
 class NotificationInfoDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -197,7 +218,14 @@ class NotificationInfoDialog(QDialog):
     def _on_file_double_clicked(self, item):
         file_path = item.text()
         if os.path.exists(file_path):
+            # 1. 파일 실행
             os.startfile(file_path)
+            
+            # 2. 데이터 입력 창 띄우기 (비모달 방식으로 띄워 공고문과 동시에 볼 수 있게 함)
+            entry_dialog = DataEntryDialog(file_path, self)
+            entry_dialog.show()
+            # 참조가 유지되도록 인스턴스 변수에 저장 (여러 개를 띄우고 싶다면 리스트 등으로 관리 가능)
+            self.current_entry_dialog = entry_dialog
 
 
 if __name__ == "__main__":
