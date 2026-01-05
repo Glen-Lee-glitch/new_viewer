@@ -75,11 +75,14 @@ class RegionDataFormWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.region = None
+        self.checked_status_list = {} # 대분류별 확인 상태 저장
         self._init_ui()
 
     def set_region(self, region):
         """지역 설정 및 UI 초기화 상태 변경"""
         self.region = region
+        # 지역 변경 시 상태 리스트 초기화 (load_data에서 채워짐)
+        self.checked_status_list = {}
         # 개인사업자 페이지의 지역명 라디오 버튼 업데이트
         if hasattr(self, 'rb_loc_region'):
             self.rb_loc_region.setText(region)
@@ -105,6 +108,9 @@ class RegionDataFormWidget(QWidget):
         """DB에서 불러온 데이터를 UI에 채웁니다."""
         if not data:
             return
+
+        # 0. 확인 상태 로드
+        self.checked_status_list = data.get('checked_status_list') or {}
 
         # 1. 지원신청서류 데이터 로드
         apply_data = data.get('notification_apply', {}).get('application_docs', {})
@@ -267,6 +273,36 @@ class RegionDataFormWidget(QWidget):
 
         # 3. 하단 버튼
         btn_layout = QHBoxLayout()
+        
+        # 왼쪽 정렬 버튼들 (확인 상태)
+        self.status_need_btn = QPushButton("확인필요")
+        self.status_done_btn = QPushButton("확인완료")
+        
+        for btn in [self.status_need_btn, self.status_done_btn]:
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedWidth(100)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #f0f0f0;
+                    color: #333;
+                    padding: 8px;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    font-size: 13px;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+            """)
+        
+        self.status_need_btn.clicked.connect(lambda: self._on_status_clicked("확인필요"))
+        self.status_done_btn.clicked.connect(lambda: self._on_status_clicked("확인완료"))
+        
+        btn_layout.addWidget(self.status_need_btn)
+        btn_layout.addWidget(self.status_done_btn)
+        
+        btn_layout.addStretch() # 중간을 띄워서 저장하기 버튼은 오른쪽으로
+        
         self.save_btn = QPushButton("저장하기")
         self.save_btn.clicked.connect(self._on_save_clicked)
         self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -284,7 +320,6 @@ class RegionDataFormWidget(QWidget):
             }
         """)
         
-        btn_layout.addStretch()
         btn_layout.addWidget(self.save_btn)
         layout.addLayout(btn_layout)
 
@@ -452,13 +487,14 @@ class RegionDataFormWidget(QWidget):
                     
                     # (2) 공고문 테이블 업데이트
                     update_query = """
-                        INSERT INTO 공고문 (region_id, notification_apply, notification_payment, co_name, residence_requirements, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, NOW())
+                        INSERT INTO 공고문 (region_id, notification_apply, notification_payment, co_name, residence_requirements, checked_status_list, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW())
                         ON CONFLICT (region_id) DO UPDATE 
                         SET notification_apply = COALESCE(공고문.notification_apply, '{}'::jsonb) || EXCLUDED.notification_apply,
                             notification_payment = EXCLUDED.notification_payment,
                             co_name = EXCLUDED.co_name,
                             residence_requirements = EXCLUDED.residence_requirements,
+                            checked_status_list = EXCLUDED.checked_status_list,
                             updated_at = NOW()
                     """
                     cursor.execute(update_query, (
@@ -466,7 +502,8 @@ class RegionDataFormWidget(QWidget):
                         json.dumps(app_docs_data),
                         json.dumps(payment_data),
                         json.dumps(co_name_data),
-                        residence_val
+                        residence_val,
+                        json.dumps(self.checked_status_list)
                     ))
                     conn.commit()
                     
@@ -959,6 +996,16 @@ class RegionDataFormWidget(QWidget):
     def _on_category_changed(self, index):
         self.stack.setCurrentIndex(index)
 
+    def _on_status_clicked(self, status):
+        """현재 선택된 대분류의 확인 상태를 업데이트합니다."""
+        category = self.category_combo.currentText()
+        if category == "선택해주세요":
+            QMessageBox.warning(self, "경고", "대분류를 먼저 선택해주세요.")
+            return
+            
+        self.checked_status_list[category] = status
+        QMessageBox.information(self, "상태 업데이트", f"'{category}' 항목의 상태가 '{status}'(으)로 설정되었습니다.\n저장하기 버튼을 눌러야 최종 반영됩니다.")
+
 class NotificationInfoDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1170,7 +1217,7 @@ class NotificationInfoDialog(QDialog):
             with closing(psycopg2.connect(**DB_CONFIG)) as conn:
                 with conn.cursor() as cursor:
                     query = """
-                        SELECT notification_apply, co_name, residence_requirements, notification_payment
+                        SELECT notification_apply, co_name, residence_requirements, notification_payment, checked_status_list
                         FROM 공고문 g
                         JOIN region_metadata r ON g.region_id = r.region_id
                         WHERE r.region = %s
@@ -1182,7 +1229,8 @@ class NotificationInfoDialog(QDialog):
                             'notification_apply': row[0],
                             'co_name': row[1],
                             'residence_requirements': row[2],
-                            'notification_payment': row[3]
+                            'notification_payment': row[3],
+                            'checked_status_list': row[4]
                         }
                         self.form_widget.load_data(existing_data)
                     else:
