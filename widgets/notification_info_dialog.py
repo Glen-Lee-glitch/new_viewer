@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QStackedWidget,
     QLineEdit,
+    QCheckBox,
     QFormLayout,
     QPushButton,
     QGroupBox,
@@ -212,12 +213,81 @@ class DataEntryDialog(QDialog):
         app_form_row.addWidget(self.app_form_path_edit)
         app_form_row.addWidget(app_form_btn)
         
+        common_layout.addLayout(app_form_row)
+        
         # 2. 구매계약서 (텍스트로만 표시)
         contract_label = QLabel("구매계약서")
         contract_label.setStyleSheet("color: #777; padding-left: 5px;")
-        
-        common_layout.addLayout(app_form_row)
         common_layout.addWidget(contract_label)
+
+        # 3. 구매 주체 선택 및 동적 항목 섹션
+        entity_layout = QHBoxLayout()
+        entity_label = QLabel("구매 주체")
+        entity_label.setFixedWidth(80)
+        self.entity_type_combo = QComboBox()
+        self.entity_type_combo.addItems(['개인', '개인사업자', '법인', '외국인'])
+        self.entity_type_combo.setStyleSheet("padding: 3px;")
+        
+        entity_layout.addWidget(entity_label)
+        entity_layout.addWidget(self.entity_type_combo)
+        common_layout.addLayout(entity_layout)
+
+        # 주체별 하위 항목 (StackedWidget)
+        self.entity_stack = QStackedWidget()
+        
+        # (1) 개인 페이지
+        person_page = QWidget()
+        person_layout = QHBoxLayout(person_page)
+        person_layout.setContentsMargins(85, 0, 0, 0) # 라벨 너비만큼 왼쪽 여백
+        self.chk_resident_reg = QCheckBox("주민등록등본")
+        self.chk_resident_reg.setChecked(True)
+        self.chk_resident_abstract = QCheckBox("주민등록초본")
+        self.chk_resident_abstract.setChecked(True)
+        person_layout.addWidget(self.chk_resident_reg)
+        person_layout.addWidget(self.chk_resident_abstract)
+        person_layout.addStretch()
+        
+        # (2) 개인사업자 페이지
+        indiv_biz_page = QWidget()
+        indiv_biz_layout = QHBoxLayout(indiv_biz_page)
+        indiv_biz_layout.setContentsMargins(85, 0, 0, 0)
+        self.chk_biz_person = QCheckBox("개인서류")
+        self.chk_biz_person.setChecked(True)
+        self.chk_biz_reg_cert = QCheckBox("사업자등록증명원")
+        self.chk_biz_reg_cert.setChecked(True)
+        indiv_biz_layout.addWidget(self.chk_biz_person)
+        indiv_biz_layout.addWidget(self.chk_biz_reg_cert)
+        indiv_biz_layout.addStretch()
+
+        # (3) 법인 페이지
+        corp_page = QWidget()
+        corp_layout = QHBoxLayout(corp_page)
+        corp_layout.setContentsMargins(85, 0, 0, 0)
+        self.chk_corp_reg = QCheckBox("법인등기부등본")
+        self.chk_corp_reg.setChecked(True)
+        self.chk_corp_biz_cert = QCheckBox("사업자등록증명원")
+        self.chk_corp_biz_cert.setChecked(True)
+        corp_layout.addWidget(self.chk_corp_reg)
+        corp_layout.addWidget(self.chk_corp_biz_cert)
+        corp_layout.addStretch()
+
+        # (4) 외국인 페이지
+        foreigner_page = QWidget()
+        foreigner_layout = QVBoxLayout(foreigner_page)
+        foreigner_layout.setContentsMargins(85, 0, 0, 0)
+        self.foreigner_input = QLineEdit()
+        self.foreigner_input.setPlaceholderText("'외국인등록증' 혹은 '국내거소사실확인서' 입력")
+        foreigner_layout.addWidget(self.foreigner_input)
+
+        self.entity_stack.addWidget(person_page)     # index 0
+        self.entity_stack.addWidget(indiv_biz_page)  # index 1
+        self.entity_stack.addWidget(corp_page)       # index 2
+        self.entity_stack.addWidget(foreigner_page)  # index 3
+
+        # 콤보박스 변경 시 스택 변경 연결
+        self.entity_type_combo.currentIndexChanged.connect(self.entity_stack.setCurrentIndex)
+        
+        common_layout.addWidget(self.entity_stack)
         layout.addWidget(common_group)
 
         # 지자체 추가 서류 섹션 (작업자가 추가 가능)
