@@ -34,7 +34,7 @@ class DataEntryDialog(QDialog):
     def __init__(self, file_path, parent=None):
         super().__init__(parent)
         self.setWindowTitle("공고문 데이터 상세 입력")
-        self.resize(500, 700)
+        self.resize(500, 750)
         self.setMinimumWidth(450)
         
         self._init_ui(file_path)
@@ -79,11 +79,11 @@ class DataEntryDialog(QDialog):
         self.stack = QStackedWidget()
         
         # 각 카테고리별 위젯 생성
-        self.stack.addWidget(self._create_empty_page())        # index 0: 선택 전
-        self.stack.addWidget(self._create_common_page())      # index 1: 공통 사항
-        self.stack.addWidget(self._create_private_page())     # index 2: 개인
-        self.stack.addWidget(self._create_corporate_page())   # index 3: 법인
-        self.stack.addWidget(self._create_special_page())     # index 4: 특수 조건
+        self.stack.addWidget(self._create_empty_page())            # index 0
+        self.stack.addWidget(self._create_application_docs_page()) # index 1: 지원신청서류
+        self.stack.addWidget(self._create_joint_owner_page())      # index 2: 공동명의
+        self.stack.addWidget(self._create_residence_page())        # index 3: 거주요건
+        self.stack.addWidget(self._create_priority_page())         # index 4: 우선순위
         
         layout.addWidget(self.stack, stretch=1)
 
@@ -119,33 +119,105 @@ class DataEntryDialog(QDialog):
         layout.addWidget(msg)
         return page
 
-    def _create_common_page(self):
+    def _create_application_docs_page(self):
+        """지원신청서류 입력 페이지"""
         page = QWidget()
-        layout = QFormLayout(page)
-        layout.setSpacing(10)
-        layout.addRow("공고 기간:", QLineEdit())
-        layout.addRow("전체 예산:", QLineEdit())
-        layout.addRow("보급 대수:", QLineEdit())
-        layout.addRow("접수 방법:", QComboBox())
+        layout = QVBoxLayout(page)
+        layout.setSpacing(15)
+
+        # 공통 서류 섹션 (파일 첨부 UI)
+        common_group = QGroupBox("공통 서류 (기본 항목)")
+        common_layout = QVBoxLayout(common_group)
+        common_layout.setSpacing(10)
+        
+        # 1. 지원신청서 행 (파일 첨부 UI 포함)
+        app_form_row = QHBoxLayout()
+        app_form_label = QLabel("지원신청서")
+        app_form_label.setFixedWidth(80)
+        self.app_form_path_edit = QLineEdit()
+        self.app_form_path_edit.setReadOnly(True)
+        self.app_form_path_edit.setPlaceholderText("파일을 첨부해 주세요...")
+        self.app_form_path_edit.setStyleSheet("background-color: #f8f8f8; color: #666;")
+        
+        app_form_btn = QPushButton("파일 선택")
+        app_form_btn.setFixedWidth(80)
+        
+        app_form_row.addWidget(app_form_label)
+        app_form_row.addWidget(self.app_form_path_edit)
+        app_form_row.addWidget(app_form_btn)
+        
+        # 2. 구매계약서 (텍스트로만 표시)
+        contract_label = QLabel("구매계약서")
+        contract_label.setStyleSheet("color: #777; padding-left: 5px;")
+        
+        common_layout.addLayout(app_form_row)
+        common_layout.addWidget(contract_label)
+        layout.addWidget(common_group)
+
+        # 지자체 추가 서류 섹션 (작업자가 추가 가능)
+        extra_group = QGroupBox("지자체 추가 서류")
+        extra_layout = QVBoxLayout(extra_group)
+        
+        self.extra_docs_list = QListWidget()
+        self.extra_docs_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.extra_docs_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        
+        # 항목 추가 입력창 및 버튼
+        add_input_layout = QHBoxLayout()
+        self.doc_input_field = QLineEdit()
+        self.doc_input_field.setPlaceholderText("추가 서류 명칭 입력...")
+        self.doc_input_field.returnPressed.connect(self._add_extra_document) # 엔터키 지원
+        
+        add_btn = QPushButton("추가")
+        add_btn.setFixedWidth(60)
+        add_btn.clicked.connect(self._add_extra_document)
+        add_btn.setStyleSheet("padding: 5px; background-color: #f0f0f0;")
+        
+        add_input_layout.addWidget(self.doc_input_field)
+        add_input_layout.addWidget(add_btn)
+        
+        extra_layout.addWidget(self.extra_docs_list)
+        extra_layout.addLayout(add_input_layout)
+        
+        # 도움말 팁
+        tip_label = QLabel("※ 항목을 더블클릭하면 삭제할 수 있습니다.")
+        tip_label.setStyleSheet("color: #999; font-size: 11px;")
+        extra_layout.addWidget(tip_label)
+        
+        self.extra_docs_list.itemDoubleClicked.connect(lambda item: self.extra_docs_list.takeItem(self.extra_docs_list.row(item)))
+        
+        layout.addWidget(extra_group)
+        layout.addStretch()
         return page
 
-    def _create_private_page(self):
+    def _add_extra_document(self):
+        text = self.doc_input_field.text().strip()
+        if text:
+            # 중복 체크
+            existing_items = [self.extra_docs_list.item(i).text() for i in range(self.extra_docs_list.count())]
+            if text not in existing_items:
+                self.extra_docs_list.addItem(text)
+                self.doc_input_field.clear()
+            else:
+                self.doc_input_field.setPlaceholderText("이미 존재하는 항목입니다!")
+
+    def _create_joint_owner_page(self):
+        page = QWidget()
+        layout = QFormLayout(page)
+        layout.addRow("공동명의 가능 여부:", QComboBox())
+        layout.addRow("지분율 조건:", QLineEdit())
+        layout.addRow("대표자 설정 방식:", QLineEdit())
+        return page
+
+    def _create_residence_page(self):
         page = QWidget()
         layout = QFormLayout(page)
         layout.addRow("거주 기간 조건:", QLineEdit())
-        layout.addRow("개인 구매 제한:", QLineEdit())
-        layout.addRow("추가 증빙 서류:", QLineEdit())
+        layout.addRow("전입일 기준:", QLineEdit())
+        layout.addRow("거주지 증빙 방식:", QLineEdit())
         return page
 
-    def _create_corporate_page(self):
-        page = QWidget()
-        layout = QFormLayout(page)
-        layout.addRow("사업자 등록지:", QLineEdit())
-        layout.addRow("법인 등기부 요건:", QLineEdit())
-        layout.addRow("대량 구매 조건:", QLineEdit())
-        return page
-
-    def _create_special_page(self):
+    def _create_priority_page(self):
         page = QWidget()
         layout = QFormLayout(page)
         layout.addRow("대상자 구분:", QComboBox())
