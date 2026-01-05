@@ -208,8 +208,15 @@ class DataEntryDialog(QDialog):
         rep_setting = self.joint_rep_edit.text().strip()
         if rep_setting:
             co_name_data["representative_setting"] = rep_setting
+
+        # (3) 거주요건 데이터 수집 (integer 타입)
+        selected_period_btn = self.residence_period_group.checkedButton()
+        residence_period = selected_period_btn.property("value") if selected_period_btn else None
         
-        # (3) 최종 저장용 데이터 분리
+        # '확인필요'("")인 경우 None(NULL)으로 처리, 그 외에는 int 변환
+        residence_val = int(residence_period) if residence_period else None
+        
+        # (4) 최종 저장용 데이터 분리
         # notification_apply 컬럼용
         app_docs_data = {
             "application_docs": {
@@ -236,15 +243,21 @@ class DataEntryDialog(QDialog):
                     region_id = result[0]
                     
                     # (2) 공고문 테이블 업데이트 (JSONB merge)
-                    # notification_apply와 co_name 컬럼을 각각 업데이트
+                    # notification_apply, co_name, residence_requirements 컬럼을 업데이트
                     update_query = """
-                        INSERT INTO 공고문 (region_id, notification_apply, co_name)
-                        VALUES (%s, %s, %s)
+                        INSERT INTO 공고문 (region_id, notification_apply, co_name, residence_requirements)
+                        VALUES (%s, %s, %s, %s)
                         ON CONFLICT (region_id) DO UPDATE 
                         SET notification_apply = COALESCE(공고문.notification_apply, '{}'::jsonb) || EXCLUDED.notification_apply,
-                            co_name = EXCLUDED.co_name
+                            co_name = EXCLUDED.co_name,
+                            residence_requirements = EXCLUDED.residence_requirements
                     """
-                    cursor.execute(update_query, (region_id, json.dumps(app_docs_data), json.dumps(co_name_data)))
+                    cursor.execute(update_query, (
+                        region_id, 
+                        json.dumps(app_docs_data), 
+                        json.dumps(co_name_data),
+                        residence_val
+                    ))
                     conn.commit()
                     
             QMessageBox.information(self, "성공", f"데이터와 파일이 성공적으로 저장되었습니다.\n지역: {self.region}")
@@ -555,11 +568,25 @@ class DataEntryDialog(QDialog):
         return page
 
     def _create_residence_page(self):
+        """거주요건 조건 입력 페이지"""
         page = QWidget()
         layout = QFormLayout(page)
-        layout.addRow("거주 기간 조건:", QLineEdit())
-        layout.addRow("전입일 기준:", QLineEdit())
-        layout.addRow("거주지 증빙 방식:", QLineEdit())
+        layout.setSpacing(15)
+
+        # 1. 거주 기간 조건 (라디오 버튼)
+        period_layout = QHBoxLayout()
+        self.residence_period_group = QButtonGroup(self)
+        
+        periods = [("30", "30일"), ("60", "60일"), ("90", "90일"), ("", "확인필요")]
+        for val, label in periods:
+            rb = QRadioButton(label)
+            if val == "90": rb.setChecked(True) # 기본값 90일
+            rb.setProperty("value", val)
+            self.residence_period_group.addButton(rb)
+            period_layout.addWidget(rb)
+        
+        layout.addRow("거주 기간 조건:", period_layout)
+
         return page
 
     def _create_priority_page(self):
