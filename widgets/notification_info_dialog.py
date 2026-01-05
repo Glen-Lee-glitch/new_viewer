@@ -329,6 +329,32 @@ class RegionDataFormWidget(QWidget):
             QMessageBox.warning(self, "경고", "지역이 선택되지 않았습니다.")
             return
 
+        # 0. 모든 대분류 상태 확인 검사
+        all_categories = [self.category_combo.itemText(i) for i in range(self.category_combo.count()) 
+                          if self.category_combo.itemText(i) != "선택해주세요"]
+        
+        missing_categories = [cat for cat in all_categories if cat not in self.checked_status_list]
+        
+        if missing_categories:
+            missing_str = "\n- ".join(missing_categories)
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("상태 미설정 항목 존재")
+            msg_box.setText("모든 대분류의 상태를 확인해야 저장할 수 있습니다.")
+            msg_box.setInformativeText(f"미확인 항목:\n- {missing_str}")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.setDefaultButton(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+            
+            # 누락된 첫 번째 항목으로 카테고리 이동 및 포커스
+            idx = self.category_combo.findText(missing_categories[0])
+            if idx != -1:
+                self.category_combo.setCurrentIndex(idx)
+                # 콤보박스에 포커스를 주어 사용자가 바로 인지하게 함
+                self.category_combo.setFocus()
+                # 시각적 강조 (잠깐 테두리 색상 변경 등은 복잡하므로 포커스만으로 처리)
+            return
+
         import shutil
         import json
         
