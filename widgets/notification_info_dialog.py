@@ -22,6 +22,8 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QLineEdit,
     QCheckBox,
+    QRadioButton,
+    QButtonGroup,
     QFormLayout,
     QPushButton,
     QGroupBox,
@@ -188,9 +190,14 @@ class DataEntryDialog(QDialog):
         extra_docs = [self.extra_docs_list.item(i).text() for i in range(self.extra_docs_list.count())]
         doc_date = self.doc_date_combo.currentText()
         
-        # (2) 공동명의 데이터
+        # (2) 공동명의 데이터 수집 (라디오 버튼)
+        if self.joint_custom_radio.isChecked():
+            selected_joint_condition = self.joint_custom_edit.text().strip()
+        else:
+            selected_joint_condition = self.joint_group.checkedButton().text()
+        
         joint_owner_data = {
-            "basic_condition": self.joint_basic_combo.currentText(),
+            "basic_condition": selected_joint_condition,
             "share_ratio": self.joint_share_edit.text().strip(),
             "representative_setting": self.joint_rep_edit.text().strip()
         }
@@ -475,36 +482,65 @@ class DataEntryDialog(QDialog):
 
     def _create_joint_owner_page(self):
         page = QWidget()
-        layout = QFormLayout(page)
-        layout.setContentsMargins(10, 20, 10, 20)
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
 
-        # 1. 공동명의 기본 조건 (CSV 분석 기반)
-        self.joint_basic_combo = QComboBox()
-        # CSV에서 추출한 주요 항목들 (빈도순)
-        csv_options = [
-            "등본 상 세대 내 가족(거주요건 둘 다 만족)",
-            "등본 상 세대 내 가족(거주요건 대표자만 만족)",
-            "같은지역내 / 가족 x / 같이거주안해도 공동명의 가능",
-            "같은 지역내/ 가족/ 같이 거주 안해도 공동명의 가능",
-            "타지역/ 가족X / 공동명의 가능",
-            "타지역/ 가족O/ 공동명의 가능",
-            "주민등록상 동일 세대원에 한해 가능",
-            "확인필요"
+        # 1. 공동명의 기본 조건 (라디오 버튼 그룹)
+        cond_group = QGroupBox("공동명의 기본 조건")
+        cond_layout = QVBoxLayout(cond_group)
+        
+        self.joint_group = QButtonGroup(self)
+        self.joint_radios = []
+        conditions = [
+            "등본 상 세대 내 가족 (거주요건 둘 다 만족)",
+            "등본 상 세대 내 가족 (대표자만 만족 가능)",
+            "같은 지역 내 (가족 관계 무관 가능)",
+            "타지역 (가족 관계 무관 가능)",
+            "타지역 (가족 필수)",
+            "주민등록상 동일 세대원 한정",
+            "지자체 확인 필요"
         ]
-        self.joint_basic_combo.addItems(csv_options)
-        self.joint_basic_combo.setEditable(True) # 직접 입력도 가능하게 설정
-        layout.addRow("공동명의 기본 조건:", self.joint_basic_combo)
+        
+        for i, text in enumerate(conditions):
+            rb = QRadioButton(text)
+            if i == 0: rb.setChecked(True)
+            cond_layout.addWidget(rb)
+            self.joint_group.addButton(rb)
+            self.joint_radios.append(rb)
+            
+        # 직접 입력 라디오 버튼 및 입력창
+        custom_layout = QHBoxLayout()
+        self.joint_custom_radio = QRadioButton("직접 입력")
+        self.joint_group.addButton(self.joint_custom_radio)
+        self.joint_custom_edit = QLineEdit()
+        self.joint_custom_edit.setPlaceholderText("조건을 직접 입력하세요...")
+        self.joint_custom_edit.setEnabled(False) # 처음엔 비활성화
+        
+        # 라디오 버튼 상태에 따라 입력창 활성화 제어
+        self.joint_custom_radio.toggled.connect(self.joint_custom_edit.setEnabled)
+        
+        custom_layout.addWidget(self.joint_custom_radio)
+        custom_layout.addWidget(self.joint_custom_edit)
+        cond_layout.addLayout(custom_layout)
+        
+        layout.addWidget(cond_group)
 
-        # 3. 지분율 조건
+        # 2. 기타 조건 (지분율, 대표자 설정)
+        other_group = QGroupBox("세부 조건 설정")
+        other_layout = QFormLayout(other_group)
+        other_layout.setSpacing(10)
+
         self.joint_share_edit = QLineEdit()
         self.joint_share_edit.setPlaceholderText("예: 대표자 지분 50% 이상")
-        layout.addRow("지분율 조건:", self.joint_share_edit)
+        other_layout.addRow("지분율 조건:", self.joint_share_edit)
 
-        # 4. 대표자 설정 방식
         self.joint_rep_edit = QLineEdit()
         self.joint_rep_edit.setPlaceholderText("예: 거주요건 충족자 우선")
-        layout.addRow("대표자 설정 방식:", self.joint_rep_edit)
+        other_layout.addRow("대표자 설정 방식:", self.joint_rep_edit)
+        
+        layout.addWidget(other_group)
+        layout.addStretch()
 
         return page
 
