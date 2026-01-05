@@ -71,8 +71,6 @@ class RegionDataFormWidget(QWidget):
     
     # 제조사 기본 지급 서류
     DEFAULT_MFG_DOCS = ['지급신청서', '자동차등록증', '세금계산서', '사업자등록증', '통장사본']
-    # 지급신청서를 고객이 준비해야 하는 특별 지역 리스트
-    CUST_PAY_APP_REGIONS = ['서울특별시', '세종특별자치시']
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -89,9 +87,9 @@ class RegionDataFormWidget(QWidget):
             self.rb_loc_region.setChecked(True)
 
         # 지급신청서류 기본값 세팅 (DB 저장 안 함)
-        self._reset_payment_defaults(region)
+        self._reset_payment_defaults()
 
-    def _reset_payment_defaults(self, region):
+    def _reset_payment_defaults(self):
         """지급신청서류를 주체별 기본값으로 리셋합니다."""
         if not hasattr(self, 'cust_payment_list') or not hasattr(self, 'mfg_payment_list'):
             return
@@ -99,13 +97,9 @@ class RegionDataFormWidget(QWidget):
         self.cust_payment_list.clear()
         self.mfg_payment_list.clear()
 
-        is_cust_app = region in self.CUST_PAY_APP_REGIONS
-        
+        # 무조건 제조사에 기본 5종 투입
         for doc in self.DEFAULT_MFG_DOCS:
-            if doc == '지급신청서' and is_cust_app:
-                self.cust_payment_list.addItem(doc)
-            else:
-                self.mfg_payment_list.addItem(doc)
+            self.mfg_payment_list.addItem(doc)
 
     def load_data(self, data):
         """DB에서 불러온 데이터를 UI에 채웁니다."""
@@ -479,7 +473,7 @@ class RegionDataFormWidget(QWidget):
             "고객 작성 서류", 
             self.cust_payment_list, 
             "고객용 서류 명칭 입력...",
-            ["보조금 지급신청서", "통장사본", "차량등록증"]
+            ["지급신청서", "보조금 지급신청서", "통장사본", "차량등록증"]
         )
         layout.addWidget(cust_group)
 
@@ -489,7 +483,7 @@ class RegionDataFormWidget(QWidget):
             "제조사 작성 서류", 
             self.mfg_payment_list, 
             "제조사용 서류 명칭 입력...",
-            ["지방세 납세증명서", "사업자등록증명원"]
+            ["지급신청서", "지방세 납세증명서", "사업자등록증명원"]
         )
         layout.addWidget(mfg_group)
 
