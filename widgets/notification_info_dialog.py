@@ -98,6 +98,7 @@ class DataEntryDialog(QDialog):
         
         self.category_combo = QComboBox()
         self.category_combo.addItems(["선택해주세요", "지원신청서류", "공동명의 조건", "거주요건 조건", "우선순위 조건"])
+        self.category_combo.setCurrentIndex(1) # '지원신청서류' 디폴트 선택
         self.category_combo.currentIndexChanged.connect(self._on_category_changed)
         self.category_combo.setStyleSheet("""
             QComboBox {
@@ -123,6 +124,10 @@ class DataEntryDialog(QDialog):
         self.stack.addWidget(self._create_priority_page())         # index 4: 우선순위
         
         layout.addWidget(self.stack, stretch=1)
+
+        # 초기 카테고리 설정 (지원신청서류)
+        self.category_combo.setCurrentIndex(1)
+        self.stack.setCurrentIndex(1)
 
         # 4. 하단 버튼
         btn_layout = QHBoxLayout()
@@ -279,15 +284,16 @@ class DataEntryDialog(QDialog):
                         raise Exception(f"'{self.region}'에 해당하는 region_id를 찾을 수 없습니다.")
                     region_id = result[0]
                     
-                    # (2) 공고문 테이블 업데이트 (JSONB merge)
+                    # (2) 공고문 테이블 업데이트 (JSONB merge 및 updated_at 기록)
                     # notification_apply, co_name, residence_requirements 컬럼을 업데이트
                     update_query = """
-                        INSERT INTO 공고문 (region_id, notification_apply, co_name, residence_requirements)
-                        VALUES (%s, %s, %s, %s)
+                        INSERT INTO 공고문 (region_id, notification_apply, co_name, residence_requirements, updated_at)
+                        VALUES (%s, %s, %s, %s, NOW())
                         ON CONFLICT (region_id) DO UPDATE 
                         SET notification_apply = COALESCE(공고문.notification_apply, '{}'::jsonb) || EXCLUDED.notification_apply,
                             co_name = EXCLUDED.co_name,
-                            residence_requirements = EXCLUDED.residence_requirements
+                            residence_requirements = EXCLUDED.residence_requirements,
+                            updated_at = NOW()
                     """
                     cursor.execute(update_query, (
                         region_id, 
@@ -298,7 +304,7 @@ class DataEntryDialog(QDialog):
                     conn.commit()
                     
             QMessageBox.information(self, "성공", f"데이터와 파일이 성공적으로 저장되었습니다.\n지역: {self.region}")
-            self.accept()
+            # 저장 후 창을 닫지 않도록 self.accept() 제거
             
         except Exception as e:
             QMessageBox.critical(self, "DB 저장 오류", f"데이터베이스 저장 중 오류가 발생했습니다:\n{str(e)}")
