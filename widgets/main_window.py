@@ -36,6 +36,7 @@ from widgets.necessary_widget import NecessaryWidget
 from widgets.multi_child_check_dialog import MultiChildCheckDialog
 from widgets.help_dialog import HelpDialog
 from widgets.region_manager_dialog import RegionManagerDialog
+from widgets.notification_info_dialog import NotificationInfoDialog
 
 
 class MainWindow(QMainWindow):
@@ -217,6 +218,10 @@ class MainWindow(QMainWindow):
         # 지역 관리 액션 (UI 파일에 정의됨)
         if hasattr(self, 'action_region_manager'):
             self.action_region_manager.triggered.connect(self._open_region_manager_dialog)
+
+        # 공고문 입력 액션 (UI 파일에 정의됨)
+        if hasattr(self, 'action_announcement_input'):
+            self.action_announcement_input.triggered.connect(self._open_announcement_input_dialog)
         
         self.menu_edit.addSeparator()
         
@@ -484,6 +489,11 @@ class MainWindow(QMainWindow):
     def _open_region_manager_dialog(self):
         """지역 관리 다이얼로그를 연다."""
         dialog = RegionManagerDialog(self)
+        dialog.exec()
+
+    def _open_announcement_input_dialog(self):
+        """공고문 입력 다이얼로그를 연다."""
+        dialog = NotificationInfoDialog(self)
         dialog.exec()
 
     def _open_special_note_dialog(self):
