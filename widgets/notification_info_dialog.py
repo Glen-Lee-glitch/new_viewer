@@ -590,11 +590,30 @@ class DataEntryDialog(QDialog):
         return page
 
     def _create_priority_page(self):
+        """우선순위 조건 입력 페이지"""
         page = QWidget()
         layout = QFormLayout(page)
-        layout.addRow("대상자 구분:", QComboBox())
-        layout.addRow("우선순위 비율:", QLineEdit())
-        layout.addRow("증빙 확인 사항:", QLineEdit())
+        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # 7가지 항목 정의
+        self.priority_edits = {}
+        items = [
+            ("multi_child", "다자녀"),
+            ("first_time", "생애최초"),
+            ("low_income", "차상위/기초생활수급자"),
+            ("disabled", "장애인"),
+            ("scrappage", "노후 경유차 조기폐차"),
+            ("merit", "국가유공자"),
+            ("small_biz", "소상공인")
+        ]
+
+        for key, label in items:
+            edit = QLineEdit()
+            edit.setPlaceholderText(f"{label} 관련 세부 조건 또는 증빙 서류 입력")
+            self.priority_edits[key] = edit
+            layout.addRow(f"{label}:", edit)
+
         return page
 
     def _on_category_changed(self, index):
