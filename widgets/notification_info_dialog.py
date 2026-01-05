@@ -76,8 +76,10 @@ class RegionDataFormWidget(QWidget):
     def set_region(self, region):
         """지역 설정 및 UI 초기화 상태 변경"""
         self.region = region
-        # 지역이 설정되면 필요한 초기화 로직이 있다면 여기에 추가
-        # 현재는 입력 폼이 비워지는 로직은 없으나, 필요시 추가 가능
+        # 개인사업자 페이지의 지역명 라디오 버튼 업데이트
+        if hasattr(self, 'rb_loc_region'):
+            self.rb_loc_region.setText(region)
+            self.rb_loc_region.setChecked(True)
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -175,6 +177,7 @@ class RegionDataFormWidget(QWidget):
         entity_type = self.entity_type_combo.currentText()
         selected_docs = []
         foreigner_input = ""
+        biz_location = None
         
         if entity_type == '개인':
             if self.chk_resident_reg.isChecked(): selected_docs.append("주민등록등본")
@@ -182,6 +185,11 @@ class RegionDataFormWidget(QWidget):
         elif entity_type == '개인사업자':
             if self.chk_biz_person.isChecked(): selected_docs.append("개인서류")
             if self.chk_biz_reg_cert.isChecked(): selected_docs.append("사업자등록증명원")
+            # 사업장 소재지 수집
+            if hasattr(self, 'rb_loc_region') and self.rb_loc_region.isChecked():
+                biz_location = self.region
+            else:
+                biz_location = "무관"
         elif entity_type == '법인':
             if self.chk_corp_reg.isChecked(): selected_docs.append("법인등기부등본")
             if self.chk_corp_biz_cert.isChecked(): selected_docs.append("사업자등록증명원")
@@ -265,6 +273,10 @@ class RegionDataFormWidget(QWidget):
             }
         }
         
+        # 개인사업자 사업장 소재지 추가
+        if biz_location:
+            app_docs_data["application_docs"]["purchase_entity"]["business_location"] = biz_location
+
         # 우선순위 변경사항이 있다면 추가 (없다면 아예 키가 포함되지 않아 DB에서 삭제됨)
         if priority_conditions:
             app_docs_data["application_docs"]["priority_conditions"] = priority_conditions
@@ -377,14 +389,33 @@ class RegionDataFormWidget(QWidget):
         # (2) 개인사업자 페이지
         indiv_biz_page = QWidget()
         indiv_biz_layout = QHBoxLayout(indiv_biz_page)
-        indiv_biz_layout.setContentsMargins(85, 0, 0, 0)
+        indiv_biz_layout.setContentsMargins(85, 0, 10, 0)
+        
+        # 1. 서류 체크박스 (왼쪽)
         self.chk_biz_person = QCheckBox("개인서류")
         self.chk_biz_person.setChecked(True)
         self.chk_biz_reg_cert = QCheckBox("사업자등록증명원")
         self.chk_biz_reg_cert.setChecked(True)
+        
         indiv_biz_layout.addWidget(self.chk_biz_person)
         indiv_biz_layout.addWidget(self.chk_biz_reg_cert)
-        indiv_biz_layout.addStretch()
+        
+        indiv_biz_layout.addStretch() # 중간 여백
+        
+        # 2. 사업장 소재지 라디오 버튼 (오른쪽)
+        loc_label = QLabel("사업장 소재지:")
+        loc_label.setStyleSheet("color: #666; font-size: 11px;")
+        
+        self.biz_location_group = QButtonGroup(self)
+        self.rb_loc_any = QRadioButton("무관")
+        self.rb_loc_region = QRadioButton("지역명") # set_region에서 업데이트됨
+        
+        self.biz_location_group.addButton(self.rb_loc_any)
+        self.biz_location_group.addButton(self.rb_loc_region)
+        
+        indiv_biz_layout.addWidget(loc_label)
+        indiv_biz_layout.addWidget(self.rb_loc_any)
+        indiv_biz_layout.addWidget(self.rb_loc_region)
 
         # (3) 법인 페이지
         corp_page = QWidget()
