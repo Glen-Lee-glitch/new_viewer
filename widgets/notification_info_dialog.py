@@ -33,7 +33,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy
 )
 from PyQt6.QtGui import QColor
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 
 from core.data_manage import DB_CONFIG
 
@@ -1209,6 +1209,11 @@ class NotificationInfoDialog(QDialog):
         
         main_layout.addWidget(splitter)
 
+        # 20초마다 자동 새로고침 타이머 설정
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self._refresh_regions)
+        self.refresh_timer.start(20000)  # 20000ms = 20초
+
     def _setup_styles(self):
         self.setStyleSheet("""
             QDialog {
@@ -1361,6 +1366,30 @@ class NotificationInfoDialog(QDialog):
                 QMessageBox.warning(self, "오류", f"파일을 열 수 없습니다:\n{e}")
         else:
             QMessageBox.warning(self, "경고", "유효한 파일 경로가 아닙니다.")
+
+    def _refresh_regions(self):
+        """DB에서 데이터를 다시 불러와 지역 목록과 상태(배경색)를 갱신합니다."""
+        # 1. 현재 선택된 항목 기억
+        current_item = self.region_list.currentItem()
+        current_region = current_item.text() if current_item else None
+        
+        # 2. 데이터 다시 로드
+        self._load_data_from_db()
+        
+        # 3. 리스트 갱신 (기존 항목 제거 후 재생성)
+        self.region_list.clear()
+        self._load_regions()
+        
+        # 4. 선택 상태 복구
+        if current_region:
+            # 리스트를 순회하며 이전에 선택했던 지역을 찾음
+            items = self.region_list.findItems(current_region, Qt.MatchFlag.MatchExactly)
+            if items:
+                # 찾았으면 해당 아이템을 다시 선택 상태로 설정
+                self.region_list.setCurrentItem(items[0])
+                # 주의: setCurrentItem만으로는 _on_region_selected가 호출되지 않음 (의도된 동작)
+                # 사용자가 작성 중인 폼 데이터가 날아가는 것을 방지하기 위함
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
