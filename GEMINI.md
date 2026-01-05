@@ -57,3 +57,37 @@ Stores the history of email chains associated with a specific thread.
 | `received_date` | `timestamptz` | NO | The date when this specific email in the chain was received. |
 | `content` | `text` | YES | Body content of the specific email in the chain. |
 | `chained_file_path` | `text` | YES | Path to any file attached to this specific email in the chain. |
+
+# Git Commit Message Guidelines
+
+When generating or proposing git commit messages, provide them in **text format** for review, rather than executing them directly via shell immediately (unless explicitly instructed to commit).
+
+## Structure
+```
+type: Subject
+
+body
+
+footer
+```
+
+## Type Keywords
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Formatting, missing semicolons, etc. (no code change)
+- `refactor`: Refactoring production code
+- `test`: Adding or refactoring tests
+- `chore`: Build process, package manager, etc.
+
+## Rules
+1. **Subject**:
+   - Max 50 characters.
+   - No period at the end.
+   - Imperative mood (e.g., "Add feature" not "Added feature").
+   - Capitalized first letter.
+2. **Body** (Optional):
+   - Wrap at 72 characters.
+   - Focus on "What" and "Why", not "How".
+3. **Footer** (Optional):
+   - Reference issues (e.g., `Resolves: #123`).
