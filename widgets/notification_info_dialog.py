@@ -18,31 +18,143 @@ from PyQt6.QtWidgets import (
     QApplication,
     QSplitter,
     QWidget,
+    QComboBox,
+    QStackedWidget,
+    QLineEdit,
+    QFormLayout,
+    QPushButton,
+    QGroupBox,
 )
 from PyQt6.QtCore import Qt
 
 from core.data_manage import DB_CONFIG
 
 class DataEntryDialog(QDialog):
-    """공고문을 보며 데이터를 입력하는 창 (현재는 빈 오브젝트 placeholder)"""
+    """공고문을 보며 데이터를 입력하는 창"""
     def __init__(self, file_path, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("공고문 데이터 입력")
-        self.resize(400, 300)
+        self.setWindowTitle("공고문 데이터 상세 입력")
+        self.resize(500, 700)
+        self.setMinimumWidth(450)
         
+        self._init_ui(file_path)
+
+    def _init_ui(self, file_path):
         layout = QVBoxLayout(self)
-        self.label = QLabel(f"현재 확인 중인 파일:\n{os.path.basename(file_path)}")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setWordWrap(True)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+
+        # 1. 파일 정보 섹션
+        info_group = QGroupBox("파일 정보")
+        info_layout = QVBoxLayout(info_group)
+        file_name = os.path.basename(file_path)
+        self.file_label = QLabel(f"파일명: {file_name}")
+        self.file_label.setStyleSheet("font-weight: bold; color: #333;")
+        self.file_label.setWordWrap(True)
+        info_layout.addWidget(self.file_label)
+        layout.addWidget(info_group)
+
+        # 2. 대분류 선택 섹션
+        category_layout = QHBoxLayout()
+        category_label = QLabel("대분류 선택:")
+        category_label.setStyleSheet("font-weight: bold;")
         
-        # '빈 오브젝트' 역할을 할 위젯 (나중에 입력 폼으로 대체될 영역)
-        self.placeholder_widget = QWidget()
-        self.placeholder_widget.setMinimumHeight(100)
-        self.placeholder_widget.setStyleSheet("border: 2px dashed #cccccc; background: #f9f9f9;")
+        self.category_combo = QComboBox()
+        self.category_combo.addItems(["선택해주세요", "공통 사항", "개인/개인사업자", "법인/공공기관", "특수 조건(취약계층 등)"])
+        self.category_combo.currentIndexChanged.connect(self._on_category_changed)
+        self.category_combo.setStyleSheet("""
+            QComboBox {
+                padding: 8px;
+                border: 1px solid #0078d4;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+        """)
         
-        layout.addWidget(self.label)
-        layout.addWidget(self.placeholder_widget)
-        layout.addWidget(QLabel("데이터 입력 필드가 여기에 위치할 예정입니다."))
+        category_layout.addWidget(category_label)
+        category_layout.addWidget(self.category_combo, stretch=1)
+        layout.addLayout(category_layout)
+
+        # 3. 동적 입력 섹션 (Stacked Widget)
+        self.stack = QStackedWidget()
+        
+        # 각 카테고리별 위젯 생성
+        self.stack.addWidget(self._create_empty_page())        # index 0: 선택 전
+        self.stack.addWidget(self._create_common_page())      # index 1: 공통 사항
+        self.stack.addWidget(self._create_private_page())     # index 2: 개인
+        self.stack.addWidget(self._create_corporate_page())   # index 3: 법인
+        self.stack.addWidget(self._create_special_page())     # index 4: 특수 조건
+        
+        layout.addWidget(self.stack, stretch=1)
+
+        # 4. 하단 버튼
+        btn_layout = QHBoxLayout()
+        save_btn = QPushButton("저장하기")
+        save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #0078d4;
+                color: white;
+                padding: 10px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #106ebe;
+            }
+        """)
+        cancel_btn = QPushButton("취소")
+        cancel_btn.clicked.connect(self.reject)
+        
+        btn_layout.addStretch()
+        btn_layout.addWidget(cancel_btn)
+        btn_layout.addWidget(save_btn)
+        layout.addLayout(btn_layout)
+
+    def _create_empty_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        msg = QLabel("상단의 대분류를 선택하면\n입력 양식이 표시됩니다.")
+        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        msg.setStyleSheet("color: #888; font-style: italic;")
+        layout.addWidget(msg)
+        return page
+
+    def _create_common_page(self):
+        page = QWidget()
+        layout = QFormLayout(page)
+        layout.setSpacing(10)
+        layout.addRow("공고 기간:", QLineEdit())
+        layout.addRow("전체 예산:", QLineEdit())
+        layout.addRow("보급 대수:", QLineEdit())
+        layout.addRow("접수 방법:", QComboBox())
+        return page
+
+    def _create_private_page(self):
+        page = QWidget()
+        layout = QFormLayout(page)
+        layout.addRow("거주 기간 조건:", QLineEdit())
+        layout.addRow("개인 구매 제한:", QLineEdit())
+        layout.addRow("추가 증빙 서류:", QLineEdit())
+        return page
+
+    def _create_corporate_page(self):
+        page = QWidget()
+        layout = QFormLayout(page)
+        layout.addRow("사업자 등록지:", QLineEdit())
+        layout.addRow("법인 등기부 요건:", QLineEdit())
+        layout.addRow("대량 구매 조건:", QLineEdit())
+        return page
+
+    def _create_special_page(self):
+        page = QWidget()
+        layout = QFormLayout(page)
+        layout.addRow("대상자 구분:", QComboBox())
+        layout.addRow("우선순위 비율:", QLineEdit())
+        layout.addRow("증빙 확인 사항:", QLineEdit())
+        return page
+
+    def _on_category_changed(self, index):
+        self.stack.setCurrentIndex(index)
 
 class NotificationInfoDialog(QDialog):
     def __init__(self, parent=None):
