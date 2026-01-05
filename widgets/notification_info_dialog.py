@@ -168,6 +168,7 @@ class DataEntryDialog(QDialog):
                 return
 
         # 2. UI 데이터 수집 (JSON 형식)
+        # (1) 지원신청서류 데이터
         entity_type = self.entity_type_combo.currentText()
         selected_docs = []
         foreigner_input = ""
@@ -187,7 +188,14 @@ class DataEntryDialog(QDialog):
         extra_docs = [self.extra_docs_list.item(i).text() for i in range(self.extra_docs_list.count())]
         doc_date = self.doc_date_combo.currentText()
         
-        app_docs_data = {
+        # (2) 공동명의 데이터
+        joint_owner_data = {
+            "basic_condition": self.joint_basic_combo.currentText(),
+            "share_ratio": self.joint_share_edit.text().strip(),
+            "representative_setting": self.joint_rep_edit.text().strip()
+        }
+        
+        final_data = {
             "application_docs": {
                 "has_app_form": has_app_form,
                 "purchase_entity": {
@@ -197,7 +205,8 @@ class DataEntryDialog(QDialog):
                 },
                 "extra_docs": extra_docs,
                 "document_date": doc_date
-            }
+            },
+            "joint_owner": joint_owner_data
         }
 
         # 3. DB 업데이트
@@ -212,14 +221,13 @@ class DataEntryDialog(QDialog):
                     region_id = result[0]
                     
                     # (2) 공고문 테이블 업데이트 (JSONB merge)
-                    # 기존 데이터가 있으면 유지하면서 application_docs 부분만 덮어쓰거나 추가함
                     update_query = """
                         INSERT INTO 공고문 (region_id, notification_apply)
                         VALUES (%s, %s)
                         ON CONFLICT (region_id) DO UPDATE 
                         SET notification_apply = COALESCE(공고문.notification_apply, '{}'::jsonb) || EXCLUDED.notification_apply
                     """
-                    cursor.execute(update_query, (region_id, json.dumps(app_docs_data)))
+                    cursor.execute(update_query, (region_id, json.dumps(final_data)))
                     conn.commit()
                     
             QMessageBox.information(self, "성공", f"데이터와 파일이 성공적으로 저장되었습니다.\n지역: {self.region}")
@@ -468,9 +476,36 @@ class DataEntryDialog(QDialog):
     def _create_joint_owner_page(self):
         page = QWidget()
         layout = QFormLayout(page)
-        layout.addRow("공동명의 가능 여부:", QComboBox())
-        layout.addRow("지분율 조건:", QLineEdit())
-        layout.addRow("대표자 설정 방식:", QLineEdit())
+        layout.setContentsMargins(10, 20, 10, 20)
+        layout.setSpacing(15)
+
+        # 1. 공동명의 기본 조건 (CSV 분석 기반)
+        self.joint_basic_combo = QComboBox()
+        # CSV에서 추출한 주요 항목들 (빈도순)
+        csv_options = [
+            "등본 상 세대 내 가족(거주요건 둘 다 만족)",
+            "등본 상 세대 내 가족(거주요건 대표자만 만족)",
+            "같은지역내 / 가족 x / 같이거주안해도 공동명의 가능",
+            "같은 지역내/ 가족/ 같이 거주 안해도 공동명의 가능",
+            "타지역/ 가족X / 공동명의 가능",
+            "타지역/ 가족O/ 공동명의 가능",
+            "주민등록상 동일 세대원에 한해 가능",
+            "확인필요"
+        ]
+        self.joint_basic_combo.addItems(csv_options)
+        self.joint_basic_combo.setEditable(True) # 직접 입력도 가능하게 설정
+        layout.addRow("공동명의 기본 조건:", self.joint_basic_combo)
+
+        # 3. 지분율 조건
+        self.joint_share_edit = QLineEdit()
+        self.joint_share_edit.setPlaceholderText("예: 대표자 지분 50% 이상")
+        layout.addRow("지분율 조건:", self.joint_share_edit)
+
+        # 4. 대표자 설정 방식
+        self.joint_rep_edit = QLineEdit()
+        self.joint_rep_edit.setPlaceholderText("예: 거주요건 충족자 우선")
+        layout.addRow("대표자 설정 방식:", self.joint_rep_edit)
+
         return page
 
     def _create_residence_page(self):
