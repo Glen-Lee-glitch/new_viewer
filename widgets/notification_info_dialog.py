@@ -1215,32 +1215,180 @@ class NotificationInfoDialog(QDialog):
         self.refresh_timer.start(20000)  # 20000ms = 20초
 
     def _setup_styles(self):
+        """다이얼로그 및 하위 위젯에 대해 글로벌 테마(qt_material)를 무시하고 기본(Light) 스타일을 강제 적용합니다."""
         self.setStyleSheet("""
-            QDialog {
-                background-color: #ffffff;
+            /* =================================================================
+               Global Reset & Light Theme Enforcement
+               (qt_material 테마의 영향을 받지 않도록 모든 주요 속성을 재정의)
+               ================================================================= */
+            
+            QDialog, QWidget {
+                background-color: #f0f0f0;
+                color: #000000;
+                font-family: "Segoe UI", "Malgun Gothic", "Dotum", sans-serif;
+                font-size: 9pt;
             }
-            #titleLabel {
-                font-size: 24px;
+
+            /* --- 입력 필드 --- */
+            QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox {
+                background-color: #ffffff;
+                color: #000000;
+                border: 1px solid #a0a0a0;
+                border-radius: 2px;
+                padding: 4px;
+                selection-background-color: #0078d7;
+                selection-color: #ffffff;
+            }
+            QLineEdit:disabled, QTextEdit:disabled, QPlainTextEdit:disabled {
+                background-color: #e0e0e0;
+                color: #808080;
+                border: 1px solid #d0d0d0;
+            }
+            QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
+                border: 1px solid #0078d7;
+            }
+
+            /* --- 콤보박스 --- */
+            QComboBox {
+                background-color: #ffffff;
+                color: #000000;
+                border: 1px solid #a0a0a0;
+                border-radius: 2px;
+                padding: 4px;
+                min-height: 20px;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 0px;
+                border-top-right-radius: 2px;
+                border-bottom-right-radius: 2px;
+                background: transparent;
+            }
+            QComboBox::down-arrow {
+                image: none; /* 기본 화살표 제거 후 커스텀 혹은 텍스트로 대체 가능하나 여기선 심플하게 처리 */
+                border-left: 2px solid transparent;
+                border-right: 2px solid transparent;
+                border-top: 4px solid #606060;
+                margin-right: 6px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                color: #000000;
+                selection-background-color: #0078d7;
+                selection-color: #ffffff;
+                border: 1px solid #a0a0a0;
+            }
+
+            /* --- 리스트 위젯 --- */
+            QListWidget {
+                background-color: #ffffff;
+                color: #000000;
+                border: 1px solid #a0a0a0;
+                outline: none;
+            }
+            QListWidget::item {
+                color: #000000;
+                padding: 4px;
+            }
+            QListWidget::item:selected {
+                background-color: #0078d7;
+                color: #ffffff;
+            }
+            QListWidget::item:hover:!selected {
+                background-color: #e5f3ff;
+            }
+
+            /* --- 버튼 --- */
+            QPushButton {
+                background-color: #e1e1e1;
+                color: #000000;
+                border: 1px solid #adadad;
+                border-radius: 2px;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #e5f1fb;
+                border-color: #0078d7;
+            }
+            QPushButton:pressed {
+                background-color: #cce4f7;
+                border-color: #005499;
+            }
+            QPushButton:disabled {
+                background-color: #f0f0f0;
+                color: #a0a0a0;
+                border: 1px solid #d0d0d0;
+            }
+
+            /* --- 그룹박스 --- */
+            QGroupBox {
+                border: 1px solid #d0d0d0;
+                border-radius: 4px;
+                margin-top: 10px; /* 타이틀 공간 확보 */
+                padding-top: 15px;
                 font-weight: bold;
-                color: #1a1a1a;
-                margin-bottom: 5px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 5px;
+                left: 5px;
+                color: #333333;
+                background-color: transparent;
+            }
+
+            /* --- 체크박스 & 라디오버튼 --- */
+            QCheckBox, QRadioButton {
+                color: #000000;
+                spacing: 5px;
+                background-color: transparent;
+            }
+            QCheckBox::indicator, QRadioButton::indicator {
+                width: 14px;
+                height: 14px;
+                background-color: #ffffff;
+                border: 1px solid #808080;
+            }
+            QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+                background-color: #0078d7;
+                border: 1px solid #0078d7;
+                image: none; /* 필요시 체크 아이콘 이미지 경로 설정 */
+            }
+            /* 간단한 체크 표시 (색상만 변경됨) */
+            
+            /* --- 라벨 --- */
+            QLabel {
+                color: #000000;
+                background-color: transparent;
+                border: none;
+            }
+
+            /* --- 스플리터 --- */
+            QSplitter::handle {
+                background-color: #d0d0d0;
+            }
+
+            /* --- 특정 ID 스타일 (타이틀 등) --- */
+            #titleLabel {
+                font-size: 18pt;
+                font-weight: bold;
+                color: #222222;
+                margin-bottom: 10px;
             }
             #subHeader {
-                font-size: 14px;
+                font-size: 11pt;
                 font-weight: bold;
-                color: #666666;
-                padding-bottom: 5px;
+                color: #555555;
             }
             #regionHeader {
-                font-size: 20px;
+                font-size: 14pt;
                 font-weight: bold;
-                color: #0078d4;
-                border-bottom: 2px solid #0078d4;
-                padding-bottom: 8px;
-            }
-            QSplitter::handle {
-                background-color: #e0e0e0;
-                width: 1px;
+                color: #0066cc;
+                border-bottom: 2px solid #0066cc;
+                padding-bottom: 5px;
+                margin-bottom: 5px;
             }
         """)
 
