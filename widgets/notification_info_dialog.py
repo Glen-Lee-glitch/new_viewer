@@ -30,7 +30,8 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
     QCompleter,
-    QSizePolicy
+    QSizePolicy,
+    QListView
 )
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt, QTimer
@@ -92,6 +93,43 @@ class RegionDataFormWidget(QWidget):
 
         # 지급신청서류 기본값 세팅 (DB 저장 안 함)
         self._reset_payment_defaults()
+
+    def _apply_combo_style(self, combo, padding=4, font_size=None):
+        """콤보박스에 QListView 뷰를 설정하고 스타일을 강제 적용합니다."""
+        combo.setView(QListView())
+        
+        base_style = f"""
+            QComboBox {{
+                padding: {padding}px;
+                border: 1px solid #0078d4;
+                border-radius: 4px;
+                color: #000000;
+                background-color: #ffffff;
+                {f'font-size: {font_size}px;' if font_size else ''}
+            }}
+        """
+        combo.setStyleSheet(base_style)
+        
+        combo.view().setStyleSheet("""
+            QListView {
+                color: #000000;
+                background-color: #ffffff;
+                outline: none;
+            }
+            QListView::item {
+                color: #000000;
+                background-color: #ffffff;
+                padding: 5px;
+            }
+            QListView::item:selected {
+                color: #ffffff;
+                background-color: #0078d7;
+            }
+            QListView::item:hover {
+                background-color: #e5f3ff;
+                color: #000000;
+            }
+        """)
 
     def reset_to_defaults(self):
         """모든 입력 필드를 기본 상태로 초기화합니다."""
@@ -290,19 +328,13 @@ class RegionDataFormWidget(QWidget):
         category_layout = QHBoxLayout()
         category_label = QLabel("대분류 선택:")
         category_label.setStyleSheet("font-weight: bold;")
-        
         self.category_combo = QComboBox()
         self.category_combo.addItems(["선택해주세요", "지원신청서류", "공동명의 조건", "거주요건 조건", "우선순위 조건", "지급신청서류"])
         self.category_combo.setCurrentIndex(1) # '지원신청서류' 디폴트 선택
         self.category_combo.currentIndexChanged.connect(self._on_category_changed)
-        self.category_combo.setStyleSheet("""
-            QComboBox {
-                padding: 8px;
-                border: 1px solid #0078d4;
-                border-radius: 4px;
-                font-size: 14px;
-            }
-        """)
+        
+        # 스타일 적용 (8px padding, 14px font)
+        self._apply_combo_style(self.category_combo, padding=8, font_size=14)
         
         category_layout.addWidget(category_label)
         category_layout.addWidget(self.category_combo, stretch=1)
@@ -724,7 +756,7 @@ class RegionDataFormWidget(QWidget):
         entity_label.setFixedWidth(80)
         self.entity_type_combo = QComboBox()
         self.entity_type_combo.addItems(['개인', '개인사업자', '법인', '외국인'])
-        self.entity_type_combo.setStyleSheet("padding: 3px;")
+        self._apply_combo_style(self.entity_type_combo, padding=3)
         
         entity_layout.addWidget(entity_label)
         entity_layout.addWidget(self.entity_type_combo)
@@ -815,6 +847,7 @@ class RegionDataFormWidget(QWidget):
         self.doc_date_combo.addItems(["15", "30", "60", "90", "X"])
         self.doc_date_combo.setFixedWidth(60)
         self.doc_date_combo.setCurrentIndex(1)  # "30"이 디폴트가 되도록 인덱스 1로 설정
+        self._apply_combo_style(self.doc_date_combo, padding=2)
         
         day_unit_label = QLabel("(일)")
         day_unit_label.setStyleSheet("color: #666;")
@@ -1047,6 +1080,7 @@ class RegionDataFormWidget(QWidget):
                 self.combo_multi_child_age = QComboBox()
                 self.combo_multi_child_age.addItems(['만 18세 이하', '만 19세 이하', '알 수 없음'])
                 self.combo_multi_child_age.setCurrentIndex(0) # '만 18세 이하' 디폴트
+                self._apply_combo_style(self.combo_multi_child_age, padding=3)
                 
                 h_layout.addWidget(self.chk_multi_child_reg_only)
                 h_layout.addWidget(self.combo_multi_child_age)
@@ -1177,7 +1211,38 @@ class NotificationInfoDialog(QDialog):
         self.file_combo = QComboBox()
         self.file_combo.setPlaceholderText("참조할 공고문 파일을 선택하세요")
         self.file_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.file_combo.setStyleSheet("padding: 5px;")
+        
+        # 콤보박스 뷰 및 스타일 강제 적용
+        self.file_combo.setView(QListView())
+        self.file_combo.setStyleSheet("""
+            QComboBox {
+                padding: 5px;
+                background-color: #ffffff;
+                color: #000000;
+                border: 1px solid #a0a0a0;
+                border-radius: 2px;
+            }
+        """)
+        self.file_combo.view().setStyleSheet("""
+            QListView {
+                color: #000000;
+                background-color: #ffffff;
+                outline: none;
+            }
+            QListView::item {
+                color: #000000;
+                background-color: #ffffff;
+                padding: 5px;
+            }
+            QListView::item:selected {
+                color: #ffffff;
+                background-color: #0078d7;
+            }
+            QListView::item:hover {
+                background-color: #e5f3ff;
+                color: #000000;
+            }
+        """)
         
         self.open_file_btn = QPushButton("파일 열기")
         self.open_file_btn.setFixedWidth(80)
@@ -1279,6 +1344,14 @@ class NotificationInfoDialog(QDialog):
                 selection-background-color: #0078d7;
                 selection-color: #ffffff;
                 border: 1px solid #a0a0a0;
+            }
+            QComboBox QAbstractItemView::item {
+                color: #000000;
+                background-color: #ffffff;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #0078d7;
+                color: #ffffff;
             }
 
             /* --- 리스트 위젯 --- */
