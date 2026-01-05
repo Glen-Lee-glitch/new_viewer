@@ -63,12 +63,13 @@ class DragAndDropLineEdit(QLineEdit):
 
 class DataEntryDialog(QDialog):
     """공고문을 보며 데이터를 입력하는 창"""
-    def __init__(self, file_path, parent=None):
+    def __init__(self, file_path, region, parent=None):
         super().__init__(parent)
         self.setWindowTitle("공고문 데이터 상세 입력")
         self.resize(500, 750)
         self.setMinimumWidth(450)
         
+        self.region = region
         self._init_ui(file_path)
 
     def _init_ui(self, file_path):
@@ -121,8 +122,9 @@ class DataEntryDialog(QDialog):
 
         # 4. 하단 버튼
         btn_layout = QHBoxLayout()
-        save_btn = QPushButton("저장하기")
-        save_btn.setStyleSheet("""
+        self.save_btn = QPushButton("저장하기")
+        self.save_btn.clicked.connect(self._on_save_clicked)
+        self.save_btn.setStyleSheet("""
             QPushButton {
                 background-color: #0078d4;
                 color: white;
@@ -139,8 +141,39 @@ class DataEntryDialog(QDialog):
         
         btn_layout.addStretch()
         btn_layout.addWidget(cancel_btn)
-        btn_layout.addWidget(save_btn)
+        btn_layout.addWidget(self.save_btn)
         layout.addLayout(btn_layout)
+
+    def _on_save_clicked(self):
+        """지원신청서 파일을 지정된 경로로 저장(복사)합니다."""
+        import shutil
+        source_file = self.app_form_path_edit.text().strip()
+        
+        if not source_file or not os.path.exists(source_file):
+            QMessageBox.warning(self, "경고", "첨부된 지원신청서 파일이 없거나 경로가 유효하지 않습니다.")
+            return
+
+        try:
+            # 기본 저장 경로 설정 (네트워크 경로)
+            base_path = r"\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\26q1\공고문"
+            # 지역별 '전처리된 서류' 폴더 경로 생성
+            target_dir = os.path.join(base_path, self.region, "전처리된 서류")
+            
+            # 폴더가 없으면 생성
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir, exist_ok=True)
+            
+            # 대상 파일 경로
+            target_file = os.path.join(target_dir, "지원신청서.pdf")
+            
+            # 파일 복사
+            shutil.copy2(source_file, target_file)
+            
+            QMessageBox.information(self, "성공", f"파일이 성공적으로 저장되었습니다.\n지역: {self.region}\n경로: {target_file}")
+            self.accept()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"파일 저장 중 오류가 발생했습니다:\n{str(e)}")
 
     def _create_empty_page(self):
         page = QWidget()
@@ -452,10 +485,13 @@ class NotificationInfoDialog(QDialog):
             # 1. 파일 실행
             os.startfile(file_path)
             
-            # 2. 데이터 입력 창 띄우기 (비모달 방식으로 띄워 공고문과 동시에 볼 수 있게 함)
-            entry_dialog = DataEntryDialog(file_path, self)
+            # 2. 현재 선택된 지역 정보 가져오기
+            selected_region_item = self.region_list.currentItem()
+            region = selected_region_item.text() if selected_region_item else "알수없음"
+            
+            # 3. 데이터 입력 창 띄우기
+            entry_dialog = DataEntryDialog(file_path, region, self)
             entry_dialog.show()
-            # 참조가 유지되도록 인스턴스 변수에 저장 (여러 개를 띄우고 싶다면 리스트 등으로 관리 가능)
             self.current_entry_dialog = entry_dialog
 
 
