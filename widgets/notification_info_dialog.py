@@ -1358,14 +1358,17 @@ class NotificationInfoDialog(QDialog):
             }
             QListWidget::item {
                 color: #000000;
-                padding: 4px;
+                padding: 6px;
+                border-bottom: 1px solid #f0f0f0;
             }
+            /* 선택되거나 호버링될 때만 배경색을 강제 적용하여 일반 상태의 아이템 배경색(조건부 서식)이 보이게 함 */
             QListWidget::item:selected {
                 background-color: #0078d7;
                 color: #ffffff;
             }
             QListWidget::item:hover:!selected {
-                background-color: #e5f3ff;
+                background-color: rgba(0, 120, 215, 20); /* 매우 연한 파란색으로 호버 표시, 기존 배경색이 투영되도록 함 */
+                color: #000000;
             }
 
             /* --- 버튼 --- */
