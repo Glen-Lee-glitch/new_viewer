@@ -68,6 +68,12 @@ class DragAndDropLineEdit(QLineEdit):
 
 class RegionDataFormWidget(QWidget):
     """공고문을 보며 데이터를 입력하는 위젯 (기존 DataEntryDialog 대체)"""
+    
+    # 제조사 기본 지급 서류
+    DEFAULT_MFG_DOCS = ['지급신청서', '자동차등록증', '세금계산서', '사업자등록증', '통장사본']
+    # 지급신청서를 고객이 준비해야 하는 특별 지역 리스트
+    CUST_PAY_APP_REGIONS = ['서울특별시', '세종특별자치시']
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.region = None
@@ -81,6 +87,25 @@ class RegionDataFormWidget(QWidget):
             self.rb_loc_region.setText(region)
             # 기본적으로 지역명 체크 (load_data에서 덮어씌워질 수 있음)
             self.rb_loc_region.setChecked(True)
+
+        # 지급신청서류 기본값 세팅 (DB 저장 안 함)
+        self._reset_payment_defaults(region)
+
+    def _reset_payment_defaults(self, region):
+        """지급신청서류를 주체별 기본값으로 리셋합니다."""
+        if not hasattr(self, 'cust_payment_list') or not hasattr(self, 'mfg_payment_list'):
+            return
+
+        self.cust_payment_list.clear()
+        self.mfg_payment_list.clear()
+
+        is_cust_app = region in self.CUST_PAY_APP_REGIONS
+        
+        for doc in self.DEFAULT_MFG_DOCS:
+            if doc == '지급신청서' and is_cust_app:
+                self.cust_payment_list.addItem(doc)
+            else:
+                self.mfg_payment_list.addItem(doc)
 
     def load_data(self, data):
         """DB에서 불러온 데이터를 UI에 채웁니다."""
@@ -119,10 +144,24 @@ class RegionDataFormWidget(QWidget):
             for doc in apply_data.get('extra_docs', []):
                 self.extra_docs_list.addItem(doc)
 
-            # 지급 서류 리스트
-            self.payment_docs_list.clear()
-            for doc in apply_data.get('payment_docs', []):
-                self.payment_docs_list.addItem(doc)
+            # 지급 서류 리스트 (주체별 로드 - 기본값은 유지하고 추가분만 삽입)
+            p_docs = apply_data.get('payment_docs', {})
+            if isinstance(p_docs, dict):
+                for doc in p_docs.get('customer', []):
+                    # 중복 방지 (기본값에 이미 있을 수 있음)
+                    existing = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
+                    if doc not in existing:
+                        self.cust_payment_list.addItem(doc)
+                for doc in p_docs.get('manufacturer', []):
+                    existing = [self.mfg_payment_list.item(i).text() for i in range(self.mfg_payment_list.count())]
+                    if doc not in existing:
+                        self.mfg_payment_list.addItem(doc)
+            elif isinstance(p_docs, list):
+                # 하위 호환성: 기존 리스트 데이터는 고객 서류로 간주
+                for doc in p_docs:
+                    existing = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
+                    if doc not in existing:
+                        self.cust_payment_list.addItem(doc)
             
             # 서류 발급일
             self.doc_date_combo.setCurrentText(apply_data.get('document_date', '30'))
@@ -297,7 +336,17 @@ class RegionDataFormWidget(QWidget):
             foreigner_input = self.foreigner_input.text().strip()
             
         extra_docs = [self.extra_docs_list.item(i).text() for i in range(self.extra_docs_list.count())]
-        payment_docs = [self.payment_docs_list.item(i).text() for i in range(self.payment_docs_list.count())]
+        
+        # 지급 서류 수집 및 기본값 제외 필터링
+        all_cust_pay = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
+        all_mfg_pay = [self.mfg_payment_list.item(i).text() for i in range(self.mfg_payment_list.count())]
+        
+        # 기본값 리스트에 없는 것만 골라냄
+        payment_docs = {
+            "customer": [d for d in all_cust_pay if d not in self.DEFAULT_MFG_DOCS],
+            "manufacturer": [d for d in all_mfg_pay if d not in self.DEFAULT_MFG_DOCS]
+        }
+        
         doc_date = self.doc_date_combo.currentText()
         
         # (2) 공동명의 데이터 수집 (라디오 버튼)
@@ -419,56 +468,75 @@ class RegionDataFormWidget(QWidget):
             QMessageBox.critical(self, "DB 저장 오류", f"데이터베이스 저장 중 오류가 발생했습니다:\n{str(e)}")
 
     def _create_payment_docs_page(self):
-        """지급신청서류 입력 페이지"""
+        """지급신청서류 입력 페이지 (고객/제조사 구분)"""
         page = QWidget()
         layout = QVBoxLayout(page)
+        layout.setSpacing(20)
+
+        # 1. 고객 작성 서류 섹션
+        self.cust_payment_list = QListWidget()
+        cust_group = self._create_subject_doc_group(
+            "고객 작성 서류", 
+            self.cust_payment_list, 
+            "고객용 서류 명칭 입력...",
+            ["보조금 지급신청서", "통장사본", "차량등록증"]
+        )
+        layout.addWidget(cust_group)
+
+        # 2. 제조사 작성 서류 섹션
+        self.mfg_payment_list = QListWidget()
+        mfg_group = self._create_subject_doc_group(
+            "제조사 작성 서류", 
+            self.mfg_payment_list, 
+            "제조사용 서류 명칭 입력...",
+            ["지방세 납세증명서", "사업자등록증명원"]
+        )
+        layout.addWidget(mfg_group)
+
+        tip = QLabel("※ 각 항목을 더블클릭하여 삭제할 수 있습니다.")
+        tip.setStyleSheet("color: #999; font-size: 11px;")
+        layout.addWidget(tip)
+        layout.addStretch()
+        return page
+
+    def _create_subject_doc_group(self, title, list_widget, placeholder, quick_items):
+        """주체별 서류 그룹 박스 생성 헬퍼"""
+        group = QGroupBox(title)
+        layout = QVBoxLayout(group)
         
-        group = QGroupBox("보조금 지급 신청 시 필요 서류")
-        g_layout = QVBoxLayout(group)
-        
-        self.payment_docs_list = QListWidget()
-        
-        # 항목 추가 레이아웃
+        # 입력창 및 추가 버튼
         add_layout = QHBoxLayout()
-        self.payment_input = QLineEdit()
-        self.payment_input.setPlaceholderText("서류 명칭 입력 (예: 통장사본, 지급신청서...)")
+        input_field = QLineEdit()
+        input_field.setPlaceholderText(placeholder)
         
         add_btn = QPushButton("추가")
         add_btn.setFixedWidth(60)
-        add_btn.clicked.connect(lambda: self._add_to_list(self.payment_input, self.payment_docs_list))
-        self.payment_input.returnPressed.connect(lambda: self._add_to_list(self.payment_input, self.payment_docs_list))
+        add_btn.clicked.connect(lambda: self._add_to_list(input_field, list_widget))
+        input_field.returnPressed.connect(lambda: self._add_to_list(input_field, list_widget))
         
-        add_layout.addWidget(self.payment_input)
+        add_layout.addWidget(input_field)
         add_layout.addWidget(add_btn)
         
-        # 빠른 추가 (자주 쓰는 지급 서류)
+        # 빠른 추가 버튼
         quick_layout = QHBoxLayout()
-        common_payments = ["보조금 지급신청서", "통장사본", "차량등록증", "지방세 납세증명서"]
-        for name in common_payments:
+        for name in quick_items:
             btn = QPushButton(name)
             btn.setStyleSheet("""
                 QPushButton { font-size: 11px; color: #0078d4; background: transparent; 
                 border: 1px solid #0078d4; border-radius: 10px; padding: 2px 10px; }
             """)
-            btn.clicked.connect(lambda checked, n=name: self._add_to_list(None, self.payment_docs_list, n))
+            btn.clicked.connect(lambda checked, n=name: self._add_to_list(None, list_widget, n))
             quick_layout.addWidget(btn)
         quick_layout.addStretch()
         
-        g_layout.addWidget(self.payment_docs_list)
-        g_layout.addLayout(add_layout)
-        g_layout.addLayout(quick_layout)
+        layout.addWidget(list_widget)
+        layout.addLayout(add_layout)
+        layout.addLayout(quick_layout)
         
-        tip = QLabel("※ 더블클릭하여 항목을 삭제할 수 있습니다.")
-        tip.setStyleSheet("color: #999; font-size: 11px;")
-        g_layout.addWidget(tip)
-        
-        self.payment_docs_list.itemDoubleClicked.connect(
-            lambda item: self.payment_docs_list.takeItem(self.payment_docs_list.row(item))
+        list_widget.itemDoubleClicked.connect(
+            lambda item: list_widget.takeItem(list_widget.row(item))
         )
-        
-        layout.addWidget(group)
-        layout.addStretch()
-        return page
+        return group
 
     def _add_to_list(self, input_field, list_widget, text=None):
         """리스트 위젯에 항목을 추가하는 공통 유틸리티"""
