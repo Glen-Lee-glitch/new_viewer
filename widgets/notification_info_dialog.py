@@ -24,10 +24,42 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QPushButton,
     QGroupBox,
+    QFileDialog,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt
 
 from core.data_manage import DB_CONFIG
+
+class DragAndDropLineEdit(QLineEdit):
+    """드래그 앤 드롭을 지원하는 커스텀 QLineEdit"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.setReadOnly(True)
+        self.setPlaceholderText("파일을 이곳에 드래그하거나 선택 버튼을 누르세요...")
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            # 드롭된 데이터가 URL(파일 경로)을 포함하고 있는지 확인
+            urls = event.mimeData().urls()
+            if urls and urls[0].toLocalFile().lower().endswith('.pdf'):
+                event.acceptProposedAction()
+                self.setStyleSheet("background-color: #e1f0fe; border: 2px solid #0078d4;")
+            else:
+                event.ignore()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self.setStyleSheet("background-color: #f8f8f8; color: #666;")
+
+    def dropEvent(self, event):
+        file_path = event.mimeData().urls()[0].toLocalFile()
+        if file_path.lower().endswith('.pdf'):
+            self.setText(file_path)
+            self.setStyleSheet("background-color: #f8f8f8; color: #333; font-weight: bold;")
+        self.setStyleSheet("background-color: #f8f8f8; color: #333;")
 
 class DataEntryDialog(QDialog):
     """공고문을 보며 데이터를 입력하는 창"""
@@ -130,17 +162,17 @@ class DataEntryDialog(QDialog):
         common_layout = QVBoxLayout(common_group)
         common_layout.setSpacing(10)
         
-        # 1. 지원신청서 행 (파일 첨부 UI 포함)
+        # 1. 지원신청서 행 (커스텀 드래그 앤 드롭 위젯 사용)
         app_form_row = QHBoxLayout()
         app_form_label = QLabel("지원신청서")
         app_form_label.setFixedWidth(80)
-        self.app_form_path_edit = QLineEdit()
-        self.app_form_path_edit.setReadOnly(True)
-        self.app_form_path_edit.setPlaceholderText("파일을 첨부해 주세요...")
+        
+        self.app_form_path_edit = DragAndDropLineEdit()
         self.app_form_path_edit.setStyleSheet("background-color: #f8f8f8; color: #666;")
         
         app_form_btn = QPushButton("파일 선택")
         app_form_btn.setFixedWidth(80)
+        app_form_btn.clicked.connect(self._select_app_form_file)
         
         app_form_row.addWidget(app_form_label)
         app_form_row.addWidget(self.app_form_path_edit)
@@ -189,6 +221,21 @@ class DataEntryDialog(QDialog):
         layout.addWidget(extra_group)
         layout.addStretch()
         return page
+
+    def _select_app_form_file(self):
+        """파일 탐색기를 열어 PDF 파일을 선택합니다."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "지원신청서 파일 선택",
+            "",
+            "PDF Files (*.pdf);;All Files (*)"
+        )
+        if file_path:
+            if file_path.lower().endswith('.pdf'):
+                self.app_form_path_edit.setText(file_path)
+                self.app_form_path_edit.setStyleSheet("background-color: #f8f8f8; color: #333; font-weight: bold;")
+            else:
+                QMessageBox.warning(self, "경고", "PDF 파일만 첨부할 수 있습니다.")
 
     def _add_extra_document(self):
         text = self.doc_input_field.text().strip()
