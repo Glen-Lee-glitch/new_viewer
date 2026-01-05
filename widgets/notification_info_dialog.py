@@ -1,4 +1,5 @@
 import sys
+import os
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -72,6 +73,7 @@ class NotificationInfoDialog(QDialog):
         
         self.file_list = QListWidget()
         self.file_list.setObjectName("fileList")
+        self.file_list.itemDoubleClicked.connect(self._on_file_double_clicked)
         
         right_layout.addWidget(self.region_name_label)
         right_layout.addWidget(self.file_list)
@@ -135,9 +137,18 @@ class NotificationInfoDialog(QDialog):
         """)
 
     def _load_regions(self):
+        # file_paths가 있고 그 길이가 0보다 큰 지역만 리스트에 추가합니다.
         regions = sorted(self.data.keys())
         for region in regions:
-            item = QListWidgetItem(region)
+            files = self.data.get(region, [])
+            if files:  # 파일 리스트가 비어있지 않은 경우에만 추가
+                item = QListWidgetItem(region)
+                self.region_list.addItem(item)
+        
+        # 만약 표시할 지역이 하나도 없다면 안내 메시지 표시 가능
+        if self.region_list.count() == 0:
+            item = QListWidgetItem("공고문이 있는 지역이 없습니다.")
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
             self.region_list.addItem(item)
 
     def _on_region_selected(self, item):
@@ -156,6 +167,12 @@ class NotificationInfoDialog(QDialog):
                 # 파일 경로에서 파일명만 표시하거나 전체 경로를 표시할 수 있습니다.
                 # 여기서는 구분을 위해 전체 경로를 넣되, 스타일로 조절 가능합니다.
                 self.file_list.addItem(QListWidgetItem(file))
+
+    def _on_file_double_clicked(self, item):
+        file_path = item.text()
+        if os.path.exists(file_path):
+            os.startfile(file_path)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
