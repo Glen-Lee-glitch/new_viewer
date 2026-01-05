@@ -609,10 +609,39 @@ class DataEntryDialog(QDialog):
         ]
 
         for key, label in items:
-            edit = QLineEdit()
-            edit.setPlaceholderText(f"{label} 관련 세부 조건 또는 증빙 서류 입력")
-            self.priority_edits[key] = edit
-            layout.addRow(f"{label}:", edit)
+            if key == "multi_child":
+                # 다자녀 전용 UI: 체크박스 + 콤보박스
+                h_layout = QHBoxLayout()
+                
+                self.chk_multi_child_reg_only = QCheckBox("등본만 가능")
+                self.chk_multi_child_reg_only.setChecked(False)
+                
+                self.combo_multi_child_age = QComboBox()
+                self.combo_multi_child_age.addItems(['만 18세 이하', '만 19세 이하', '알 수 없음'])
+                self.combo_multi_child_age.setCurrentIndex(0) # '만 18세 이하' 디폴트
+                
+                h_layout.addWidget(self.chk_multi_child_reg_only)
+                h_layout.addWidget(self.combo_multi_child_age)
+                h_layout.addStretch()
+                
+                layout.addRow(f"{label}:", h_layout)
+            else:
+                edit = QLineEdit()
+                if key == "first_time":
+                    edit.setText("(출생~현재)지방세 세목별 미과세증명서")
+                elif key == "low_income":
+                    edit.setText("차상위 계층 증명서/기초생활 수급자 증명서")
+                elif key == "disabled":
+                    edit.setText("장애인증명서(장애인등록증 혹은 복지카드 등)")
+                elif key == "merit":
+                    edit.setText("국가유공자 확인 증명 서류")
+                elif key == "scrappage":
+                    edit.setText("(지급신청 시 필요) 자동차 말소 등록 사실증명서")
+                elif key == "small_biz":
+                    edit.setText("중소기업(소상공인)확인서")
+                edit.setPlaceholderText(f"{label} 관련 세부 조건 또는 증빙 서류 입력")
+                self.priority_edits[key] = edit
+                layout.addRow(f"{label}:", edit)
 
         return page
 
