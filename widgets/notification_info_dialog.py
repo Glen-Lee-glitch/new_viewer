@@ -92,6 +92,59 @@ class RegionDataFormWidget(QWidget):
         # 지급신청서류 기본값 세팅 (DB 저장 안 함)
         self._reset_payment_defaults()
 
+    def reset_to_defaults(self):
+        """모든 입력 필드를 기본 상태로 초기화합니다."""
+        # 0. 상태 리스트 초기화
+        self.checked_status_list = {}
+        
+        # 1. 지원신청서류 초기화
+        self.app_form_path_edit.clear()
+        self.entity_type_combo.setCurrentIndex(0) # '개인'
+        self.chk_resident_reg.setChecked(True)
+        self.chk_resident_abstract.setChecked(True)
+        self.chk_biz_person.setChecked(True)
+        self.chk_biz_reg_cert.setChecked(True)
+        self.chk_corp_reg.setChecked(True)
+        self.chk_corp_biz_cert.setChecked(True)
+        self.foreigner_input.clear()
+        self.rb_loc_any.setChecked(True)
+        self.extra_docs_list.clear()
+        self.doc_date_combo.setCurrentIndex(1) # '30'
+        
+        # 2. 공동명의 초기화
+        if self.joint_radios:
+            self.joint_radios[0].setChecked(True)
+        self.joint_custom_edit.clear()
+        self.joint_share_edit.clear()
+        self.joint_rep_edit.clear()
+        
+        # 3. 거주요건 초기화
+        for btn in self.residence_period_group.buttons():
+            if btn.property("value") == "90":
+                btn.setChecked(True)
+                break
+                
+        # 4. 우선순위 초기화
+        self.chk_multi_child_reg_only.setChecked(False)
+        self.combo_multi_child_age.setCurrentIndex(0)
+        p_defaults = {
+            "first_time": "(출생~현재)지방세 세목별 미과세증명서",
+            "low_income": "차상위 계층 증명서/기초생활 수급자 증명서",
+            "disabled": "장애인증명서(장애인등록증 혹은 복지카드 등)",
+            "merit": "국가유공자 확인 증명 서류",
+            "scrappage": "(지급신청 시 필요) 자동차 말소 등록 사실증명서",
+            "small_biz": "중소기업(소상공인)확인서"
+        }
+        for key, default_val in p_defaults.items():
+            if key in self.priority_edits:
+                self.priority_edits[key].setText(default_val)
+                
+        # 5. 지급신청서류 초기화
+        self._reset_payment_defaults()
+        
+        # 6. 카테고리 콤보박스 리셋
+        self.category_combo.setCurrentIndex(1)
+
     def _reset_payment_defaults(self):
         """지급신청서류를 주체별 기본값으로 리셋합니다."""
         if not hasattr(self, 'cust_payment_list') or not hasattr(self, 'mfg_payment_list'):
@@ -1219,10 +1272,34 @@ class NotificationInfoDialog(QDialog):
     def _on_region_selected(self, item):
         region = item.text()
         
-        # 1. 헤더 업데이트
+        # 이미 선택된 지역을 다시 누른 경우 무시
+        if self.form_widget.region == region:
+            return
+
+        # 이미 다른 지역이 선택되어 있는 경우에만 경고 메시지 표시
+        if self.form_widget.region is not None:
+            reply = QMessageBox.question(
+                self, "지역 변경 확인",
+                f"'{region}' 지역으로 전환하시겠습니까?\n작성 중인 내용은 저장하지 않으면 사라지며, 해당 지역의 기존 데이터가 로드됩니다.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply != QMessageBox.StandardButton.Yes:
+                # 선택을 이전 지역으로 되돌리기
+                for i in range(self.region_list.count()):
+                    if self.region_list.item(i).text() == self.form_widget.region:
+                        self.region_list.item(i).setSelected(True)
+                        break
+                return
+
+        # 1. 폼 초기화 (기본값 설정)
+        self.form_widget.reset_to_defaults()
+        
+        # 2. 헤더 업데이트
         self.region_name_label.setText(f"{region}")
         
-        # 2. 파일 콤보박스 업데이트
+        # 3. 파일 콤보박스 업데이트
         self.file_combo.clear()
         files = self.data.get(region, [])
         if files:
@@ -1234,11 +1311,11 @@ class NotificationInfoDialog(QDialog):
             self.file_combo.setEnabled(False)
             self.open_file_btn.setEnabled(False)
             
-        # 3. 폼 위젯 활성화 및 지역 설정
+        # 4. 폼 위젯 활성화 및 지역 설정
         self.form_widget.setEnabled(True)
         self.form_widget.set_region(region)
 
-        # 4. 기존 DB 데이터 로드
+        # 5. 기존 DB 데이터 로드
         try:
             with closing(psycopg2.connect(**DB_CONFIG)) as conn:
                 with conn.cursor() as cursor:
@@ -1260,7 +1337,7 @@ class NotificationInfoDialog(QDialog):
                         }
                         self.form_widget.load_data(existing_data)
                     else:
-                        # 데이터가 없는 경우 폼을 기본 상태로 초기화 (필요시)
+                        # 데이터가 없는 경우 이미 reset_to_defaults()가 호출되었으므로 기본값 상태 유지
                         pass
         except Exception as e:
             print(f"기존 데이터 로드 실패: {e}")
