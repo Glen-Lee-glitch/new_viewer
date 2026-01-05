@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
     QCompleter,
+    QSizePolicy
 )
 from PyQt6.QtCore import Qt
 
@@ -65,33 +66,25 @@ class DragAndDropLineEdit(QLineEdit):
             self.setStyleSheet("background-color: #f8f8f8; color: #333; font-weight: bold;")
         self.setStyleSheet("background-color: #f8f8f8; color: #333;")
 
-class DataEntryDialog(QDialog):
-    """공고문을 보며 데이터를 입력하는 창"""
-    def __init__(self, file_path, region, parent=None):
+class RegionDataFormWidget(QWidget):
+    """공고문을 보며 데이터를 입력하는 위젯 (기존 DataEntryDialog 대체)"""
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("공고문 데이터 상세 입력")
-        self.resize(500, 750)
-        self.setMinimumWidth(450)
-        
-        self.region = region
-        self._init_ui(file_path)
+        self.region = None
+        self._init_ui()
 
-    def _init_ui(self, file_path):
+    def set_region(self, region):
+        """지역 설정 및 UI 초기화 상태 변경"""
+        self.region = region
+        # 지역이 설정되면 필요한 초기화 로직이 있다면 여기에 추가
+        # 현재는 입력 폼이 비워지는 로직은 없으나, 필요시 추가 가능
+
+    def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(0, 0, 0, 0) # 내장 위젯이므로 여백 제거
         layout.setSpacing(15)
 
-        # 1. 파일 정보 섹션
-        info_group = QGroupBox("파일 정보")
-        info_layout = QVBoxLayout(info_group)
-        file_name = os.path.basename(file_path)
-        self.file_label = QLabel(f"파일명: {file_name}")
-        self.file_label.setStyleSheet("font-weight: bold; color: #333;")
-        self.file_label.setWordWrap(True)
-        info_layout.addWidget(self.file_label)
-        layout.addWidget(info_group)
-
-        # 2. 대분류 선택 섹션
+        # 1. 대분류 선택 섹션
         category_layout = QHBoxLayout()
         category_label = QLabel("대분류 선택:")
         category_label.setStyleSheet("font-weight: bold;")
@@ -113,7 +106,7 @@ class DataEntryDialog(QDialog):
         category_layout.addWidget(self.category_combo, stretch=1)
         layout.addLayout(category_layout)
 
-        # 3. 동적 입력 섹션 (Stacked Widget)
+        # 2. 동적 입력 섹션 (Stacked Widget)
         self.stack = QStackedWidget()
         
         # 각 카테고리별 위젯 생성
@@ -129,32 +122,35 @@ class DataEntryDialog(QDialog):
         self.category_combo.setCurrentIndex(1)
         self.stack.setCurrentIndex(1)
 
-        # 4. 하단 버튼
+        # 3. 하단 버튼
         btn_layout = QHBoxLayout()
         self.save_btn = QPushButton("저장하기")
         self.save_btn.clicked.connect(self._on_save_clicked)
+        self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.save_btn.setStyleSheet("""
             QPushButton {
                 background-color: #0078d4;
                 color: white;
-                padding: 10px;
+                padding: 12px;
                 font-weight: bold;
                 border-radius: 4px;
+                font-size: 14px;
             }
             QPushButton:hover {
                 background-color: #106ebe;
             }
         """)
-        cancel_btn = QPushButton("취소")
-        cancel_btn.clicked.connect(self.reject)
         
         btn_layout.addStretch()
-        btn_layout.addWidget(cancel_btn)
         btn_layout.addWidget(self.save_btn)
         layout.addLayout(btn_layout)
 
     def _on_save_clicked(self):
         """데이터 수집 및 파일 복사, DB 저장을 수행합니다."""
+        if not self.region:
+            QMessageBox.warning(self, "경고", "지역이 선택되지 않았습니다.")
+            return
+
         import shutil
         import json
         
@@ -304,7 +300,6 @@ class DataEntryDialog(QDialog):
                     conn.commit()
                     
             QMessageBox.information(self, "성공", f"데이터와 파일이 성공적으로 저장되었습니다.\n지역: {self.region}")
-            # 저장 후 창을 닫지 않도록 self.accept() 제거
             
         except Exception as e:
             QMessageBox.critical(self, "DB 저장 오류", f"데이터베이스 저장 중 오류가 발생했습니다:\n{str(e)}")
@@ -695,7 +690,7 @@ class NotificationInfoDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("공고문 관리")
-        self.resize(900, 600)
+        self.resize(1100, 750)
         self.setMinimumSize(900, 600)
         # 최대화 및 최소화 버튼 활성화
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint)
@@ -734,18 +729,18 @@ class NotificationInfoDialog(QDialog):
         main_layout.setSpacing(15)
 
         # 상단 타이틀
-        self.title_label = QLabel("지역별 공고문 목록")
+        self.title_label = QLabel("지역별 공고문 관리")
         self.title_label.setObjectName("titleLabel")
-        main_layout.addWidget(self.title_label, stretch=1)
+        main_layout.addWidget(self.title_label)
 
         # 스플리터 생성
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setObjectName("mainSplitter")
         
-        # 왼쪽: 지역 리스트 영역
+        # 1. 왼쪽: 지역 리스트 영역
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setContentsMargins(0, 0, 10, 0) # 우측 여백
         
         region_label = QLabel("지역 선택")
         region_label.setObjectName("subHeader")
@@ -757,27 +752,58 @@ class NotificationInfoDialog(QDialog):
         left_layout.addWidget(region_label)
         left_layout.addWidget(self.region_list)
         
-        # 오른쪽: 파일 리스트 영역
+        # 2. 오른쪽: 상세 정보 및 입력 영역
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setContentsMargins(10, 0, 0, 0) # 좌측 여백
+        right_layout.setSpacing(10)
+        
+        # 2-1. 헤더 (지역명 + 파일 열기)
+        header_widget = QWidget()
+        header_layout = QVBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 10)
         
         self.region_name_label = QLabel("지역을 선택해주세요")
         self.region_name_label.setObjectName("regionHeader")
         
-        self.file_list = QListWidget()
-        self.file_list.setObjectName("fileList")
-        self.file_list.itemDoubleClicked.connect(self._on_file_double_clicked)
+        # 파일 선택 컨트롤
+        file_control_layout = QHBoxLayout()
+        file_control_layout.setSpacing(10)
         
-        right_layout.addWidget(self.region_name_label)
-        right_layout.addWidget(self.file_list)
+        self.file_combo = QComboBox()
+        self.file_combo.setPlaceholderText("참조할 공고문 파일을 선택하세요")
+        self.file_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.file_combo.setStyleSheet("padding: 5px;")
+        
+        self.open_file_btn = QPushButton("파일 열기")
+        self.open_file_btn.setFixedWidth(80)
+        self.open_file_btn.setStyleSheet("padding: 5px;")
+        self.open_file_btn.clicked.connect(self._on_open_file_clicked)
+        
+        file_control_layout.addWidget(self.file_combo)
+        file_control_layout.addWidget(self.open_file_btn)
+        
+        header_layout.addWidget(self.region_name_label)
+        header_layout.addLayout(file_control_layout)
+        
+        right_layout.addWidget(header_widget)
+        
+        # 2-2. 입력 폼 (내장된 RegionDataFormWidget)
+        self.form_widget = RegionDataFormWidget()
+        
+        # 초기엔 비활성화 상태 (지역 선택 전)
+        self.form_widget.setEnabled(False)
+        
+        right_layout.addWidget(self.form_widget)
         
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
+        
+        # 화면 비율 1:2
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
         
-        main_layout.addWidget(splitter, stretch=9)
+        main_layout.addWidget(splitter)
 
     def _setup_styles(self):
         self.setStyleSheet("""
@@ -785,22 +811,23 @@ class NotificationInfoDialog(QDialog):
                 background-color: #ffffff;
             }
             #titleLabel {
-                font-size: 22px;
+                font-size: 24px;
                 font-weight: bold;
                 color: #1a1a1a;
                 margin-bottom: 5px;
             }
-            #subHeader, #regionHeader {
+            #subHeader {
                 font-size: 14px;
                 font-weight: bold;
                 color: #666666;
                 padding-bottom: 5px;
             }
             #regionHeader {
-                font-size: 16px;
+                font-size: 20px;
+                font-weight: bold;
                 color: #0078d4;
-                border-bottom: 1px solid #eeeeee;
-                margin-bottom: 10px;
+                border-bottom: 2px solid #0078d4;
+                padding-bottom: 8px;
             }
             QListWidget {
                 border: 1px solid #e0e0e0;
@@ -822,11 +849,9 @@ class NotificationInfoDialog(QDialog):
                 font-weight: bold;
                 border-left: 3px solid #0078d4;
             }
-            #fileList::item {
-                padding: 12px 15px;
-            }
             QSplitter::handle {
-                background-color: #f0f0f0;
+                background-color: #e0e0e0;
+                width: 1px;
             }
         """)
 
@@ -847,36 +872,35 @@ class NotificationInfoDialog(QDialog):
 
     def _on_region_selected(self, item):
         region = item.text()
-        self.region_name_label.setText(f"{region} 관련 파일")
-        self.file_list.clear()
         
+        # 1. 헤더 업데이트
+        self.region_name_label.setText(f"{region}")
+        
+        # 2. 파일 콤보박스 업데이트
+        self.file_combo.clear()
         files = self.data.get(region, [])
-        if not files:
-            no_file_item = QListWidgetItem("등록된 파일이 없습니다.")
-            no_file_item.setFlags(Qt.ItemFlag.NoItemFlags)
-            no_file_item.setForeground(Qt.GlobalColor.gray)
-            self.file_list.addItem(no_file_item)
+        if files:
+            self.file_combo.addItems(files)
+            self.file_combo.setEnabled(True)
+            self.open_file_btn.setEnabled(True)
         else:
-            for file in files:
-                # 파일 경로에서 파일명만 표시하거나 전체 경로를 표시할 수 있습니다.
-                # 여기서는 구분을 위해 전체 경로를 넣되, 스타일로 조절 가능합니다.
-                self.file_list.addItem(QListWidgetItem(file))
-
-    def _on_file_double_clicked(self, item):
-        file_path = item.text()
-        if os.path.exists(file_path):
-            # 1. 파일 실행
-            os.startfile(file_path)
+            self.file_combo.addItem("표시할 파일이 없습니다")
+            self.file_combo.setEnabled(False)
+            self.open_file_btn.setEnabled(False)
             
-            # 2. 현재 선택된 지역 정보 가져오기
-            selected_region_item = self.region_list.currentItem()
-            region = selected_region_item.text() if selected_region_item else "알수없음"
-            
-            # 3. 데이터 입력 창 띄우기
-            entry_dialog = DataEntryDialog(file_path, region, self)
-            entry_dialog.show()
-            self.current_entry_dialog = entry_dialog
+        # 3. 폼 위젯 활성화 및 지역 설정
+        self.form_widget.setEnabled(True)
+        self.form_widget.set_region(region)
 
+    def _on_open_file_clicked(self):
+        file_path = self.file_combo.currentText()
+        if file_path and os.path.exists(file_path):
+            try:
+                os.startfile(file_path)
+            except Exception as e:
+                QMessageBox.warning(self, "오류", f"파일을 열 수 없습니다:\n{e}")
+        else:
+            QMessageBox.warning(self, "경고", "유효한 파일 경로가 아닙니다.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
