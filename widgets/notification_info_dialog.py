@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QCompleter,
     QSizePolicy
 )
+from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
 from core.data_manage import DB_CONFIG
@@ -1106,18 +1107,21 @@ class NotificationInfoDialog(QDialog):
         try:
             with closing(psycopg2.connect(**DB_CONFIG)) as conn:
                 with conn.cursor() as cursor:
-                    # file_paths가 NULL이 아니고 배열 길이가 0보다 큰 데이터 조회
+                    # ev_info와 공고문 상태를 함께 조회
                     query = """
-                        SELECT region, file_paths 
-                        FROM ev_info 
-                        WHERE file_paths IS NOT NULL 
-                          AND array_length(file_paths, 1) > 0
-                        ORDER BY region ASC
+                        SELECT e.region, e.file_paths, g.checked_status_list
+                        FROM ev_info e
+                        LEFT JOIN region_metadata r ON e.region = r.region
+                        LEFT JOIN 공고문 g ON r.region_id = g.region_id
+                        WHERE e.file_paths IS NOT NULL 
+                          AND array_length(e.file_paths, 1) > 0
+                        ORDER BY e.region ASC
                     """
                     cursor.execute(query)
                     rows = cursor.fetchall()
                     
-                    self.data = {row[0]: row[1] for row in rows}
+                    # {지역명: {"files": [], "status": {}}} 구조로 저장
+                    self.data = {row[0]: {"files": row[1], "status": row[2]} for row in rows}
         except Exception as e:
             print(f"DB 데이터 로드 실패: {e}")
             self.data = {}
@@ -1146,6 +1150,7 @@ class NotificationInfoDialog(QDialog):
         
         self.region_list = QListWidget()
         self.region_list.setObjectName("regionList")
+        self.region_list.setSpacing(5)  # 아이템 간 간격 추가 (스타일시트 제거 보완)
         self.region_list.itemClicked.connect(self._on_region_selected)
         
         left_layout.addWidget(region_label)
@@ -1228,26 +1233,6 @@ class NotificationInfoDialog(QDialog):
                 border-bottom: 2px solid #0078d4;
                 padding-bottom: 8px;
             }
-            QListWidget {
-                border: 1px solid #e0e0e0;
-                border-radius: 4px;
-                background-color: #fcfcfc;
-                outline: none;
-            }
-            QListWidget::item {
-                padding: 10px 15px;
-                border-bottom: 1px solid #f0f0f0;
-                color: #333333;
-            }
-            QListWidget::item:hover {
-                background-color: #f0f7ff;
-            }
-            QListWidget::item:selected {
-                background-color: #e1f0fe;
-                color: #0078d4;
-                font-weight: bold;
-                border-left: 3px solid #0078d4;
-            }
             QSplitter::handle {
                 background-color: #e0e0e0;
                 width: 1px;
@@ -1255,15 +1240,27 @@ class NotificationInfoDialog(QDialog):
         """)
 
     def _load_regions(self):
-        # file_paths가 있고 그 길이가 0보다 큰 지역만 리스트에 추가합니다.
+        # 지역 리스트를 생성하며 상태를 체크합니다.
         regions = sorted(self.data.keys())
         for region in regions:
-            files = self.data.get(region, [])
-            if files:  # 파일 리스트가 비어있지 않은 경우에만 추가
+            region_info = self.data.get(region, {})
+            files = region_info.get("files", [])
+            status_list = region_info.get("status")
+            
+            if files:
                 item = QListWidgetItem(region)
                 self.region_list.addItem(item)
+                
+                # 로드 시 즉시 '확인완료' 여부 체크 및 디버그 출력
+                if status_list and isinstance(status_list, dict):
+                    if any(value == "확인필요" for value in status_list.values()):
+                        # '확인필요' 항목이 하나라도 있으면 연한 노란색
+                        item.setBackground(QColor("#fff9c4"))
+                    elif all(value == "확인완료" for value in status_list.values()):
+                        print(f"DEBUG [초기로딩]: '{region}' 지역의 모든 공고문 항목이 '확인완료' 상태입니다.")
+                        # 모든 항목 확인 완료 시 배경색 변경 (연한 초록색)
+                        item.setBackground(QColor("#d4edda"))
         
-        # 만약 표시할 지역이 하나도 없다면 안내 메시지 표시 가능
         if self.region_list.count() == 0:
             item = QListWidgetItem("공고문이 있는 지역이 없습니다.")
             item.setFlags(Qt.ItemFlag.NoItemFlags)
@@ -1301,7 +1298,8 @@ class NotificationInfoDialog(QDialog):
         
         # 3. 파일 콤보박스 업데이트
         self.file_combo.clear()
-        files = self.data.get(region, [])
+        region_info = self.data.get(region, {})
+        files = region_info.get("files", [])
         if files:
             self.file_combo.addItems(files)
             self.file_combo.setEnabled(True)
@@ -1336,6 +1334,18 @@ class NotificationInfoDialog(QDialog):
                             'checked_status_list': row[4]
                         }
                         self.form_widget.load_data(existing_data)
+                        
+                        # 디버그: 선택 시 데이터 로드 상태 확인 (무조건 출력)
+                        status_list = existing_data.get('checked_status_list')
+                        print(f"DEBUG: 선택된 지역 [{region}]")
+                        print(f"DEBUG: 로드된 status_list: {status_list}")
+                        
+                        if status_list and isinstance(status_list, dict):
+                            is_all_done = all(value == "확인완료" for value in status_list.values())
+                            print(f"DEBUG: 모든 항목 확인완료 여부: {is_all_done}")
+                            
+                            if is_all_done:
+                                print(f"DEBUG: >>> '{region}' 지역 공고문 검토 완료! <<<")
                     else:
                         # 데이터가 없는 경우 이미 reset_to_defaults()가 호출되었으므로 기본값 상태 유지
                         pass
