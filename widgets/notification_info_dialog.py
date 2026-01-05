@@ -168,6 +168,12 @@ class RegionDataFormWidget(QWidget):
         if p_docs:
             if isinstance(p_docs, dict):
                 for doc in p_docs.get('customer', []):
+                    # 만약 기본 제조사 서류가 고객 쪽에 저장되어 있다면, 제조사 리스트에서 먼저 제거
+                    if doc in self.DEFAULT_MFG_DOCS:
+                        items = self.mfg_payment_list.findItems(doc, Qt.MatchFlag.MatchExactly)
+                        for item in items:
+                            self.mfg_payment_list.takeItem(self.mfg_payment_list.row(item))
+                    
                     existing = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
                     if doc not in existing:
                         self.cust_payment_list.addItem(doc)
@@ -337,9 +343,10 @@ class RegionDataFormWidget(QWidget):
         all_cust_pay = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
         all_mfg_pay = [self.mfg_payment_list.item(i).text() for i in range(self.mfg_payment_list.count())]
         
-        # 기본값 리스트에 없는 것만 골라냄
+        # 고객 리스트는 위치가 변동된 것이므로 모두 저장 (지급신청서가 여기 있다면 저장됨)
+        # 제조사 리스트는 기본값 5종을 제외하고 사용자가 추가한 것만 저장
         payment_docs = {
-            "customer": [d for d in all_cust_pay if d not in self.DEFAULT_MFG_DOCS],
+            "customer": all_cust_pay,
             "manufacturer": [d for d in all_mfg_pay if d not in self.DEFAULT_MFG_DOCS]
         }
         
