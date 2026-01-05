@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QFileDialog,
     QMessageBox,
+    QCompleter,
 )
 from PyQt6.QtCore import Qt
 
@@ -231,6 +232,14 @@ class DataEntryDialog(QDialog):
         add_input_layout = QHBoxLayout()
         self.doc_input_field = QLineEdit()
         self.doc_input_field.setPlaceholderText("추가 서류 명칭 입력...")
+        
+        # 자동완성 (Completer) 설정
+        self.common_docs = ['지방세(납세)증명 신청서', '탄소중립포인트(에너지) 가입 확인서']
+        completer = QCompleter(self.common_docs)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains) # 포함된 텍스트로 검색 가능
+        self.doc_input_field.setCompleter(completer)
+        
         self.doc_input_field.returnPressed.connect(self._add_extra_document) # 엔터키 지원
         
         add_btn = QPushButton("추가")
@@ -241,8 +250,36 @@ class DataEntryDialog(QDialog):
         add_input_layout.addWidget(self.doc_input_field)
         add_input_layout.addWidget(add_btn)
         
+        # 빠른 추가 버튼 (UX 개선)
+        quick_add_layout = QHBoxLayout()
+        quick_add_layout.setSpacing(8)
+        quick_label = QLabel("빠른 추가:")
+        quick_label.setStyleSheet("font-size: 11px; color: #666;")
+        quick_add_layout.addWidget(quick_label)
+        
+        for doc_name in self.common_docs:
+            q_btn = QPushButton(doc_name)
+            q_btn.setStyleSheet("""
+                QPushButton {
+                    font-size: 11px;
+                    color: #0078d4;
+                    background: transparent;
+                    border: 1px solid #0078d4;
+                    border-radius: 10px;
+                    padding: 2px 10px;
+                }
+                QPushButton:hover {
+                    background-color: #f0f7ff;
+                }
+            """)
+            # 람다 캡처 문제 방지를 위해 doc_name=doc_name 사용
+            q_btn.clicked.connect(lambda checked, name=doc_name: self._add_extra_document(name))
+            quick_add_layout.addWidget(q_btn)
+        quick_add_layout.addStretch()
+
         extra_layout.addWidget(self.extra_docs_list)
         extra_layout.addLayout(add_input_layout)
+        extra_layout.addLayout(quick_add_layout) # 빠른 추가 레이아웃 추가
         
         # 도움말 팁
         tip_label = QLabel("※ 항목을 더블클릭하면 삭제할 수 있습니다.")
@@ -270,8 +307,13 @@ class DataEntryDialog(QDialog):
             else:
                 QMessageBox.warning(self, "경고", "PDF 파일만 첨부할 수 있습니다.")
 
-    def _add_extra_document(self):
-        text = self.doc_input_field.text().strip()
+    def _add_extra_document(self, text=None):
+        # 인자가 없거나(returnPressed) 불리언인 경우(clicked) 입력창의 텍스트를 사용
+        if text is None or isinstance(text, bool):
+            text = self.doc_input_field.text().strip()
+        else:
+            text = text.strip()
+            
         if text:
             # 중복 체크
             existing_items = [self.extra_docs_list.item(i).text() for i in range(self.extra_docs_list.count())]
