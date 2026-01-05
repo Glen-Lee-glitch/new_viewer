@@ -196,13 +196,22 @@ class DataEntryDialog(QDialog):
         else:
             selected_joint_condition = self.joint_group.checkedButton().text()
         
-        joint_owner_data = {
-            "basic_condition": selected_joint_condition,
-            "share_ratio": self.joint_share_edit.text().strip(),
-            "representative_setting": self.joint_rep_edit.text().strip()
+        co_name_data = {
+            "basic_condition": selected_joint_condition
         }
         
-        final_data = {
+        # 값이 있는 경우에만 추가
+        share_ratio = self.joint_share_edit.text().strip()
+        if share_ratio:
+            co_name_data["share_ratio"] = share_ratio
+            
+        rep_setting = self.joint_rep_edit.text().strip()
+        if rep_setting:
+            co_name_data["representative_setting"] = rep_setting
+        
+        # (3) 최종 저장용 데이터 분리
+        # notification_apply 컬럼용
+        app_docs_data = {
             "application_docs": {
                 "has_app_form": has_app_form,
                 "purchase_entity": {
@@ -212,8 +221,7 @@ class DataEntryDialog(QDialog):
                 },
                 "extra_docs": extra_docs,
                 "document_date": doc_date
-            },
-            "joint_owner": joint_owner_data
+            }
         }
 
         # 3. DB 업데이트
@@ -228,13 +236,15 @@ class DataEntryDialog(QDialog):
                     region_id = result[0]
                     
                     # (2) 공고문 테이블 업데이트 (JSONB merge)
+                    # notification_apply와 co_name 컬럼을 각각 업데이트
                     update_query = """
-                        INSERT INTO 공고문 (region_id, notification_apply)
-                        VALUES (%s, %s)
+                        INSERT INTO 공고문 (region_id, notification_apply, co_name)
+                        VALUES (%s, %s, %s)
                         ON CONFLICT (region_id) DO UPDATE 
-                        SET notification_apply = COALESCE(공고문.notification_apply, '{}'::jsonb) || EXCLUDED.notification_apply
+                        SET notification_apply = COALESCE(공고문.notification_apply, '{}'::jsonb) || EXCLUDED.notification_apply,
+                            co_name = EXCLUDED.co_name
                     """
-                    cursor.execute(update_query, (region_id, json.dumps(final_data)))
+                    cursor.execute(update_query, (region_id, json.dumps(app_docs_data), json.dumps(co_name_data)))
                     conn.commit()
                     
             QMessageBox.information(self, "성공", f"데이터와 파일이 성공적으로 저장되었습니다.\n지역: {self.region}")
