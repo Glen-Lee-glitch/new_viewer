@@ -185,6 +185,7 @@ class DataEntryDialog(QDialog):
             foreigner_input = self.foreigner_input.text().strip()
             
         extra_docs = [self.extra_docs_list.item(i).text() for i in range(self.extra_docs_list.count())]
+        doc_date = self.doc_date_combo.currentText()
         
         app_docs_data = {
             "application_docs": {
@@ -194,7 +195,8 @@ class DataEntryDialog(QDialog):
                     "selected_docs": selected_docs,
                     "foreigner_input": foreigner_input
                 },
-                "extra_docs": extra_docs
+                "extra_docs": extra_docs,
+                "document_date": doc_date
             }
         }
 
@@ -337,6 +339,27 @@ class DataEntryDialog(QDialog):
         self.entity_type_combo.currentIndexChanged.connect(self.entity_stack.setCurrentIndex)
         
         common_layout.addWidget(self.entity_stack)
+
+        # 4. 서류 발급일 기준
+        doc_date_layout = QHBoxLayout()
+        doc_date_label = QLabel("서류 발급일 기준:")
+        doc_date_label.setFixedWidth(110)
+        
+        self.doc_date_combo = QComboBox()
+        self.doc_date_combo.addItems(["15", "30", "60", "90", "X"])
+        self.doc_date_combo.setFixedWidth(60)
+        self.doc_date_combo.setCurrentIndex(1)  # "30"이 디폴트가 되도록 인덱스 1로 설정
+        
+        day_unit_label = QLabel("(일)")
+        day_unit_label.setStyleSheet("color: #666;")
+        
+        doc_date_layout.addWidget(doc_date_label)
+        doc_date_layout.addWidget(self.doc_date_combo)
+        doc_date_layout.addWidget(day_unit_label)
+        doc_date_layout.addStretch()
+        
+        common_layout.addLayout(doc_date_layout)
+
         layout.addWidget(common_group)
 
         # 지자체 추가 서류 섹션 (작업자가 추가 가능)
