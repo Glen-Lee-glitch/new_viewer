@@ -147,35 +147,84 @@ class DataEntryDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def _on_save_clicked(self):
-        """지원신청서 파일을 지정된 경로로 저장(복사)합니다."""
+        """데이터 수집 및 파일 복사, DB 저장을 수행합니다."""
         import shutil
-        source_file = self.app_form_path_edit.text().strip()
+        import json
         
-        if not source_file or not os.path.exists(source_file):
-            QMessageBox.warning(self, "경고", "첨부된 지원신청서 파일이 없거나 경로가 유효하지 않습니다.")
-            return
-
-        try:
-            # 기본 저장 경로 설정 (네트워크 경로)
-            base_path = r"\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\26q1\공고문"
-            # 지역별 '전처리된 서류' 폴더 경로 생성
-            target_dir = os.path.join(base_path, self.region, "전처리된 서류")
-            
-            # 폴더가 없으면 생성
-            if not os.path.exists(target_dir):
+        # 1. 파일 복사 로직 (지원신청서)
+        source_file = self.app_form_path_edit.text().strip()
+        has_app_form = False
+        
+        if source_file and os.path.exists(source_file):
+            try:
+                base_path = r"\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\26q1\공고문"
+                target_dir = os.path.join(base_path, self.region, "전처리된 서류")
                 os.makedirs(target_dir, exist_ok=True)
+                target_file = os.path.join(target_dir, "지원신청서.pdf")
+                shutil.copy2(source_file, target_file)
+                has_app_form = True
+            except Exception as e:
+                QMessageBox.critical(self, "파일 저장 오류", f"파일 복사 중 오류 발생: {e}")
+                return
+
+        # 2. UI 데이터 수집 (JSON 형식)
+        entity_type = self.entity_type_combo.currentText()
+        selected_docs = []
+        foreigner_input = ""
+        
+        if entity_type == '개인':
+            if self.chk_resident_reg.isChecked(): selected_docs.append("주민등록등본")
+            if self.chk_resident_abstract.isChecked(): selected_docs.append("주민등록초본")
+        elif entity_type == '개인사업자':
+            if self.chk_biz_person.isChecked(): selected_docs.append("개인서류")
+            if self.chk_biz_reg_cert.isChecked(): selected_docs.append("사업자등록증명원")
+        elif entity_type == '법인':
+            if self.chk_corp_reg.isChecked(): selected_docs.append("법인등기부등본")
+            if self.chk_corp_biz_cert.isChecked(): selected_docs.append("사업자등록증명원")
+        elif entity_type == '외국인':
+            foreigner_input = self.foreigner_input.text().strip()
             
-            # 대상 파일 경로
-            target_file = os.path.join(target_dir, "지원신청서.pdf")
-            
-            # 파일 복사
-            shutil.copy2(source_file, target_file)
-            
-            QMessageBox.information(self, "성공", f"파일이 성공적으로 저장되었습니다.\n지역: {self.region}\n경로: {target_file}")
+        extra_docs = [self.extra_docs_list.item(i).text() for i in range(self.extra_docs_list.count())]
+        
+        app_docs_data = {
+            "application_docs": {
+                "has_app_form": has_app_form,
+                "purchase_entity": {
+                    "type": entity_type,
+                    "selected_docs": selected_docs,
+                    "foreigner_input": foreigner_input
+                },
+                "extra_docs": extra_docs
+            }
+        }
+
+        # 3. DB 업데이트
+        try:
+            with closing(psycopg2.connect(**DB_CONFIG)) as conn:
+                with conn.cursor() as cursor:
+                    # (1) region_id 조회
+                    cursor.execute("SELECT region_id FROM region_metadata WHERE region = %s", (self.region,))
+                    result = cursor.fetchone()
+                    if not result:
+                        raise Exception(f"'{self.region}'에 해당하는 region_id를 찾을 수 없습니다.")
+                    region_id = result[0]
+                    
+                    # (2) 공고문 테이블 업데이트 (JSONB merge)
+                    # 기존 데이터가 있으면 유지하면서 application_docs 부분만 덮어쓰거나 추가함
+                    update_query = """
+                        INSERT INTO 공고문 (region_id, notification_apply)
+                        VALUES (%s, %s)
+                        ON CONFLICT (region_id) DO UPDATE 
+                        SET notification_apply = COALESCE(공고문.notification_apply, '{}'::jsonb) || EXCLUDED.notification_apply
+                    """
+                    cursor.execute(update_query, (region_id, json.dumps(app_docs_data)))
+                    conn.commit()
+                    
+            QMessageBox.information(self, "성공", f"데이터와 파일이 성공적으로 저장되었습니다.\n지역: {self.region}")
             self.accept()
             
         except Exception as e:
-            QMessageBox.critical(self, "오류", f"파일 저장 중 오류가 발생했습니다:\n{str(e)}")
+            QMessageBox.critical(self, "DB 저장 오류", f"데이터베이스 저장 중 오류가 발생했습니다:\n{str(e)}")
 
     def _create_empty_page(self):
         page = QWidget()
