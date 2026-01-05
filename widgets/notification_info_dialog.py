@@ -215,8 +215,35 @@ class DataEntryDialog(QDialog):
         
         # '확인필요'("")인 경우 None(NULL)으로 처리, 그 외에는 int 변환
         residence_val = int(residence_period) if residence_period else None
+
+        # (4) 우선순위 데이터 수집 (기본값과 다를 때만 저장)
+        priority_conditions = {}
         
-        # (4) 최종 저장용 데이터 분리
+        # 다자녀: 체크박스가 True이거나 연령이 '만 18세 이하'가 아니면 저장
+        mc_reg_only = self.chk_multi_child_reg_only.isChecked()
+        mc_age_limit = self.combo_multi_child_age.currentText()
+        if mc_reg_only != False or mc_age_limit != "만 18세 이하":
+            priority_conditions["multi_child"] = {
+                "reg_only": mc_reg_only,
+                "age_limit": mc_age_limit
+            }
+            
+        # 나머지 6개 항목 기본값 정의
+        p_defaults = {
+            "first_time": "(출생~현재)지방세 세목별 미과세증명서",
+            "low_income": "차상위 계층 증명서/기초생활 수급자 증명서",
+            "disabled": "장애인증명서(장애인등록증 혹은 복지카드 등)",
+            "merit": "국가유공자 확인 증명 서류",
+            "scrappage": "(지급신청 시 필요) 자동차 말소 등록 사실증명서",
+            "small_biz": "중소기업(소상공인)확인서"
+        }
+        
+        for key, default_val in p_defaults.items():
+            current_val = self.priority_edits[key].text().strip()
+            if current_val != default_val:
+                priority_conditions[key] = current_val
+
+        # (5) 최종 저장용 데이터 분리
         # notification_apply 컬럼용
         app_docs_data = {
             "application_docs": {
@@ -230,6 +257,10 @@ class DataEntryDialog(QDialog):
                 "document_date": doc_date
             }
         }
+        
+        # 우선순위 변경사항이 있다면 추가
+        if priority_conditions:
+            app_docs_data["application_docs"]["priority_conditions"] = priority_conditions
 
         # 3. DB 업데이트
         try:
