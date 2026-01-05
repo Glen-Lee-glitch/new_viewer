@@ -121,13 +121,9 @@ class RegionDataFormWidget(QWidget):
                 background-color: #ffffff;
                 padding: 5px;
             }
-            QListView::item:selected {
+            QListView::item:selected, QListView::item:hover {
                 color: #ffffff;
                 background-color: #0078d7;
-            }
-            QListView::item:hover {
-                background-color: #e5f3ff;
-                color: #000000;
             }
         """)
 
@@ -1135,6 +1131,9 @@ class NotificationInfoDialog(QDialog):
         self._init_ui()
         self._setup_styles()
         self._load_regions()
+        
+        # 다이얼로그 실행 시 최대화 상태로 표시
+        self.setWindowState(Qt.WindowState.WindowMaximized)
 
     def _load_data_from_db(self):
         """실제 DB에서 공고문 데이터를 불러옵니다."""
@@ -1234,13 +1233,9 @@ class NotificationInfoDialog(QDialog):
                 background-color: #ffffff;
                 padding: 5px;
             }
-            QListView::item:selected {
+            QListView::item:selected, QListView::item:hover {
                 color: #ffffff;
                 background-color: #0078d7;
-            }
-            QListView::item:hover {
-                background-color: #e5f3ff;
-                color: #000000;
             }
         """)
         
