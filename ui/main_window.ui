@@ -173,6 +173,7 @@ QSplitter::handle:horizontal {
      <string>편집</string>
     </property>
     <addaction name="action_region_manager"/>
+    <addaction name="action_announcement_input"/>
    </widget>
    <widget class="QMenu" name="menu_view">
     <property name="title">
@@ -344,6 +345,11 @@ QSplitter::handle:horizontal {
   <action name="action_region_manager">
    <property name="text">
     <string>지역 관리</string>
+   </property>
+  </action>
+  <action name="action_announcement_input">
+   <property name="text">
+    <string>공고문 입력</string>
    </property>
   </action>
  </widget>
