@@ -138,25 +138,6 @@ class RegionDataFormWidget(QWidget):
             for doc in apply_data.get('extra_docs', []):
                 self.extra_docs_list.addItem(doc)
 
-            # 지급 서류 리스트 (주체별 로드 - 기본값은 유지하고 추가분만 삽입)
-            p_docs = apply_data.get('payment_docs', {})
-            if isinstance(p_docs, dict):
-                for doc in p_docs.get('customer', []):
-                    # 중복 방지 (기본값에 이미 있을 수 있음)
-                    existing = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
-                    if doc not in existing:
-                        self.cust_payment_list.addItem(doc)
-                for doc in p_docs.get('manufacturer', []):
-                    existing = [self.mfg_payment_list.item(i).text() for i in range(self.mfg_payment_list.count())]
-                    if doc not in existing:
-                        self.mfg_payment_list.addItem(doc)
-            elif isinstance(p_docs, list):
-                # 하위 호환성: 기존 리스트 데이터는 고객 서류로 간주
-                for doc in p_docs:
-                    existing = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
-                    if doc not in existing:
-                        self.cust_payment_list.addItem(doc)
-            
             # 서류 발급일
             self.doc_date_combo.setCurrentText(apply_data.get('document_date', '30'))
 
@@ -180,7 +161,28 @@ class RegionDataFormWidget(QWidget):
                 val = priority_data.get(key, p_defaults.get(key, ""))
                 edit.setText(val)
 
-        # 2. 공동명의 데이터 로드
+        # 2. 지급 서류 리스트 로드 (notification_payment 컬럼에서 별도로 로드)
+        payment_root = data.get('notification_payment', {})
+        p_docs = payment_root.get('payment_docs', {}) if payment_root else {}
+        
+        if p_docs:
+            if isinstance(p_docs, dict):
+                for doc in p_docs.get('customer', []):
+                    existing = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
+                    if doc not in existing:
+                        self.cust_payment_list.addItem(doc)
+                for doc in p_docs.get('manufacturer', []):
+                    existing = [self.mfg_payment_list.item(i).text() for i in range(self.mfg_payment_list.count())]
+                    if doc not in existing:
+                        self.mfg_payment_list.addItem(doc)
+            elif isinstance(p_docs, list):
+                # 하위 호환성: 기존 리스트 데이터는 고객 서류로 간주
+                for doc in p_docs:
+                    existing = [self.cust_payment_list.item(i).text() for i in range(self.cust_payment_list.count())]
+                    if doc not in existing:
+                        self.cust_payment_list.addItem(doc)
+
+        # 3. 공동명의 데이터 로드
         co_data = data.get('co_name', {})
         if co_data:
             basic_cond = co_data.get('basic_condition', "")
@@ -403,7 +405,7 @@ class RegionDataFormWidget(QWidget):
                 priority_conditions[key] = current_val
 
         # (5) 최종 저장용 데이터 분리
-        # notification_apply 컬럼용
+        # notification_apply 컬럼용 (지급 서류 제외)
         app_docs_data = {
             "application_docs": {
                 "has_app_form": has_app_form,
@@ -413,7 +415,6 @@ class RegionDataFormWidget(QWidget):
                     "foreigner_input": foreigner_input
                 },
                 "extra_docs": extra_docs,
-                "payment_docs": payment_docs,
                 "document_date": doc_date
             }
         }
@@ -422,9 +423,14 @@ class RegionDataFormWidget(QWidget):
         if biz_location:
             app_docs_data["application_docs"]["purchase_entity"]["business_location"] = biz_location
 
-        # 우선순위 변경사항이 있다면 추가 (없다면 아예 키가 포함되지 않아 DB에서 삭제됨)
+        # 우선순위 변경사항이 있다면 추가
         if priority_conditions:
             app_docs_data["application_docs"]["priority_conditions"] = priority_conditions
+
+        # notification_payment 컬럼용 데이터
+        payment_data = {
+            "payment_docs": payment_docs
+        }
 
         # 3. DB 업데이트
         try:
@@ -437,20 +443,21 @@ class RegionDataFormWidget(QWidget):
                         raise Exception(f"'{self.region}'에 해당하는 region_id를 찾을 수 없습니다.")
                     region_id = result[0]
                     
-                    # (2) 공고문 테이블 업데이트 (JSONB merge 및 updated_at 기록)
-                    # notification_apply, co_name, residence_requirements 컬럼을 업데이트
+                    # (2) 공고문 테이블 업데이트
                     update_query = """
-                        INSERT INTO 공고문 (region_id, notification_apply, co_name, residence_requirements, updated_at)
-                        VALUES (%s, %s, %s, %s, NOW())
+                        INSERT INTO 공고문 (region_id, notification_apply, notification_payment, co_name, residence_requirements, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, NOW())
                         ON CONFLICT (region_id) DO UPDATE 
                         SET notification_apply = COALESCE(공고문.notification_apply, '{}'::jsonb) || EXCLUDED.notification_apply,
+                            notification_payment = EXCLUDED.notification_payment,
                             co_name = EXCLUDED.co_name,
                             residence_requirements = EXCLUDED.residence_requirements,
                             updated_at = NOW()
                     """
                     cursor.execute(update_query, (
                         region_id, 
-                        json.dumps(app_docs_data), 
+                        json.dumps(app_docs_data),
+                        json.dumps(payment_data),
                         json.dumps(co_name_data),
                         residence_val
                     ))
@@ -1156,7 +1163,7 @@ class NotificationInfoDialog(QDialog):
             with closing(psycopg2.connect(**DB_CONFIG)) as conn:
                 with conn.cursor() as cursor:
                     query = """
-                        SELECT notification_apply, co_name, residence_requirements
+                        SELECT notification_apply, co_name, residence_requirements, notification_payment
                         FROM 공고문 g
                         JOIN region_metadata r ON g.region_id = r.region_id
                         WHERE r.region = %s
@@ -1167,7 +1174,8 @@ class NotificationInfoDialog(QDialog):
                         existing_data = {
                             'notification_apply': row[0],
                             'co_name': row[1],
-                            'residence_requirements': row[2]
+                            'residence_requirements': row[2],
+                            'notification_payment': row[3]
                         }
                         self.form_widget.load_data(existing_data)
                     else:
