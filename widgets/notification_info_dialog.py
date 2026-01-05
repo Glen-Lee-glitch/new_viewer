@@ -79,7 +79,101 @@ class RegionDataFormWidget(QWidget):
         # 개인사업자 페이지의 지역명 라디오 버튼 업데이트
         if hasattr(self, 'rb_loc_region'):
             self.rb_loc_region.setText(region)
+            # 기본적으로 지역명 체크 (load_data에서 덮어씌워질 수 있음)
             self.rb_loc_region.setChecked(True)
+
+    def load_data(self, data):
+        """DB에서 불러온 데이터를 UI에 채웁니다."""
+        if not data:
+            return
+
+        # 1. 지원신청서류 데이터 로드
+        apply_data = data.get('notification_apply', {}).get('application_docs', {})
+        if apply_data:
+            # 구매 주체 및 하위 항목
+            entity = apply_data.get('purchase_entity', {})
+            entity_type = entity.get('type', '개인')
+            self.entity_type_combo.setCurrentText(entity_type)
+            
+            selected_docs = entity.get('selected_docs', [])
+            if entity_type == '개인':
+                self.chk_resident_reg.setChecked("주민등록등본" in selected_docs)
+                self.chk_resident_abstract.setChecked("주민등록초본" in selected_docs)
+            elif entity_type == '개인사업자':
+                self.chk_biz_person.setChecked("개인서류" in selected_docs)
+                self.chk_biz_reg_cert.setChecked("사업자등록증명원" in selected_docs)
+                # 사업장 소재지 로드
+                biz_loc = entity.get('business_location')
+                if biz_loc == "무관":
+                    self.rb_loc_any.setChecked(True)
+                else:
+                    self.rb_loc_region.setChecked(True)
+            elif entity_type == '법인':
+                self.chk_corp_reg.setChecked("법인등기부등본" in selected_docs)
+                self.chk_corp_biz_cert.setChecked("사업자등록증명원" in selected_docs)
+            elif entity_type == '외국인':
+                self.foreigner_input.setText(entity.get('foreigner_input', ''))
+
+            # 추가 서류 리스트
+            self.extra_docs_list.clear()
+            for doc in apply_data.get('extra_docs', []):
+                self.extra_docs_list.addItem(doc)
+            
+            # 서류 발급일
+            self.doc_date_combo.setCurrentText(apply_data.get('document_date', '30'))
+
+            # 우선순위 조건 로드
+            priority_data = apply_data.get('priority_conditions', {})
+            # 다자녀
+            mc_data = priority_data.get('multi_child', {})
+            self.chk_multi_child_reg_only.setChecked(mc_data.get('reg_only', False))
+            self.combo_multi_child_age.setCurrentText(mc_data.get('age_limit', '만 18세 이하'))
+            
+            # 나머지 우선순위 항목
+            p_defaults = {
+                "first_time": "(출생~현재)지방세 세목별 미과세증명서",
+                "low_income": "차상위 계층 증명서/기초생활 수급자 증명서",
+                "disabled": "장애인증명서(장애인등록증 혹은 복지카드 등)",
+                "merit": "국가유공자 확인 증명 서류",
+                "scrappage": "(지급신청 시 필요) 자동차 말소 등록 사실증명서",
+                "small_biz": "중소기업(소상공인)확인서"
+            }
+            for key, edit in self.priority_edits.items():
+                val = priority_data.get(key, p_defaults.get(key, ""))
+                edit.setText(val)
+
+        # 2. 공동명의 데이터 로드
+        co_data = data.get('co_name', {})
+        if co_data:
+            basic_cond = co_data.get('basic_condition', "")
+            found = False
+            for rb in self.joint_radios:
+                if rb.text() == basic_cond:
+                    rb.setChecked(True)
+                    found = True
+                    break
+            if not found and basic_cond:
+                self.joint_custom_radio.setChecked(True)
+                self.joint_custom_edit.setText(basic_cond)
+            
+            self.joint_share_edit.setText(co_data.get('share_ratio', ''))
+            self.joint_rep_edit.setText(co_data.get('representative_setting', ''))
+
+        # 3. 거주요건 데이터 로드
+        res_val = data.get('residence_requirements')
+        if res_val is not None:
+            res_str = str(res_val)
+            for i in range(self.residence_period_group.buttons().__len__()):
+                btn = self.residence_period_group.buttons()[i]
+                if btn.property("value") == res_str:
+                    btn.setChecked(True)
+                    break
+        else:
+            # NULL인 경우 '확인필요' 선택
+            for btn in self.residence_period_group.buttons():
+                if btn.property("value") == "":
+                    btn.setChecked(True)
+                    break
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -922,6 +1016,31 @@ class NotificationInfoDialog(QDialog):
         # 3. 폼 위젯 활성화 및 지역 설정
         self.form_widget.setEnabled(True)
         self.form_widget.set_region(region)
+
+        # 4. 기존 DB 데이터 로드
+        try:
+            with closing(psycopg2.connect(**DB_CONFIG)) as conn:
+                with conn.cursor() as cursor:
+                    query = """
+                        SELECT notification_apply, co_name, residence_requirements
+                        FROM 공고문 g
+                        JOIN region_metadata r ON g.region_id = r.region_id
+                        WHERE r.region = %s
+                    """
+                    cursor.execute(query, (region,))
+                    row = cursor.fetchone()
+                    if row:
+                        existing_data = {
+                            'notification_apply': row[0],
+                            'co_name': row[1],
+                            'residence_requirements': row[2]
+                        }
+                        self.form_widget.load_data(existing_data)
+                    else:
+                        # 데이터가 없는 경우 폼을 기본 상태로 초기화 (필요시)
+                        pass
+        except Exception as e:
+            print(f"기존 데이터 로드 실패: {e}")
 
     def _on_open_file_clicked(self):
         file_path = self.file_combo.currentText()
