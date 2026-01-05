@@ -219,14 +219,18 @@ class DataEntryDialog(QDialog):
         # (4) 우선순위 데이터 수집 (기본값과 다를 때만 저장)
         priority_conditions = {}
         
-        # 다자녀: 체크박스가 True이거나 연령이 '만 18세 이하'가 아니면 저장
+        # 다자녀: 변경된 서브 항목만 기입
+        mc_data = {}
         mc_reg_only = self.chk_multi_child_reg_only.isChecked()
         mc_age_limit = self.combo_multi_child_age.currentText()
-        if mc_reg_only != False or mc_age_limit != "만 18세 이하":
-            priority_conditions["multi_child"] = {
-                "reg_only": mc_reg_only,
-                "age_limit": mc_age_limit
-            }
+        
+        if mc_reg_only != False:
+            mc_data["reg_only"] = mc_reg_only
+        if mc_age_limit != "만 18세 이하":
+            mc_data["age_limit"] = mc_age_limit
+            
+        if mc_data:
+            priority_conditions["multi_child"] = mc_data
             
         # 나머지 6개 항목 기본값 정의
         p_defaults = {
@@ -240,6 +244,8 @@ class DataEntryDialog(QDialog):
         
         for key, default_val in p_defaults.items():
             current_val = self.priority_edits[key].text().strip()
+            # 입력값이 기본값과 다를 때만 딕셔너리에 추가
+            # 만약 다시 기본값으로 수정했다면, 딕셔너리에 포함되지 않아 DB에서 해당 키가 제거됨
             if current_val != default_val:
                 priority_conditions[key] = current_val
 
@@ -258,7 +264,7 @@ class DataEntryDialog(QDialog):
             }
         }
         
-        # 우선순위 변경사항이 있다면 추가
+        # 우선순위 변경사항이 있다면 추가 (없다면 아예 키가 포함되지 않아 DB에서 삭제됨)
         if priority_conditions:
             app_docs_data["application_docs"]["priority_conditions"] = priority_conditions
 
