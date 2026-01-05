@@ -1,5 +1,13 @@
 import sys
 import os
+
+# 프로젝트 루트 디렉토리를 sys.path에 추가하여 core 패키지를 찾을 수 있게 함
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+import psycopg2
+from contextlib import closing
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -13,26 +21,44 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
+from core.data_manage import DB_CONFIG
+
 class NotificationInfoDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("공고문 관리")
         self.resize(900, 600)
+        self.setMinimumSize(900, 600)
+        # 최대화 및 최소화 버튼 활성화
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint)
+        
+        self.data = {}
+        self._load_data_from_db()
+        
         self._init_ui()
         self._setup_styles()
-        
-        # 임시 데이터 (나중에 DB 연동 시 제거하거나 연동 로직으로 대체)
-        self.data = {
-            "서울특별시": [
-                "\\\\DESKTOP-KEHQ34D\\Users\\com\\Desktop\\GreetLounge\\26q1\\공고문\\서울특별시\\test1.hwp",
-                "\\\\DESKTOP-KEHQ34D\\Users\\com\\Desktop\\GreetLounge\\26q1\\공고문\\서울특별시\\test2.hwpx",
-                "\\\\DESKTOP-KEHQ34D\\Users\\com\\Desktop\\GreetLounge\\26q1\\공고문\\서울특별시\\test3.pdf"
-            ],
-            "가평군": [],
-            "강릉시": ["notice_2024.pdf"],
-            "세종특별자치시": ["sejong_ev_info.pdf", "manual.docx"]
-        }
         self._load_regions()
+
+    def _load_data_from_db(self):
+        """실제 DB에서 공고문 데이터를 불러옵니다."""
+        try:
+            with closing(psycopg2.connect(**DB_CONFIG)) as conn:
+                with conn.cursor() as cursor:
+                    # file_paths가 NULL이 아니고 배열 길이가 0보다 큰 데이터 조회
+                    query = """
+                        SELECT region, file_paths 
+                        FROM ev_info 
+                        WHERE file_paths IS NOT NULL 
+                          AND array_length(file_paths, 1) > 0
+                        ORDER BY region ASC
+                    """
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+                    
+                    self.data = {row[0]: row[1] for row in rows}
+        except Exception as e:
+            print(f"DB 데이터 로드 실패: {e}")
+            self.data = {}
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -42,7 +68,7 @@ class NotificationInfoDialog(QDialog):
         # 상단 타이틀
         self.title_label = QLabel("지역별 공고문 목록")
         self.title_label.setObjectName("titleLabel")
-        main_layout.addWidget(self.title_label)
+        main_layout.addWidget(self.title_label, stretch=1)
 
         # 스플리터 생성
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -83,7 +109,7 @@ class NotificationInfoDialog(QDialog):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
         
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, stretch=9)
 
     def _setup_styles(self):
         self.setStyleSheet("""
