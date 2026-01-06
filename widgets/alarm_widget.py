@@ -1,6 +1,6 @@
 from pathlib import Path
 from PyQt6.QtWidgets import QWidget, QListWidget, QVBoxLayout, QLabel, QPushButton, QGridLayout, QScrollArea, QDialog
-from PyQt6.QtCore import QTimer, Qt, pyqtSignal
+from PyQt6.QtCore import QTimer, Qt, pyqtSignal, QSettings
 from PyQt6 import uic
 
 from core.sql_manager import get_today_completed_subsidies
@@ -25,6 +25,14 @@ class AlarmWidget(QWidget):
         ui_path = Path(__file__).parent.parent / "ui" / "alarm_widget.ui"
         uic.loadUi(str(ui_path), self)
         
+        # 위젯 매핑 (순서 변경용)
+        self._widget_map = {
+            "email": self.groupBox_email,
+            "memo": self.groupBox_memo_management,
+            "ev_check": self.groupBox_2,
+            "da_request": self.groupBox_3
+        }
+
         # 메모 리스트 위젯 및 레이아웃 설정
         self._setup_memo_list()
         
@@ -46,7 +54,32 @@ class AlarmWidget(QWidget):
         # 메모 작성 버튼 연결
         if hasattr(self, 'pushButton_write_memo'):
             self.pushButton_write_memo.clicked.connect(self._on_write_memo_clicked)
-    
+            
+        # 레이아웃 순서 적용
+        self._apply_layout_order()
+
+    def _apply_layout_order(self):
+        """저장된 설정에 따라 레이아웃 순서를 적용합니다."""
+        settings = QSettings("GyeonggooLee", "NewViewer")
+        default_order = ["email", "memo", "ev_check", "da_request"]
+        order = settings.value("layout/info_panel_order", default_order)
+        
+        if isinstance(order, list):
+            self.set_layout_order(order)
+
+    def set_layout_order(self, order_list):
+        """주어진 키 순서대로 위젯을 재배치합니다."""
+        layout = self.layout()
+        if not layout:
+            return
+            
+        # 순서대로 다시 추가 (기존 레이아웃에서 자동으로 이동됨)
+        for key in order_list:
+            widget = self._widget_map.get(key)
+            if widget:
+                layout.addWidget(widget)
+                widget.show()
+
     def _setup_memo_list(self):
         """메모관리 그룹박스의 리스트 위젯 스타일 및 레이아웃 설정"""
         if hasattr(self, 'listWidget_memos'):

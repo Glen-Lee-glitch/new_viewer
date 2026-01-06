@@ -485,6 +485,10 @@ class MainWindow(QMainWindow):
             # 지급신청 로드 체크박스 상태를 PdfLoadWidget에 설정
             payment_request_load_enabled = self._config_dialog.payment_request_load_enabled
             self._pdf_load_widget.set_payment_request_load_enabled(payment_request_load_enabled)
+
+            # 레이아웃 순서 적용
+            new_order = self._config_dialog.layout_order
+            self._alarm_widget.set_layout_order(new_order)
     
     def _open_region_manager_dialog(self):
         """지역 관리 다이얼로그를 연다."""
