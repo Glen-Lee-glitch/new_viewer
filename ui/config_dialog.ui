@@ -137,13 +137,62 @@
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_info">
           <item>
-           <widget class="QLabel" name="label_info">
+           <widget class="QLabel" name="label_info_header">
             <property name="text">
-             <string>정보 패널</string>
+             <string>정보 패널 (드래그로 순서 변경)</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignCenter</set>
             </property>
+            <property name="styleSheet">
+             <string>font-weight: bold; margin-bottom: 5px;</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QListWidget" name="listWidget_info_order">
+            <property name="styleSheet">
+             <string>QListWidget::item {
+    background-color: #f0f0f0;
+    border: 1px solid #c0c0c0;
+    border-radius: 4px;
+    margin: 2px;
+    padding: 8px;
+}
+QListWidget::item:selected {
+    background-color: #d0e0ff;
+    border: 1px solid #80a0ff;
+}</string>
+            </property>
+            <property name="dragDropMode">
+             <enum>QAbstractItemView::InternalMove</enum>
+            </property>
+            <property name="defaultDropAction">
+             <enum>Qt::MoveAction</enum>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::SingleSelection</enum>
+            </property>
+            <item>
+             <property name="text">
+              <string>이메일</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>메모관리</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>서류미비 및 확인필요</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>DA 추가요청(수신)</string>
+             </property>
+            </item>
            </widget>
           </item>
          </layout>
