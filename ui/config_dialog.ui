@@ -78,6 +78,11 @@
        <string>단축키</string>
       </attribute>
      </widget>
+     <widget class="QWidget" name="tab_layout">
+      <attribute name="title">
+       <string>레이아웃</string>
+      </attribute>
+     </widget>
     </widget>
    </item>
    <item>
