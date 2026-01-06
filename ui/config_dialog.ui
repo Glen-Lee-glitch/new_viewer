@@ -82,6 +82,74 @@
       <attribute name="title">
        <string>레이아웃</string>
       </attribute>
+      <layout class="QHBoxLayout" name="horizontalLayout_layout">
+       <item>
+        <widget class="QFrame" name="frame_layout_thumbnail">
+         <property name="frameShape">
+          <enum>QFrame::Box</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Sunken</enum>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_thumbnail">
+          <item>
+           <widget class="QLabel" name="label_thumbnail">
+            <property name="text">
+             <string>썸네일</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="frame_layout_content">
+         <property name="frameShape">
+          <enum>QFrame::Box</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Sunken</enum>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_content">
+          <item>
+           <widget class="QLabel" name="label_content">
+            <property name="text">
+             <string>메인 컨텐츠</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="frame_layout_info">
+         <property name="frameShape">
+          <enum>QFrame::Box</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Sunken</enum>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_info">
+          <item>
+           <widget class="QLabel" name="label_info">
+            <property name="text">
+             <string>정보 패널</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
      </widget>
     </widget>
    </item>
