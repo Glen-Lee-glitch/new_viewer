@@ -82,17 +82,43 @@
       <attribute name="title">
        <string>레이아웃</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout_layout_main">
+      <layout class="QVBoxLayout" name="verticalLayout_layout_root">
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_layout_containers">
+        <layout class="QHBoxLayout" name="horizontalLayout_layout_preview" stretch="1,2,1">
          <item>
-          <widget class="QGroupBox" name="groupBox_left_container">
-           <property name="title">
-            <string>왼쪽 영역</string>
+          <widget class="QFrame" name="frame_left_container">
+           <property name="frameShape">
+            <enum>QFrame::Box</enum>
            </property>
-           <layout class="QVBoxLayout" name="verticalLayout_left">
+           <property name="frameShadow">
+            <enum>QFrame::Sunken</enum>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_left_container">
+            <item>
+             <widget class="QLabel" name="label_left_title">
+              <property name="text">
+               <string>왼쪽 영역</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+              <property name="styleSheet">
+               <string>font-size: 10px; color: #888;</string>
+              </property>
+             </widget>
+            </item>
             <item>
              <widget class="QListWidget" name="listWidget_layout_left">
+              <property name="styleSheet">
+               <string>QListWidget { background: transparent; border: none; }
+QListWidget::item { 
+    background-color: #3d3d3d; 
+    border: 1px solid #555; 
+    border-radius: 5px; 
+    margin: 5px; 
+    padding: 10px; 
+}</string>
+              </property>
               <property name="dragEnabled">
                <bool>true</bool>
               </property>
@@ -109,6 +135,9 @@
                <property name="text">
                 <string>썸네일</string>
                </property>
+               <property name="textAlignment">
+                <set>Qt::AlignCenter</set>
+               </property>
               </item>
              </widget>
             </item>
@@ -117,17 +146,14 @@
          </item>
          <item>
           <widget class="QFrame" name="frame_layout_content">
-           <property name="minimumSize">
-            <size>
-             <width>100</width>
-             <height>0</height>
-            </size>
-           </property>
            <property name="frameShape">
             <enum>QFrame::Box</enum>
            </property>
            <property name="frameShadow">
-            <enum>QFrame::Raised</enum>
+            <enum>QFrame::Plain</enum>
+           </property>
+           <property name="styleSheet">
+            <string>background-color: #2a2a2a;</string>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_content">
             <item>
@@ -139,19 +165,48 @@
               <property name="alignment">
                <set>Qt::AlignCenter</set>
               </property>
+              <property name="styleSheet">
+               <string>font-weight: bold; color: #aaa;</string>
+              </property>
              </widget>
             </item>
            </layout>
           </widget>
          </item>
          <item>
-          <widget class="QGroupBox" name="groupBox_right_container">
-           <property name="title">
-            <string>오른쪽 영역</string>
+          <widget class="QFrame" name="frame_right_container">
+           <property name="frameShape">
+            <enum>QFrame::Box</enum>
            </property>
-           <layout class="QVBoxLayout" name="verticalLayout_right">
+           <property name="frameShadow">
+            <enum>QFrame::Sunken</enum>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_right_container">
+            <item>
+             <widget class="QLabel" name="label_right_title">
+              <property name="text">
+               <string>오른쪽 영역</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+              <property name="styleSheet">
+               <string>font-size: 10px; color: #888;</string>
+              </property>
+             </widget>
+            </item>
             <item>
              <widget class="QListWidget" name="listWidget_layout_right">
+              <property name="styleSheet">
+               <string>QListWidget { background: transparent; border: none; }
+QListWidget::item { 
+    background-color: #3d3d3d; 
+    border: 1px solid #555; 
+    border-radius: 5px; 
+    margin: 5px; 
+    padding: 10px; 
+}</string>
+              </property>
               <property name="dragEnabled">
                <bool>true</bool>
               </property>
@@ -167,6 +222,9 @@
               <item>
                <property name="text">
                 <string>정보 패널</string>
+               </property>
+               <property name="textAlignment">
+                <set>Qt::AlignCenter</set>
                </property>
               </item>
              </widget>
