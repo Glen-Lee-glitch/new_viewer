@@ -60,7 +60,7 @@ Stores the history of email chains associated with a specific thread.
 
 # Git Commit Message Guidelines
 
-When generating or proposing git commit messages, provide them in **text format** for review, rather than executing them directly via shell immediately (unless explicitly instructed to commit).
+When generating git commit messages, execute the `git commit` command directly via shell instead of providing them in text format for review.
 
 ## Structure
 ```
