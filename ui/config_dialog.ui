@@ -82,77 +82,121 @@
       <attribute name="title">
        <string>레이아웃</string>
       </attribute>
-      <layout class="QHBoxLayout" name="horizontalLayout_layout">
+      <layout class="QVBoxLayout" name="verticalLayout_layout_main">
        <item>
-        <widget class="QFrame" name="frame_layout_thumbnail">
-         <property name="frameShape">
-          <enum>QFrame::Box</enum>
+        <layout class="QHBoxLayout" name="horizontalLayout_layout_containers">
+         <item>
+          <widget class="QGroupBox" name="groupBox_left_container">
+           <property name="title">
+            <string>왼쪽 영역</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_left">
+            <item>
+             <widget class="QListWidget" name="listWidget_layout_left">
+              <property name="dragEnabled">
+               <bool>true</bool>
+              </property>
+              <property name="acceptDrops">
+               <bool>true</bool>
+              </property>
+              <property name="dragDropMode">
+               <enum>QAbstractItemView::DragDrop</enum>
+              </property>
+              <property name="defaultDropAction">
+               <enum>Qt::MoveAction</enum>
+              </property>
+              <item>
+               <property name="text">
+                <string>썸네일</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="frame_layout_content">
+           <property name="minimumSize">
+            <size>
+             <width>100</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::Box</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_content">
+            <item>
+             <widget class="QLabel" name="label_content">
+              <property name="text">
+               <string>메인 컨텐츠
+(고정)</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_right_container">
+           <property name="title">
+            <string>오른쪽 영역</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_right">
+            <item>
+             <widget class="QListWidget" name="listWidget_layout_right">
+              <property name="dragEnabled">
+               <bool>true</bool>
+              </property>
+              <property name="acceptDrops">
+               <bool>true</bool>
+              </property>
+              <property name="dragDropMode">
+               <enum>QAbstractItemView::DragDrop</enum>
+              </property>
+              <property name="defaultDropAction">
+               <enum>Qt::MoveAction</enum>
+              </property>
+              <item>
+               <property name="text">
+                <string>정보 패널</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="Line" name="line">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
          </property>
-         <property name="frameShadow">
-          <enum>QFrame::Sunken</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_thumbnail">
-          <item>
-           <widget class="QLabel" name="label_thumbnail">
-            <property name="text">
-             <string>썸네일</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-           </widget>
-          </item>
-         </layout>
         </widget>
        </item>
        <item>
-        <widget class="QFrame" name="frame_layout_content">
-         <property name="frameShape">
-          <enum>QFrame::Box</enum>
+        <widget class="QLabel" name="label_info_header">
+         <property name="text">
+          <string>정보 패널 내부 순서 (상세)</string>
          </property>
-         <property name="frameShadow">
-          <enum>QFrame::Sunken</enum>
+         <property name="styleSheet">
+          <string>font-weight: bold; margin-top: 5px;</string>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_content">
-          <item>
-           <widget class="QLabel" name="label_content">
-            <property name="text">
-             <string>메인 컨텐츠</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-           </widget>
-          </item>
-         </layout>
         </widget>
        </item>
        <item>
-        <widget class="QFrame" name="frame_layout_info">
-         <property name="frameShape">
-          <enum>QFrame::Box</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Sunken</enum>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_info">
-          <item>
-           <widget class="QLabel" name="label_info_header">
-            <property name="text">
-             <string>정보 패널 (드래그로 순서 변경)</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-            <property name="styleSheet">
-             <string>font-weight: bold; margin-bottom: 5px;</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QListWidget" name="listWidget_info_order">
-            <property name="styleSheet">
-             <string>QListWidget::item {
+        <widget class="QListWidget" name="listWidget_info_order">
+         <property name="styleSheet">
+          <string>QListWidget::item {
     background-color: #2b2b2b;
     color: #e0e0e0;
     border: 1px solid #444444;
@@ -165,39 +209,36 @@ QListWidget::item:selected {
     border: 1px solid #008080;
     color: white;
 }</string>
-            </property>
-            <property name="dragDropMode">
-             <enum>QAbstractItemView::InternalMove</enum>
-            </property>
-            <property name="defaultDropAction">
-             <enum>Qt::MoveAction</enum>
-            </property>
-            <property name="selectionMode">
-             <enum>QAbstractItemView::SingleSelection</enum>
-            </property>
-            <item>
-             <property name="text">
-              <string>이메일</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>메모관리</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>서류미비 및 확인필요</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>DA 추가요청(수신)</string>
-             </property>
-            </item>
-           </widget>
-          </item>
-         </layout>
+         </property>
+         <property name="dragDropMode">
+          <enum>QAbstractItemView::InternalMove</enum>
+         </property>
+         <property name="defaultDropAction">
+          <enum>Qt::MoveAction</enum>
+         </property>
+         <property name="selectionMode">
+          <enum>QAbstractItemView::SingleSelection</enum>
+         </property>
+         <item>
+          <property name="text">
+           <string>이메일</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>메모관리</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>서류미비 및 확인필요</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>DA 추가요청(수신)</string>
+          </property>
+         </item>
         </widget>
        </item>
       </layout>
