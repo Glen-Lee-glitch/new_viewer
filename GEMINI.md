@@ -81,13 +81,14 @@ footer
 - `chore`: Build process, package manager, etc.
 
 ## Rules
-1. **Subject**:
+1. **Always provide a commit message in English at the end of the response if any code changes or file modifications were performed.**
+2. **Subject**:
    - Max 50 characters.
    - No period at the end.
    - Imperative mood (e.g., "Add feature" not "Added feature").
    - Capitalized first letter.
-2. **Body** (Optional):
+3. **Body** (Optional):
    - Wrap at 72 characters.
    - Focus on "What" and "Why", not "How".
-3. **Footer** (Optional):
+4. **Footer** (Optional):
    - Reference issues (e.g., `Resolves: #123`).
