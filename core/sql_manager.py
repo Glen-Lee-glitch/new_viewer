@@ -2108,6 +2108,42 @@ def fetch_chained_emails_rns(worker_name: str) -> list[str]:
         traceback.print_exc()
         return []
 
+def fetch_checked_required_rns(worker_name: str) -> list[str]:
+    """
+    rns 테이블에서 status가 '확인필요'인 RN 목록을 조회한다.
+    
+    Args:
+        worker_name: 작업자 이름
+        
+    Returns:
+        RN 목록 리스트
+    """
+    if is_sample_data_mode():
+        return []
+
+    if not worker_name:
+        return []
+    
+    try:
+        # worker_name으로 worker_id 조회
+        worker_id = get_worker_id_by_name(worker_name)
+        if worker_id is None:
+            return []
+        
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = """
+                SELECT "RN"
+                FROM rns
+                WHERE worker_id = %s AND status = '확인필요'
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (worker_id,))
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 def fetch_all_ev_required_rns(worker_name: str) -> list[tuple[str, str]]:
     """
     세 가지 소스에서 RN 목록을 조회하여 중복 제거 후 반환한다.
@@ -2141,6 +2177,12 @@ def fetch_all_ev_required_rns(worker_name: str) -> list[tuple[str, str]]:
     ev_comp_list = fetch_ev_complement_rns(worker_name)
     for rn in ev_comp_list:
         rn_source_map[rn] = 'ev_complement'  # ev_complement가 최우선
+    
+    # 4. '확인필요' 상태 조회 (rns보다 높고 chained보다 낮은 우선순위로 설정 가능)
+    checked_list = fetch_checked_required_rns(worker_name)
+    for rn in checked_list:
+        if rn not in rn_source_map or rn_source_map[rn] == 'rns':
+            rn_source_map[rn] = 'checked'
     
     # 정렬하여 반환
     return sorted([(rn, source_type) for rn, source_type in rn_source_map.items()])

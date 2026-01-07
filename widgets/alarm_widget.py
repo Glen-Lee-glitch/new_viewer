@@ -244,6 +244,8 @@ class AlarmWidget(QWidget):
                                 sticky=True
                             )
                             self._notified_chained_rns.add(rn)
+                    elif source_type == 'checked':
+                        prefix = "(확인필요) "
                     
                     self._ev_required_list.addItem(f"{prefix}{rn}")
             else:
@@ -263,17 +265,20 @@ class AlarmWidget(QWidget):
         if text in ["내역 없음", "로드 실패"]:
             return
 
-        # (EV) 또는 (요청) 항목인지 확인
+        # (EV), (요청), (확인필요) 항목인지 확인
         is_ev = text.startswith("(EV) ")
         is_ce = text.startswith("(요청) ")
+        is_checked = text.startswith("(확인필요) ")
         
         if is_ev:
             print(f"[DEBUG] EV Complement 작업 플래그 활성화 (항목: {text})")
         elif is_ce:
             print(f"[DEBUG] CE(Chained Emails) 작업 플래그 활성화 (항목: {text})")
+        elif is_checked:
+            print(f"[DEBUG] 확인필요 항목 작업 (항목: {text})")
             
         # 접두어 제거하고 RN만 추출
-        rn = text.replace("(EV) ", "").replace("(요청) ", "").strip()
+        rn = text.replace("(EV) ", "").replace("(요청) ", "").replace("(확인필요) ", "").strip()
         if rn:
             self.rn_work_requested.emit(rn, is_ev, is_ce)
     
