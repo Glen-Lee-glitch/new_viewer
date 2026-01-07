@@ -748,7 +748,7 @@ class PdfViewWidget(QWidget, ViewModeMixin, EditMixin):
             
             if is_give_works:
                 # 지급 테이블 시작인 경우
-                base_dir = get_converted_path(r'\\DESKTOP-KMJ\Users\HP\Desktop\greet_db\files\지급_finished')
+                base_dir = get_converted_path(r'\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\25q4_test\지급\finished_file')
             else:
                 # 일반 작업인 경우
                 base_dir = get_converted_path(r'\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\25q4_test\finished_file')
