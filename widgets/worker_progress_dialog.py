@@ -12,6 +12,7 @@ from core.sql_manager import (
     get_daily_worker_payment_progress,
     fetch_daily_status_counts,
     fetch_today_completed_worker_stats,
+    fetch_today_ev_completed_worker_stats,
     fetch_today_impossible_list,
     fetch_today_future_apply_stats,
     fetch_today_email_count,
@@ -402,23 +403,65 @@ class WorkerProgressDialog(QDialog):
             return
 
         try:
-            stats = fetch_today_completed_worker_stats()
+            # 1. rns 테이블 기반 통계 (기존)
+            stats_rns = fetch_today_completed_worker_stats()
+            # 2. ev_rns 테이블 기반 통계 (신규)
+            stats_ev = fetch_today_ev_completed_worker_stats()
             
             self._clear_layout(self.chart_container.layout())
             if self.chart_container.layout() is None:
                 layout = QVBoxLayout()
                 self.chart_container.setLayout(layout)
             
-            if not stats:
+            if not stats_rns and not stats_ev:
                 self._show_message_in_chart("완료된 작업 데이터가 없습니다.")
                 self.current_chart_type = 'completed'
                 return
 
-            chart = PieChartWidget(stats)
-            self.chart_container.layout().addWidget(chart)
+            # 두 개의 차트를 가로로 배치하기 위한 레이아웃
+            charts_layout = QHBoxLayout()
+            
+            # 왼쪽: rns 통계
+            rns_wrapper = QVBoxLayout()
+            rns_label = QLabel("작업자 상태 기준 (rns)")
+            rns_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            rns_label.setStyleSheet("color: #ecf0f1; font-weight: bold; font-size: 14px; margin-bottom: 5px;")
+            rns_wrapper.addWidget(rns_label)
+            
+            if stats_rns:
+                chart_rns = PieChartWidget(stats_rns)
+                rns_wrapper.addWidget(chart_rns)
+            else:
+                empty_label = QLabel("데이터 없음")
+                empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                empty_label.setStyleSheet("color: #bdc3c7;")
+                rns_wrapper.addWidget(empty_label)
+            
+            # 오른쪽: ev_rns 통계
+            ev_wrapper = QVBoxLayout()
+            ev_label = QLabel("EV 상 완료 기준 (ev_rns)")
+            ev_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ev_label.setStyleSheet("color: #ecf0f1; font-weight: bold; font-size: 14px; margin-bottom: 5px;")
+            ev_wrapper.addWidget(ev_label)
+            
+            if stats_ev:
+                chart_ev = PieChartWidget(stats_ev)
+                ev_wrapper.addWidget(chart_ev)
+            else:
+                empty_label = QLabel("데이터 없음")
+                empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                empty_label.setStyleSheet("color: #bdc3c7;")
+                ev_wrapper.addWidget(empty_label)
+                
+            charts_layout.addLayout(rns_wrapper)
+            charts_layout.addLayout(ev_wrapper)
+            
+            self.chart_container.layout().addLayout(charts_layout)
             self.current_chart_type = 'completed'
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self._show_message_in_chart(f"차트 로드 실패: {str(e)}")
             self.current_chart_type = None
 

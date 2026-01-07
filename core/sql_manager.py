@@ -2516,6 +2516,36 @@ def fetch_today_completed_worker_stats() -> dict:
         traceback.print_exc()
         return {}
 
+def fetch_today_ev_completed_worker_stats() -> dict:
+    """
+    금일 'ev_rns' 테이블에서 '처리완료'된 건들의 작업자별 통계를 조회한다. (PostgreSQL 버전)
+    
+    Returns:
+        dict: { '작업자명': 건수, ... } (건수 내림차순 정렬)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT applier, COUNT(*) as count
+                FROM ev_rns
+                WHERE applied_date::date = %s
+                  AND status = '처리완료'
+                GROUP BY applier
+                ORDER BY count DESC
+            """
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                
+                return {row[0]: row[1] for row in rows}
+    except Exception:
+        traceback.print_exc()
+        return {}
+
 def fetch_today_impossible_list() -> list[dict]:
     """
     금일 '신청불가'로 처리된 건들의 목록(RN, 지역, 사유)을 조회한다. (PostgreSQL 버전)
