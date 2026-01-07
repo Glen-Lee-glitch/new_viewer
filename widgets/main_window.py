@@ -1285,6 +1285,11 @@ class MainWindow(QMainWindow):
         # QSplitter를 사용하여 영역 너비 설정
         try:
             if hasattr(self, 'ui_main_splitter'):
+                # 이미 저장된 상태가 있다면 복원하고 종료
+                if self._restore_splitter_state():
+                    return
+                
+                # 저장된 상태가 없을 때만 기본값 적용
                 # 썸네일(왼쪽), 콘텐츠(중앙), 정보패널(오른쪽)
                 left_width = 220
                 right_width = 450
@@ -1302,6 +1307,23 @@ class MainWindow(QMainWindow):
         except Exception:
             # 안전 장치: 실패해도 크래시 방지
             pass
+
+    def _save_splitter_state(self):
+        """스플리터 상태를 저장한다."""
+        if hasattr(self, 'ui_main_splitter'):
+            from PyQt6.QtCore import QSettings
+            settings = QSettings("GyeonggooLee", "NewViewer")
+            settings.setValue("layout/main_splitter", self.ui_main_splitter.saveState())
+
+    def _restore_splitter_state(self):
+        """저장된 스플리터 상태를 복원한다."""
+        if hasattr(self, 'ui_main_splitter'):
+            from PyQt6.QtCore import QSettings
+            settings = QSettings("GyeonggooLee", "NewViewer")
+            state = settings.value("layout/main_splitter")
+            if state:
+                return self.ui_main_splitter.restoreState(state)
+        return False
 
     def _check_and_show_outlier_reminder(self):
         """PDF 렌더 완료 후 이상치가 있는 경우 리마인더 메시지를 표시한다."""
@@ -1715,7 +1737,10 @@ class MainWindow(QMainWindow):
             self._initial_resize_done = True
         
     def closeEvent(self, event):
-        """애플리케이션 종료 시 PDF 문서 자원을 해제한다."""
+        """애플리케이션 종료 시 리소스 정리 및 설정을 저장한다."""
+        # 스플리터 상태 저장
+        self._save_splitter_state()
+        
         if self.renderer:
             self.renderer.close()
         event.accept()
