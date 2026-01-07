@@ -461,6 +461,18 @@ class InfoPanelWidget(QWidget):
             self.verticalLayout_task_list.addWidget(checkbox)
             self._dynamic_checkboxes.append(checkbox)
 
+    def are_all_tasks_checked(self) -> bool:
+        """모든 동적 체크박스가 체크되었는지 확인한다."""
+        # EV 보완 모드일 경우 체크박스가 표시되지 않으므로 True 반환
+        if self._is_ev_complement_mode:
+            return True
+            
+        # 체크박스가 하나라도 체크되지 않았다면 False 반환
+        for cb in self._dynamic_checkboxes:
+            if cb.isVisible() and not cb.isChecked():
+                return False
+        return True
+
     def _validate_date_format(self, text: str) -> bool:
         """날짜 형식(MM/DD 또는 M/D)을 검증한다."""
         # MM/DD 또는 M/D 형식: 월(1-12), 일(1-31)

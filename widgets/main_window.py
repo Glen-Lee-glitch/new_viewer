@@ -1071,6 +1071,11 @@ class MainWindow(QMainWindow):
 
     def _save_document(self, skip_confirmation: bool = False):
         """현재 상태(페이지 순서 포함)로 문서를 저장한다."""
+        # 추가 로직: 작업 리스트 체크 확인 (EV 보완 모드가 아닐 때만)
+        if hasattr(self, '_info_panel') and not self._info_panel.are_all_tasks_checked():
+            QMessageBox.warning(self, "경고", "작업 리스트를 확인하세요!")
+            return
+
         # 알람 위젯에서 시작한 작업인 경우 chained_emails 검토 건너뛰기
         if self._is_alarm_rn_work:
             print("[_save_document] 알람 위젯에서 시작한 작업이므로 chained_emails 검토를 건너뜁니다.")
