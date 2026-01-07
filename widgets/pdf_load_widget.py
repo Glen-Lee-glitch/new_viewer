@@ -351,12 +351,22 @@ class PdfLoadWidget(QWidget):
         data = table.item(row, 1).data(Qt.ItemDataRole.UserRole)
         menu = QMenu(self)
         menu.addAction("비고")
+
+        # '외부 작업중' 상태인 경우 'PDF 작업 완료' 액션 추가
+        if data.get('result') == '외부 작업중':
+            complete_act = menu.addAction("PDF 작업 완료")
+            # 액션 실행 시 핸들러 연결
+            complete_act.triggered.connect(lambda: self._complete_external_work(data['rn'], row))
+
         if int(data.get('mail_count', 0)) >= 2:
             menu.addSeparator()
             email_act = menu.addAction("이메일 확인하기")
-            if menu.exec(table.viewport().mapToGlobal(pos)) == email_act:
+            
+            selected_action = menu.exec(table.viewport().mapToGlobal(pos))
+            if selected_action == email_act:
                 self._show_email_view(row)
-        else: menu.exec(table.viewport().mapToGlobal(pos))
+        else:
+            menu.exec(table.viewport().mapToGlobal(pos))
 
     def _show_email_view(self, row):
         data = self.complement_table_widget.item(row, 1).data(Qt.ItemDataRole.UserRole)
@@ -370,6 +380,24 @@ class PdfLoadWidget(QWidget):
             dialog = DetailFormDialog(parent=self)
             dialog.load_data(rn)
             dialog.show()
+
+    def _complete_external_work(self, rn, row):
+        """외부에서 수동으로 작업한 PDF가 완료되었을 때 상태를 'pdf 전처리'로 변경한다."""
+        from core.sql_manager import update_subsidy_status
+        
+        # update_subsidy_status 내부에서 'pdf 전처리'로 업데이트 시 서류미비 상태 등을 체크함
+        if update_subsidy_status(rn, 'pdf 전처리'):
+            show_toast("작업 완료", f"RN: {rn} 상태가 'pdf 전처리'로 변경되었습니다.", self)
+            # 테이블 UI 즉시 업데이트
+            table = self.complement_table_widget
+            table.item(row, 3).setText('pdf 전처리')
+            # 내부 데이터 객체도 업데이트 (추후 컨텍스트 메뉴 다시 열 때 반영되도록)
+            data = table.item(row, 1).data(Qt.ItemDataRole.UserRole)
+            if data:
+                data['result'] = 'pdf 전처리'
+                table.item(row, 1).setData(Qt.ItemDataRole.UserRole, data)
+        else:
+            QMessageBox.warning(self, "실패", "상태 업데이트에 실패했습니다. (서류미비 요청 등 특정 상태에서는 변경이 제한될 수 있습니다.)")
 
     def open_by_rn(self):
         rn, ok = QInputDialog.getText(self, "RN 검색", "RN 번호:")
