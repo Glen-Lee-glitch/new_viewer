@@ -3,7 +3,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent
 from PyQt6 import uic
 from pathlib import Path
-from core.sql_manager import fetch_after_apply_counts, get_worker_names, get_worker_id_by_name
+from core.sql_manager import (
+    fetch_after_apply_counts, 
+    get_worker_names, 
+    get_worker_id_by_name,
+    cleanup_expired_region_metadata
+)
 from core.data_manage import set_use_sample_data
 
 class LoginDialog(QDialog):
@@ -81,6 +86,13 @@ class LoginDialog(QDialog):
             self._validation_passed = False
             return
         
+        # 특정 사용자(관리자) 로그인 시 만료된 지역 메타데이터 정리 수행
+        if worker_name in ["이경구", "이호형"]:
+            try:
+                cleanup_expired_region_metadata()
+            except Exception as e:
+                print(f"만료 데이터 정리 실패: {e}")
+
         # 검증 통과 - 이제 accept()를 호출해도 실제로 닫힘
         self._validation_passed = True
         self.accept()

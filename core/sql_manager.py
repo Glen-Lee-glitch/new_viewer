@@ -487,6 +487,30 @@ def get_worker_id_by_name(worker_name: str) -> int | None:
         traceback.print_exc()
         return None
 
+def cleanup_expired_region_metadata() -> bool:
+    """
+    region_metadata 테이블에서 한국 시간 기준으로 after_date가 지난 항들을 찾아 
+    after_date를 NULL로 초기화한다.
+    """
+    if is_sample_data_mode():
+        return True
+
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = """
+                UPDATE region_metadata 
+                SET after_date = NULL 
+                WHERE after_date < (NOW() AT TIME ZONE 'Asia/Seoul')
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                connection.commit()
+                print("[region_metadata] 만료된 after_date 정리 완료")
+                return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def get_mail_content_by_thread_id(thread_id: str) -> str:
     """
     thread_id로 emails 테이블에서 content를 조회한다. (PostgreSQL 버전)
