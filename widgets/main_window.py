@@ -440,6 +440,7 @@ class MainWindow(QMainWindow):
             target_screen = self._login_dialog.screen()
             self.setScreen(target_screen)
             self.move(target_screen.geometry().topLeft())
+            self.showMaximized()
 
             self._worker_name = self._login_dialog.get_worker_name() # 작업자 이름 설정
             self._worker_id = self._login_dialog.get_worker_id() # 작업자 ID 설정
@@ -1717,35 +1718,10 @@ class MainWindow(QMainWindow):
     # === 이벤트 처리 ===
     
     def showEvent(self, event):
-        """창이 처음 표시될 때 제목 표시줄을 포함한 전체 높이를 화면에 맞게 조정한다."""
+        """창이 처음 표시될 때 최대화한다."""
         super().showEvent(event)
         if not self._initial_resize_done:
-            # 최대화 상태로 전환하여 최대 크기 정보 획득
             self.showMaximized()
-            max_geometry = self.geometry()
-            
-            # 즉시 일반 상태로 복원
-            self.showNormal()
-            
-            # 너비는 1350으로 고정, 높이는 최대화 상태의 높이 사용
-            target_width = 1350
-            target_height = max_geometry.height()
-            
-            # 화면 중앙에 배치 (전체 창 높이가 화면 높이와 일치하도록)
-            screen = self.screen()
-            if screen:
-                available_geometry = screen.availableGeometry()
-                x = (available_geometry.width() - target_width) // 2
-                # 제목 표시줄 높이 계산
-                title_bar_height = self.frameGeometry().height() - self.geometry().height()
-                
-                # 제목 표시줄이 화면 맨 위에 오도록 클라이언트 영역을 제목 표시줄 높이만큼 아래로 배치
-                y = title_bar_height
-                
-                # 클라이언트 영역 높이 = 화면 높이 - 제목 표시줄 높이
-                client_height = available_geometry.height() - title_bar_height
-                
-                self.setGeometry(x, y, target_width, client_height)
             
             # 초기 스플리터 크기 설정 (화면에 표시된 후 정확한 너비 기반으로 설정)
             QTimer.singleShot(0, lambda: self.set_splitter_sizes(False))
