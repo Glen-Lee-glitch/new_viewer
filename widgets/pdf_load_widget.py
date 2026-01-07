@@ -383,6 +383,27 @@ class PdfLoadWidget(QWidget):
 
     def _complete_external_work(self, rn, row):
         """외부에서 수동으로 작업한 PDF가 완료되었을 때 상태를 'pdf 전처리'로 변경한다."""
+        # 1. 파일 존재 확인 로직
+        from core.utility import get_converted_path
+        kst = pytz.timezone('Asia/Seoul')
+        today_date = datetime.now(kst).strftime('%Y-%m-%d')
+        worker_folder = self._worker_name if self._worker_name else "미지정"
+        
+        # 공유 폴더 내 작업자/날짜 경로 구성
+        base_dir = get_converted_path(r'\\DESKTOP-KEHQ34D\Users\com\Desktop\GreetLounge\25q4_test\finished_file')
+        target_dir = Path(base_dir) / worker_folder / today_date
+        
+        file_exists = False
+        if target_dir.exists():
+            # 해당 경로에 RN이 포함된 PDF 파일이 있는지 glob으로 확인
+            if list(target_dir.glob(f"*{rn}*.pdf")):
+                file_exists = True
+                
+        if not file_exists:
+            QMessageBox.warning(self, "경고", "저장 폴더에 파일이 없습니다!")
+            return
+
+        # 2. 파일이 존재하는 경우 기존 status 업데이트 로직 실행
         from core.sql_manager import update_subsidy_status
         
         # update_subsidy_status 내부에서 'pdf 전처리'로 업데이트 시 서류미비 상태 등을 체크함
