@@ -1907,9 +1907,11 @@ class MainWindow(QMainWindow):
             from core.sql_manager import update_subsidy_status
             if update_subsidy_status(rn, '외부 작업중'):
                 print(f"[상태 업데이트] RN: {rn} -> 외부 작업중")
-                # 메인 화면 리스트 등의 UI 갱신이 필요할 수 있으므로 데이터 새로고침 호출 (필요 시)
-                # self._refresh_all_data() 
             
+            # 외부 프로그램 실행 후, 저장하지 않고 자동으로 메인 화면으로 이동
+            self.show_load_view()
+            self._refresh_all_data()
+
         except Exception as e:
             QMessageBox.critical(self, "오류", f"외부 프로그램으로 여는 중 오류가 발생했습니다:\n\n{str(e)}")
 
