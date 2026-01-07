@@ -316,6 +316,10 @@ class MainWindow(QMainWindow):
         # 작업자 현황 버튼 시그널 연결
         self.pushButton_worker_progress.clicked.connect(self._open_worker_progress_dialog)
         
+        # 외부로 열기 액션 연결
+        if hasattr(self, 'action_open_external'):
+            self.action_open_external.triggered.connect(self._open_external_document)
+        
         # --- 전역 단축키 설정 ---
         # _setup_global_shortcuts() 메서드에서 처리하므로 기존 코드는 제거
         # toggle_todo_action = QAction(self)
@@ -1879,6 +1883,28 @@ class MainWindow(QMainWindow):
         address = info.get('address', "")
         self._pending_basic_info = info
         return name, region, special_note, rn, address
+
+    def _open_external_document(self):
+        """현재 작업 중인 문서의 원본 파일을 외부 프로그램으로 연다."""
+        if not self._current_rn:
+            QMessageBox.warning(self, "오류", "현재 작업 중인 RN 정보를 찾을 수 없습니다.")
+            return
+
+        try:
+            rn = self._current_rn
+            original_filepath = get_original_pdf_path_by_rn(rn)
+
+            if not original_filepath:
+                QMessageBox.warning(self, "오류", f"원본 파일(RN: {rn})을 찾을 수 없습니다.")
+                return
+
+            # 윈도우에서 기본 연결된 프로그램으로 파일 열기
+            import os
+            os.startfile(original_filepath)
+            print(f"[외부 열기] {original_filepath}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"외부 프로그램으로 여는 중 오류가 발생했습니다:\n\n{str(e)}")
 
     
     # 문서 불러오기 기타
