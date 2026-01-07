@@ -181,10 +181,32 @@ class AlarmWidget(QWidget):
             # 리스트 위젯 생성
             self._ev_required_list = QListWidget()
             
-            # 폰트 크기 조정
-            font = self._ev_required_list.font()
-            font.setPointSize(font.pointSize() - 2)
-            self._ev_required_list.setFont(font)
+            # 강조 스타일 시트 적용 (카드 형태 디자인)
+            self._ev_required_list.setStyleSheet("""
+                QListWidget {
+                    background-color: transparent;
+                    border: none;
+                }
+                QListWidget::item {
+                    background-color: rgba(29, 233, 182, 0.15); /* 틴트된 배경색 */
+                    border: 1px solid #1de9b6;                   /* 밝은 틸 색상 테두리 */
+                    border-radius: 6px;                          /* 둥근 모서리 */
+                    margin: 4px 2px;                             /* 아이템 간격 */
+                    padding: 8px;                                /* 내부 여백 */
+                    color: #1de9b6;                              /* 텍스트 색상도 강조색으로 */
+                    font-weight: bold;
+                    font-size: 13px;                             /* 폰트 크기 명시 */
+                }
+                QListWidget::item:hover {
+                    background-color: rgba(29, 233, 182, 0.3);  /* 호버 시 더 밝게 */
+                    cursor: pointer;
+                }
+                QListWidget::item:selected {
+                    background-color: #1de9b6;                  /* 선택 시 반전 */
+                    color: #263238;                             /* 텍스트 어둡게 및 진하게 */
+                    border: 1px solid #1de9b6;
+                }
+            """)
             
             layout.addWidget(self._ev_required_list)
             
