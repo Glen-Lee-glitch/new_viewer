@@ -166,6 +166,7 @@ QSplitter::handle:horizontal {
      <addaction name="action_gu_contract"/>
      <addaction name="action_support_lease"/>
     </widget>
+    <addaction name="action_open_external"/>
     <addaction name="menu_additional_documents"/>
    </widget>
    <widget class="QMenu" name="menu_edit">
@@ -350,6 +351,11 @@ QSplitter::handle:horizontal {
   <action name="action_announcement_input">
    <property name="text">
     <string>공고문 입력</string>
+   </property>
+  </action>
+  <action name="action_open_external">
+   <property name="text">
+    <string>외부로 열기</string>
    </property>
   </action>
  </widget>

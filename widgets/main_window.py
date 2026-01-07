@@ -147,6 +147,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'pushButton_worker_progress'):
             self.pushButton_worker_progress.hide()
 
+        # '외부로 열기' 액션 초기 비활성화
+        if hasattr(self, 'action_open_external'):
+            self.action_open_external.setEnabled(False)
+
     def _init_login_dialog(self):
         """로그인 다이얼로그를 초기화한다."""
         # parent를 None으로 설정하여 독립적인 윈도우로 생성
@@ -607,6 +611,10 @@ class MainWindow(QMainWindow):
         self._thumbnail_viewer.show()
         self._alarm_widget.hide()
         self._info_panel.show()
+
+        # PDF 편집 모드 진입 시 '외부로 열기' 액션 활성화
+        if hasattr(self, 'action_open_external'):
+            self.action_open_external.setEnabled(True)
         # alarm_widget에서 info_panel_widget으로 전환될 때 체크박스 초기화
         self._info_panel.reset_task_checkboxes()
 
@@ -1164,6 +1172,10 @@ class MainWindow(QMainWindow):
         # AI 결과 보기 액션 비활성화
         if hasattr(self, 'view_ai_results_action'):
             self.view_ai_results_action.setEnabled(False)
+
+        # '외부로 열기' 액션 비활성화
+        if hasattr(self, 'action_open_external'):
+            self.action_open_external.setEnabled(False)
 
         self._pdf_load_widget.show()
         
