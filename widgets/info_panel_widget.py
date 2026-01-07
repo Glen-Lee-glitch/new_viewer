@@ -398,6 +398,11 @@ class InfoPanelWidget(QWidget):
             # 현재는 UI 표시가 주 목적이므로 리턴
             return
 
+        # 현재 체크된 상태 저장
+        checked_states = {}
+        for cb in self._dynamic_checkboxes:
+            checked_states[cb.text()] = cb.isChecked()
+
         # 기존 작업 리스트 초기화
         self.reset_task_checkboxes()
         
@@ -448,6 +453,10 @@ class InfoPanelWidget(QWidget):
             # 초기 리스트에 없던 새로운 항목이면 스타일 적용 (빨간색 굵게)
             if item not in self._initial_error_items:
                 checkbox.setStyleSheet("QCheckBox { color: red; font-weight: bold; }")
+            
+            # 기존에 체크되어 있었다면 상태 복원
+            if item in checked_states:
+                checkbox.setChecked(checked_states[item])
             
             self.verticalLayout_task_list.addWidget(checkbox)
             self._dynamic_checkboxes.append(checkbox)
