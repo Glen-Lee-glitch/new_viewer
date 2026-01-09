@@ -221,7 +221,7 @@ def fetch_subsidy_applications(
             if filter_type == 'mine' and r['worker_id'] != worker_id: continue
             if filter_type == 'unfinished':
                 # worker_id가 없거나, 상태가 '확인필요', '서류미비 도착', '중복메일'인 경우 유지
-                is_unfinished_status = r['status'] in ['확인필요', '서류미비 도착', '중복메일']
+                is_unfinished_status = r['status'] in ['확인필요', '서류미비 도착', '중복메일', '요청메일 도착']
                 if r['worker_id'] is not None and not is_unfinished_status:
                     continue
 
