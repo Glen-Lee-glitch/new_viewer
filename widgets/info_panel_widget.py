@@ -417,10 +417,13 @@ class InfoPanelWidget(QWidget):
             error_rows = fetch_error_results(rn)
             
             for row in error_rows:
-                # 1. null_fields 처리 (값이 존재하면 '파일 누락' 추가)
+                # 1. null_fields 처리 (값이 존재하면 '파일 누락: 서류명' 추가)
                 null_fields = row.get('null_fields')
-                if null_fields and "파일 누락" not in check_items:
-                    check_items.append("파일 누락")
+                if null_fields:
+                    doc_type = row.get('document_type', '알 수 없는 서류')
+                    item_text = f"파일 누락: {doc_type}"
+                    if item_text not in check_items:
+                        check_items.append(item_text)
 
                 # 2. validation_errors 처리 (딕셔너리 형태)
                 validation_errors = row.get('validation_errors', {})
