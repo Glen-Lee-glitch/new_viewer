@@ -2334,7 +2334,10 @@ def fetch_today_completed_worker_stats() -> dict:
 def update_subsidy_status(rn: str, status: str) -> bool:
     """
     rns 테이블에서 해당 RN의 status를 업데이트한다. (PostgreSQL 버전)
-    단, 'pdf 전처리'로 업데이트하려는 경우, 현재 상태가 '서류미비 요청' 또는 '서류미비 도착'이면 업데이트를 막는다.
+    
+    [추가 로직]
+    - ev_rns 테이블에 해당 RN이 존재하고 status가 '취소'가 아니면 'EV보완 필요'로 업데이트한다.
+    - 단, 'pdf 전처리'로 업데이트하려는 경우, 현재 상태가 '서류미비 요청'이면 업데이트를 막는다.
     """
     if not rn:
         return False
@@ -2342,16 +2345,25 @@ def update_subsidy_status(rn: str, status: str) -> bool:
     try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             with connection.cursor() as cursor:
-                # 조건부 체크: 'pdf 전처리'로 업데이트 하려는 경우
+                # 1. ev_rns 테이블 조건 체크
+                # status가 '취소'가 아닌 데이터 중 해당 RN이 있는지 확인
+                ev_check_query = "SELECT COUNT(*) FROM ev_rns WHERE rn = %s AND status != '취소'"
+                cursor.execute(ev_check_query, (rn,))
+                if cursor.fetchone()[0] > 0:
+                    status = 'EV보완 필요'
+                    print(f"[DEBUG] ev_rns 조건 충족 - 상태를 '{status}'로 변경합니다. (RN: {rn})")
+
+                # 2. 기존 조건부 체크: 'pdf 전처리'로 업데이트 하려는 경우
                 if status == 'pdf 전처리':
                     check_query = 'SELECT status FROM rns WHERE "RN" = %s'
                     cursor.execute(check_query, (rn,))
                     row = cursor.fetchone()
                     if row:
                         current_status = row[0]
-                        if current_status in ('서류미비 요청'):
+                        if current_status == '서류미비 요청':
                             return False
 
+                # 3. 실제 업데이트 실행
                 query = "UPDATE rns SET status = %s WHERE \"RN\" = %s"
                 cursor.execute(query, (status, rn))
                 connection.commit()

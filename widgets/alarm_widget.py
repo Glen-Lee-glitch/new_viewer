@@ -259,6 +259,7 @@ class AlarmWidget(QWidget):
             print(f"서류미비 목록 로드 중 오류: {e}")
             self._ev_required_list.clear()
             self._ev_required_list.addItem("로드 실패")
+    
     def _on_ev_required_item_double_clicked(self, item):
         """서류미비 리스트 아이템 더블 클릭 시 작업 요청 시그널을 발생시킨다."""
         text = item.text()
