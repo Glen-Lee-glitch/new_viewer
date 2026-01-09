@@ -219,7 +219,12 @@ def fetch_subsidy_applications(
             }
             # 필터링 로직 (단순 구현)
             if filter_type == 'mine' and r['worker_id'] != worker_id: continue
-            if filter_type == 'unfinished' and r['worker_id'] is not None: continue
+            if filter_type == 'unfinished':
+                # worker_id가 없거나, 상태가 '확인필요', '서류미비 도착', '중복메일'인 경우 유지
+                is_unfinished_status = r['status'] in ['확인필요', '서류미비 도착', '중복메일']
+                if r['worker_id'] is not None and not is_unfinished_status:
+                    continue
+
             if filter_type == 'uncompleted' and r['status'] == '처리완료': continue
             if regions and r['region'] not in regions: continue
             
@@ -257,7 +262,7 @@ def fetch_subsidy_applications(
                 else:
                     where_clause += "AND 1=0 "
             elif filter_type == 'unfinished':
-                where_clause += "AND r.worker_id IS NULL "
+                where_clause += "AND (r.worker_id IS NULL OR r.status IN ('확인필요', '서류미비 도착', '중복메일')) "
             elif filter_type == 'uncompleted':
                 # '처리완료'가 아닌 건들만 조회
                 where_clause += "AND (r.status IS NULL OR r.status != '처리완료') "
