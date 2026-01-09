@@ -74,6 +74,10 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'pushButton_save_memo'):
             self.pushButton_save_memo.clicked.connect(self._on_save_memo_clicked)
 
+        # 확인필요 버튼 연결
+        if hasattr(self, 'pushButton_needs_check'):
+            self.pushButton_needs_check.clicked.connect(self._on_needs_check_clicked)
+
         # 지역 입력 필드 더블클릭 이벤트 필터 설치
         if hasattr(self, 'lineEdit_region'):
             self.lineEdit_region.installEventFilter(self)
@@ -107,6 +111,27 @@ class InfoPanelWidget(QWidget):
             self._refresh_memo_list()
         else:
             QMessageBox.critical(self, "오류", "메모 저장에 실패했습니다.")
+
+    def _on_needs_check_clicked(self):
+        """'확인필요' 버튼 클릭 시 처리"""
+        if not self._current_rn:
+            QMessageBox.warning(self, "경고", "RN 정보가 없습니다.")
+            return
+
+        reply = QMessageBox.question(
+            self, "확인", 
+            f"현재 RN({self._current_rn})의 상태를 '확인필요'로 변경하시겠습니까?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            from core.sql_manager import update_subsidy_status
+            if update_subsidy_status(self._current_rn, '확인필요'):
+                QMessageBox.information(self, "성공", "상태가 '확인필요'로 변경되었습니다.")
+                # 작업 리스트 갱신 등의 필요한 조치를 취할 수 있음
+            else:
+                QMessageBox.critical(self, "오류", "상태 변경에 실패했습니다.")
 
     def _refresh_memo_list(self):
         """현재 RN의 메모 리스트를 새로고침한다."""

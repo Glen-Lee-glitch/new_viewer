@@ -19,7 +19,28 @@
      <property name="title">
       <string>작업 리스트</string>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout_task_list"/>
+     <layout class="QVBoxLayout" name="verticalLayout_task_list">
+      <item>
+       <spacer name="verticalSpacer_task_list">
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>0</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton_needs_check">
+        <property name="text">
+         <string>확인필요</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
