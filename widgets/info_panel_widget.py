@@ -342,6 +342,18 @@ class InfoPanelWidget(QWidget):
         # EV 보완 모드 초기화 (텍스트 에디트 숨김 등)
         self.set_ev_complement_mode(False)
 
+    def update_file_info(self, file_path: str, file_size_mb: float, total_pages: int):
+        """파일 관련 정보를 업데이트한다. (UI에서 파일 정보 그룹박스가 제거되어 비활성화됨)"""
+        pass
+
+    def update_total_pages(self, total_pages: int):
+        """총 페이지 수 정보만 업데이트한다. (UI에서 파일 정보 그룹박스가 제거되어 비활성화됨)"""
+        pass
+
+    def update_page_info(self, page_num: int, width: float, height: float, rotation: int):
+        """현재 페이지 관련 정보를 업데이트한다. (UI 요소가 제거되어 더 이상 사용되지 않음)"""
+        pass
+
     def reset_task_checkboxes(self):
         """작업 리스트 체크박스들을 모두 해제 상태로 초기화하고 동적 체크박스를 제거한다."""
         # 동적 체크박스 제거
