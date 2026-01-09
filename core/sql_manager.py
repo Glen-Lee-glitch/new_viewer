@@ -2689,6 +2689,79 @@ def fetch_today_future_apply_stats() -> list[dict]:
         traceback.print_exc()
         return []
 
+def fetch_today_completed_list() -> list[dict]:
+    """
+    금일 '처리완료'된 건들의 상세 목록을 조회한다. (PostgreSQL 버전)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT r."RN", r.region, w.worker_name, r.customer
+                FROM rns r
+                LEFT JOIN workers w ON r.worker_id = w.worker_id
+                WHERE r.original_received_date::date = %s
+                  AND r.status = '처리완료'
+                ORDER BY r."RN" ASC
+            """
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
+def fetch_today_deferred_list() -> list[dict]:
+    """
+    금일 '미비/보류' 상태인 건들의 상세 목록을 조회한다. (PostgreSQL 버전)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT r."RN", r.region, r.status, r.customer
+                FROM rns r
+                WHERE r.original_received_date::date = %s
+                  AND r.status IN ('서류미비 요청', '서류미비 도착', 'EV보완요청', '중복메일')
+                ORDER BY r."RN" ASC
+            """
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
+def fetch_today_future_apply_list() -> list[dict]:
+    """
+    금일 '추후 신청' 상태인 건들의 상세 목록을 조회한다. (PostgreSQL 버전)
+    """
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y-%m-%d')
+            
+            query = """
+                SELECT "RN", region, customer
+                FROM rns
+                WHERE original_received_date::date = %s
+                  AND status = '추후 신청'
+                ORDER BY "RN" ASC
+            """
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute(query, (today_str,))
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 def process_duplicate_application(rn: str, image_path: str) -> bool:
     """
     중복 신청 건을 처리한다.

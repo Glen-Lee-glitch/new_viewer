@@ -16,8 +16,18 @@ from core.sql_manager import (
     fetch_today_impossible_list,
     fetch_today_future_apply_stats,
     fetch_today_email_count,
-    fetch_today_processing_list
+    fetch_today_processing_list,
+    fetch_today_completed_list,
+    fetch_today_deferred_list,
+    fetch_today_future_apply_list
 )
+from PyQt6.QtWidgets import QFileDialog
+import pandas as pd
+import os
+from datetime import datetime
+import pytz
+from openpyxl.styles import PatternFill, Font, Border, Side, Alignment
+from openpyxl.utils import get_column_letter
 
 class ClickableCard(QWidget):
     """클릭 가능한 카드 위젯"""
@@ -169,8 +179,107 @@ class WorkerProgressDialog(QDialog):
 
     def _on_export_report(self):
         """보고서 추출 버튼 클릭 시 처리"""
-        period = self.period_combo.currentText()
-        QMessageBox.information(self, "보고서 추출", f"'{period}' 보고서 추출 기능을 준비 중입니다.")
+        try:
+            period = self.period_combo.currentText()
+            if period != "금일":
+                QMessageBox.warning(self, "보고서 추출", "현재는 '금일' 보고서만 추출 가능합니다.")
+                return
+
+            # 1. 파일 저장 경로 선택
+            kst = pytz.timezone('Asia/Seoul')
+            today_str = datetime.now(kst).strftime('%Y%m%d')
+            default_name = f"업무현황보고서_{today_str}.xlsx"
+            
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "보고서 저장", default_name, "Excel Files (*.xlsx)"
+            )
+            
+            if not file_path:
+                return
+
+            # 2. 데이터 수집
+            counts = fetch_daily_status_counts()
+            processing_list = fetch_today_processing_list()
+            completed_list = fetch_today_completed_list()
+            deferred_list = fetch_today_deferred_list()
+            impossible_list = fetch_today_impossible_list()
+            future_apply_list = fetch_today_future_apply_list()
+
+            # 3. Excel 파일 생성 (Pandas + openpyxl)
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                # 요약 시트
+                summary_data = [
+                    ["항목", "건수", "비고"],
+                    ["전체 접수 (RN 고유)", counts.get('pipeline', 0), "금일 수신된 고유 RN 수"],
+                    ["이메일 수신 총계", counts.get('email_pipeline', 0), "중복 포함 전체 메일 수"],
+                    ["처리중", counts.get('processing', 0), "현재 작업 대기/진행 중"],
+                    ["처리완료 (RNS)", counts.get('completed', 0), "작업자 상태 완료 기준"],
+                    ["신청완료 (EV)", counts.get('ev_completed', 0), "EV Portal 신청 완료 기준"],
+                    ["미비/보류", counts.get('deferred', 0), "서류미비, 보완요청 등"],
+                    ["신청불가", counts.get('impossible', 0), "부적합, 중복 등"],
+                    ["추후 신청", counts.get('future_apply', 0), "고객 요청 등으로 보류"]
+                ]
+                df_summary = pd.DataFrame(summary_data[1:], columns=summary_data[0])
+                df_summary.to_excel(writer, sheet_name='요약', index=False)
+
+                # 상세 시트들
+                pd.DataFrame(processing_list).to_excel(writer, sheet_name='처리중', index=False)
+                pd.DataFrame(completed_list).to_excel(writer, sheet_name='완료목록', index=False)
+                pd.DataFrame(deferred_list).to_excel(writer, sheet_name='미비_보류목록', index=False)
+                pd.DataFrame(impossible_list).to_excel(writer, sheet_name='신청불가목록', index=False)
+                pd.DataFrame(future_apply_list).to_excel(writer, sheet_name='추후신청목록', index=False)
+
+                # 스타일 적용을 위해 workbook 접근
+                workbook = writer.book
+                
+                # 모든 시트에 대해 스타일 적용
+                header_fill = PatternFill(start_color='2C3E50', end_color='2C3E50', fill_type='solid')
+                header_font = Font(color='FFFFFF', bold=True)
+                border = Border(
+                    left=Side(style='thin'), right=Side(style='thin'), 
+                    top=Side(style='thin'), bottom=Side(style='thin')
+                )
+
+                for sheet_name in writer.sheets:
+                    worksheet = writer.sheets[sheet_name]
+                    
+                    # 헤더 스타일 및 열 너비 조정
+                    for col_num, col_cells in enumerate(worksheet.columns, 1):
+                        # 헤더 스타일 (1행)
+                        cell = worksheet.cell(row=1, column=col_num)
+                        cell.fill = header_fill
+                        cell.font = header_font
+                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                        
+                        # 전체 테두리 및 자동 너비 조절
+                        max_length = 0
+                        for cell in col_cells:
+                            cell.border = border
+                            try:
+                                if cell.value:
+                                    length = len(str(cell.value).encode('utf-8'))
+                                    if length > max_length:
+                                        max_length = length
+                            except:
+                                pass
+                        
+                        adjusted_width = (max_length + 2) * 1.2
+                        worksheet.column_dimensions[get_column_letter(col_num)].width = min(adjusted_width, 50)
+
+            # 4. 완료 알림
+            reply = QMessageBox.question(
+                self, "보고서 추출 완료", 
+                f"보고서가 성공적으로 추출되었습니다.\n경로: {file_path}\n\n파일을 지금 여시겠습니까?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                os.startfile(file_path)
+
+        except Exception as e:
+            QMessageBox.critical(self, "보고서 추출 실패", f"에러가 발생했습니다: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
     def _init_summary_ui(self):
         """요약 UI 구조를 초기화한다."""
