@@ -83,7 +83,7 @@ class Toast(QWidget):
         confirm_button.setStyleSheet(button_style)
         close_button.setStyleSheet(button_style)
 
-        confirm_button.clicked.connect(self.close)
+        confirm_button.clicked.connect(self._on_confirm_button_clicked)
         # '닫기' 버튼 클릭 시 기존 활성 윈도우 포커스 유지
         close_button.clicked.connect(self._on_close_button_clicked)
 
@@ -184,6 +184,39 @@ class Toast(QWidget):
     def opacity(self, value):
         self._opacity = value
         self.update()
+
+    def _on_confirm_button_clicked(self):
+        """확인 버튼 클릭 시 호출되며, 알림창을 닫고 메인 윈도우를 최상위로 포커스합니다."""
+        self.close()
+        
+        try:
+            # 모든 탑레벨 위젯 중 MainWindow 찾기
+            from PyQt6.QtWidgets import QApplication
+            main_window = None
+            for widget in QApplication.topLevelWidgets():
+                if widget.__class__.__name__ == 'MainWindow':
+                    main_window = widget
+                    break
+            
+            if main_window:
+                # 윈도우 상태 정규화 및 활성화
+                if main_window.isMinimized():
+                    main_window.showNormal()
+                
+                main_window.raise_()
+                main_window.activateWindow()
+                
+                # Windows OS인 경우 Win32 API로 확실하게 최상위로
+                import sys
+                if sys.platform == 'win32':
+                    import ctypes
+                    user32 = ctypes.windll.user32
+                    hwnd = int(main_window.winId())
+                    # 다른 프로세스의 윈도우가 이미 포커스를 가지고 있을 때를 대비해 강제 포커스
+                    user32.ShowWindow(hwnd, 5)  # SW_SHOW
+                    user32.SetForegroundWindow(hwnd)
+        except Exception as e:
+            print(f"메인 윈도우 포커스 전환 중 오류: {e}")
 
     def _on_close_button_clicked(self):
         """닫기 버튼 클릭 시 호출되며, 알림창을 닫고 이전 외부 윈도우의 포커스를 복원합니다."""
