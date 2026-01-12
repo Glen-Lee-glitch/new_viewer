@@ -93,7 +93,7 @@ class MainWindow(QMainWindow):
         
         # 작업 관련 변수
         self._current_rn = ""
-        self._is_context_menu_work = False
+        self._is_ce_work = False
         self._special_note_dialog = None  # 비모달 다이얼로그 인스턴스 유지용
         self._pending_open_file_after_save = False
 
@@ -940,15 +940,24 @@ class MainWindow(QMainWindow):
         
         self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
         
-        # ev_complement 모드 체크 및 설정
+        # 모드 체크 및 설정
         if rn_value:
             ev_memo = fetch_ev_complement_memo(rn_value)
-            # 알람 위젯 플래그 또는 DB 메모 존재 여부로 판단
             is_ev = self._is_ev_complement_work or (ev_memo is not None)
-            self._info_panel.set_ev_complement_mode(is_ev, ev_memo if ev_memo else "")
-            self._pdf_view_widget.set_ev_complement_mode(is_ev)
+            is_ce = getattr(self, '_is_ce_work', False)
+            
+            if is_ev:
+                self._info_panel.set_display_mode('ev', ev_memo if ev_memo else "")
+                self._pdf_view_widget.set_ev_complement_mode(True)
+            elif is_ce:
+                # CE 모드일 경우 메일 본문을 표시
+                self._info_panel.set_display_mode('ce', mail_content if mail_content else "수신된 메일 본문이 없습니다.")
+                self._pdf_view_widget.set_ev_complement_mode(False)
+            else:
+                self._info_panel.set_display_mode('normal')
+                self._pdf_view_widget.set_ev_complement_mode(False)
         else:
-            self._info_panel.set_ev_complement_mode(False)
+            self._info_panel.set_display_mode('normal')
             self._pdf_view_widget.set_ev_complement_mode(False)
         
         # PDF 로드 후 RN을 PdfViewWidget에 전달
@@ -1106,6 +1115,7 @@ class MainWindow(QMainWindow):
         if self._is_alarm_rn_work:
             self._is_alarm_rn_work = False
             self._is_ev_complement_work = False # EV 플래그 리셋
+            self._is_ce_work = False # CE 플래그 리셋
             print("[알람 위젯 작업 플래그] 저장 완료 후 초기화됨")
         
         # 지급 테이블 작업이었다면 플래그 리셋
@@ -1147,6 +1157,7 @@ class MainWindow(QMainWindow):
         self._current_rn = ""  # 현재 RN 초기화
         self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
         self._is_alarm_rn_work = False  # 알람 위젯 작업 플래그 리셋
+        self._is_ce_work = False  # CE 플래그 리셋
         self._pending_outlier_check = False  # 이상치 체크 플래그 리셋
         self._pending_outlier_metadata = None  # 이상치 메타데이터 리셋
         self._pdf_view_widget.set_current_rn("") # PdfViewWidget의 RN도 초기화

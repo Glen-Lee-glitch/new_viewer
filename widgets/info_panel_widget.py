@@ -314,20 +314,15 @@ class InfoPanelWidget(QWidget):
         super().hideEvent(event)
         self._refresh_timer.stop()
 
-    def _on_refresh_timeout(self):
-        """타이머 타임아웃 시 작업 리스트 갱신"""
-        if self._current_rn and self.isVisible():
-            # 현재 RN으로 작업 리스트만 업데이트 (초기 로드 아님)
-            # print(f"Auto-refreshing task list for RN: {self._current_rn}")
-            self.update_task_list(self._current_rn, is_initial_load=False)
-
-    def set_ev_complement_mode(self, is_enabled: bool, ev_memo: str = ""):
+    def set_display_mode(self, mode: str, content: str = ""):
         """
-        ev_complement 모드 설정.
-        True일 경우 작업 리스트를 ev_memo를 보여주는 텍스트 영역으로 교체한다.
-        False일 경우 기존 작업 리스트(체크박스)로 복원한다.
+        정보 패널의 표시 모드 설정.
+        'ev': 보완 요청 사항 표시
+        'ce': 확인 요청(메일) 내용 표시
+        'normal': 기존 작업 리스트(체크박스) 표시
         """
-        self._is_ev_complement_mode = is_enabled
+        self._is_ev_complement_mode = (mode == 'ev')
+        self._is_ce_mode = (mode == 'ce')
         
         if not hasattr(self, 'groupBox_2'):
             return
@@ -336,37 +331,49 @@ class InfoPanelWidget(QWidget):
         if not layout:
             return
 
-        # ev_memo용 QTextEdit가 없으면 생성하여 layout에 추가하고 숨겨둠.
-        if not hasattr(self, '_ev_memo_text_edit'):
-            self._ev_memo_text_edit = QTextEdit()
-            self._ev_memo_text_edit.setReadOnly(True)
-            self._ev_memo_text_edit.setVisible(False)
-            layout.addWidget(self._ev_memo_text_edit)
+        # 내용 표시용 QTextEdit가 없으면 생성하여 layout에 추가하고 숨겨둠.
+        if not hasattr(self, '_info_display_text_edit'):
+            self._info_display_text_edit = QTextEdit()
+            self._info_display_text_edit.setReadOnly(True)
+            self._info_display_text_edit.setVisible(False)
+            # 폰트 크기 조정
+            font = self._info_display_text_edit.font()
+            font.setPointSize(font.pointSize() - 1)
+            self._info_display_text_edit.setFont(font)
+            layout.addWidget(self._info_display_text_edit)
             
-        if is_enabled:
+        if mode in ['ev', 'ce']:
             # 기존 체크박스들 숨기기
             self._set_task_list_visible(False)
-            # 텍스트 에디트 보이기 및 내용 설정
-            # DB에서 가져온 '\n'을 실제 줄바꿈 문자인 '\n'으로 변환
-            processed_memo = ev_memo.replace('\\n', '\n')
-            self._ev_memo_text_edit.setText(processed_memo)
-            self._ev_memo_text_edit.setVisible(True)
-            self.groupBox_2.setTitle("보완 요청 사항") # 타이틀 변경
             
-            # EV 보완 모드일 때는 체크박스가 새로 생성되지 않도록 해야 함
-            # 이미 생성된 체크박스가 있다면 숨김 처리됨
+            # 텍스트 에디트 보이기 및 내용 설정
+            processed_content = content.replace('\\n', '\n')
+            self._info_display_text_edit.setText(processed_content)
+            self._info_display_text_edit.setVisible(True)
+            
+            # 타이틀 변경
+            if mode == 'ev':
+                self.groupBox_2.setTitle("보완 요청 사항")
+            else:
+                self.groupBox_2.setTitle("확인 요청 내용")
         else:
             # 텍스트 에디트 숨기기
-            self._ev_memo_text_edit.setVisible(False)
-            self._ev_memo_text_edit.clear()
+            self._info_display_text_edit.setVisible(False)
+            self._info_display_text_edit.clear()
             # 기존 체크박스들 보이기
             self._set_task_list_visible(True)
-            self.groupBox_2.setTitle("작업 리스트") # 타이틀 복원
+            self.groupBox_2.setTitle("작업 리스트")
             
-            # 복원 시 현재 RN에 대한 작업 리스트 갱신 필요할 수 있음
+            # 복원 시 현재 RN에 대한 작업 리스트 갱신
             if self._current_rn:
                 self.update_task_list(self._current_rn)
 
+    def _on_refresh_timeout(self):
+        """타이머 타임아웃 시 작업 리스트 갱신"""
+        if self._current_rn and self.isVisible():
+            # 현재 RN으로 작업 리스트만 업데이트 (초기 로드 아님)
+            # print(f"Auto-refreshing task list for RN: {self._current_rn}")
+            self.update_task_list(self._current_rn, is_initial_load=False)
     def _set_task_list_visible(self, visible: bool):
         """작업 리스트 레이아웃 내의 위젯들의 가시성을 설정한다."""
         for checkbox in self._dynamic_checkboxes:
@@ -478,8 +485,8 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'textEdit_memo_input'):
             self.textEdit_memo_input.clear()
 
-        # EV 보완 모드 초기화 (텍스트 에디트 숨김 등)
-        self.set_ev_complement_mode(False)
+        # EV/CE 모드 초기화 (텍스트 에디트 숨김 등)
+        self.set_display_mode('normal')
 
     def update_file_info(self, file_path: str, file_size_mb: float, total_pages: int):
         """파일 관련 정보를 업데이트한다. (UI에서 파일 정보 그룹박스가 제거되어 비활성화됨)"""
