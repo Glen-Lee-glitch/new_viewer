@@ -90,7 +90,6 @@ def _build_subsidy_query_base():
         '  0 AS file_rendered, '
         '  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, '
         '  r.mail_count, '
-        '  r.model AS 차종, '
         '  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, '
         '  \'\' AS outlier, '
         '  COALESCE(r.status, \'\') AS result '
@@ -194,8 +193,7 @@ def fetch_subsidy_applications(
                 'urgent': 1 if r['is_urgent'] else 0,
                 'mail_count': r['mail_count'],
                 'all_ai': 1 if r['all_ai'] else 0,
-                'result': r['status'],
-                '차종': r['model']
+                'result': r['status']
             }
             # 필터링 로직 (단순 구현)
             if filter_type == 'mine' and r['worker_id'] != worker_id: continue

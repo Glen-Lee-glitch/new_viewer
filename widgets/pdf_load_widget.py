@@ -204,8 +204,7 @@ class PdfLoadWidget(QWidget):
                     'original_filepath': self._normalize_file_path(row.get('original_filepath')),
                     'finished_file_path': self._normalize_file_path(row.get('finished_file_path')),
                     'result': self._sanitize_text(row.get('result', '')),
-                    'all_ai': row.get('all_ai', 0),
-                    '차종': row.get('차종', '')
+                    'all_ai': row.get('all_ai', 0)
                 }
 
                 table.setItem(i, 0, QTableWidgetItem(row_data['region']))
