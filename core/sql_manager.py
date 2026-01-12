@@ -82,7 +82,6 @@ def _build_subsidy_query_base():
         '  r."RN" AS "RN", '
         '  r.region, '
         '  w.worker_name AS worker, '
-        '  r.customer AS name, '
         '  array_to_string(r.special, \', \') AS special_note, '
         '  r.last_received_date AS recent_received_date, '
         '  r.file_path AS finished_file_path, '
@@ -91,26 +90,13 @@ def _build_subsidy_query_base():
         '  0 AS file_rendered, '
         '  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, '
         '  r.mail_count, '
-        '  a."다자녀"->\'child_birth_date\' AS child_birth_date, '
-        '  a."초본"->>\'issue_date\' AS issue_date, '
-        '  CASE WHEN a."초본" IS NOT NULL THEN 1 ELSE 0 END AS chobon, '
-        '  a."구매계약서"->>\'order_date\' AS ai_계약일자, '
-        '  a."구매계약서"->>\'customer_name\' AS ai_이름, '
-        '  a."구매계약서"->>\'phone_number\' AS 전화번호, '
-        '  a."구매계약서"->>\'email\' AS 이메일, '
         '  r.model AS 차종, '
-        '  a."구매계약서"->>\'page_number\' AS page_number, '
-        '  COALESCE(a."초본"->\'first_person\'->>\'name\', a."초본"->>\'name\') AS chobon_name, '
-        '  COALESCE(a."초본"->\'first_person\'->>\'birth_date\', a."초본"->>\'birth_date\') AS chobon_birth_date, '
-        '  COALESCE(a."초본"->\'first_person\'->>\'address_1\', a."초본"->>\'address_1\') AS chobon_address_1, '
-        '  CASE WHEN r.special @> \'{법인}\' OR a."사업자등록증"->>\'is_corporation\' = \'true\' THEN 1 ELSE 0 END AS is_법인, '
         '  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, '
         '  \'\' AS outlier, '
         '  COALESCE(r.status, \'\') AS result '
         'FROM rns r '
         'LEFT JOIN emails e ON r.recent_thread_id = e.thread_id '
         'LEFT JOIN workers w ON r.worker_id = w.worker_id '
-        'LEFT JOIN analysis_results a ON r."RN" = a."RN" '
     )
 
 def fetch_recent_subsidy_applications():
@@ -199,7 +185,6 @@ def fetch_subsidy_applications(
                 'RN': r['RN'],
                 'region': r['region'],
                 'worker': worker.get('worker_name'),
-                'name': r['customer'],
                 'special_note': ', '.join(r['special']) if r['special'] else '',
                 'recent_received_date': r['last_received_date'],
                 'finished_file_path': r['file_path'],
@@ -313,7 +298,6 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
             'RN': rn_info['RN'],
             'region': rn_info['region'],
             'worker': next((w['worker_name'] for w in data.get('workers', []) if w['worker_id'] == rn_info['worker_id']), None),
-            'name': rn_info['customer'],
             'special_note': ', '.join(rn_info['special']) if rn_info['special'] else '',
             'finished_file_path': rn_info['file_path'],
             'original_filepath': email.get('original_pdf_path'),
@@ -321,16 +305,16 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
             'file_rendered': 0,
             'urgent': 1 if rn_info['is_urgent'] else 0,
             'mail_count': rn_info['mail_count'],
+            'all_ai': 1 if rn_info['all_ai'] else 0,
             'outlier': '',
-            'is_법인': analysis.get('사업자등록증', {}).get('is_corporation', False) if analysis.get('사업자등록증') else False
+            'result': rn_info['status']
         }
         return result
 
-    try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = (
                 "SELECT "
-                "  r.\"RN\", r.region, w.worker_name AS worker, r.customer AS name, "
+                "  r.\"RN\", r.region, w.worker_name AS worker, "
                 "  array_to_string(r.special, ', ') AS special_note, "
                 "  r.file_path AS finished_file_path, "
                 "  e.original_pdf_path AS original_filepath, "
@@ -338,27 +322,11 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 "  0 AS file_rendered, "
                 "  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, "
                 "  r.mail_count, "
-                "  a.\"구매계약서\" IS NOT NULL AS \"구매계약서\", "
-                "  a.\"초본\" IS NOT NULL AS \"초본\", "
-                "  a.\"공동명의\" IS NOT NULL OR '공동명의' = ANY(r.special) AS \"공동명의\", "
-                "  a.\"다자녀\" IS NOT NULL OR '다자녀' = ANY(r.special) AS \"다자녀\", "
-                "  a.\"다자녀\"->'child_birth_date' AS child_birth_date, "
-                "  a.\"초본\"->>'issue_date' AS issue_date, "
-                "  a.\"초본\" IS NOT NULL AS chobon, "
-                "  a.\"구매계약서\"->>'order_date' AS ai_계약일자, "
-                "  a.\"구매계약서\"->>'customer_name' AS ai_이름, "
-                "  a.\"구매계약서\"->>'phone_number' AS 전화번호, "
-                "  a.\"구매계약서\"->>'email' AS 이메일, "
-                "  r.model AS 차종, "
-                "  a.\"구매계약서\"->>'page_number' AS page_number, "
-                "  COALESCE(a.\"초본\"->'first_person'->>'name', a.\"초본\"->>'name') AS chobon_name, "
-                "  COALESCE(a.\"초본\"->'first_person'->>'birth_date', a.\"초본\"->>'birth_date') AS chobon_birth_date, "
-                "  COALESCE(a.\"초본\"->'first_person'->>'address_1', a.\"초본\"->>'address_1') AS chobon_address_1, "
-                "  (r.special @> '{법인}' OR a.\"사업자등록증\"->>'is_corporation' = 'true') AS is_법인 "
+                "  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, "
+                "  COALESCE(r.status, '') AS result "
                 "FROM rns r "
                 "LEFT JOIN emails e ON r.recent_thread_id = e.thread_id "
                 "LEFT JOIN workers w ON r.worker_id = w.worker_id "
-                "LEFT JOIN analysis_results a ON r.\"RN\" = a.\"RN\" "
                 "WHERE r.\"RN\" = %s"
             )
             
@@ -370,47 +338,7 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                     return None
                 
                 result = dict(row)
-                
-                # 이상치(outlier) 계산 로직
                 result['outlier'] = '' 
-
-                # 1. 계약일자 이상치 체크
-                try:
-                    ai_계약일자 = result.get('ai_계약일자')
-                    if ai_계약일자:
-                        contract_date_obj = None
-                        if isinstance(ai_계약일자, str):
-                            try:
-                                contract_date_obj = datetime.strptime(ai_계약일자.split()[0], "%Y-%m-%d").date()
-                            except ValueError:
-                                pass
-                        
-                        if contract_date_obj and contract_date_obj < date(2025, 1, 1):
-                            result['outlier'] = 'O'
-                except Exception:
-                    pass
-
-                # 2. 초본 issue_date 체크
-                if result['outlier'] != 'O' and result.get('초본') and result.get('issue_date'):
-                     try:
-                        issue_date = result['issue_date']
-                        kst = pytz.timezone('Asia/Seoul')
-                        today = datetime.now(kst).date()
-                        
-                        issue_date_obj = None
-                        if isinstance(issue_date, str):
-                            try:
-                                issue_date_obj = datetime.strptime(issue_date.split('T')[0], "%Y-%m-%d").date()
-                            except ValueError:
-                                pass
-
-                        if issue_date_obj:
-                            days_diff = (today - issue_date_obj).days
-                            if days_diff >= 31:
-                                result['outlier'] = 'O'
-                     except Exception:
-                         pass
-
                 return result
 
     except Exception:

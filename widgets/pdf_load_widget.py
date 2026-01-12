@@ -195,7 +195,6 @@ class PdfLoadWidget(QWidget):
                     'rn': self._sanitize_text(row.get('RN', '')),
                     'region': self._sanitize_text(row.get('region', '')),
                     'worker': self._sanitize_text(row.get('worker', '')),
-                    'name': self._sanitize_text(row.get('name', '')),
                     'special_note': self._sanitize_text(row.get('special_note', '')),
                     'recent_thread_id': self._sanitize_text(row.get('recent_thread_id', '')),
                     'file_rendered': row.get('file_rendered', 0),
@@ -206,9 +205,7 @@ class PdfLoadWidget(QWidget):
                     'finished_file_path': self._normalize_file_path(row.get('finished_file_path')),
                     'result': self._sanitize_text(row.get('result', '')),
                     'all_ai': row.get('all_ai', 0),
-                    '차종': row.get('차종', ''),
-                    'child_birth_date': row.get('child_birth_date', ''),
-                    'issue_date': row.get('issue_date', '')
+                    '차종': row.get('차종', '')
                 }
 
                 table.setItem(i, 0, QTableWidgetItem(row_data['region']))
@@ -477,7 +474,6 @@ class PdfLoadWidget(QWidget):
     def _extract_row_metadata_from_dict(self, data):
         return {
             'rn': data.get('RN', ''),
-            'name': data.get('name', ''),
             'region': data.get('region', ''),
             'worker': data.get('worker', ''),
             'finished_file_path': data.get('finished_file_path', ''),
@@ -485,6 +481,7 @@ class PdfLoadWidget(QWidget):
             'recent_thread_id': data.get('recent_thread_id', ''),
             'mail_count': data.get('mail_count', 0),
             'urgent': data.get('urgent', 0),
+            'all_ai': data.get('all_ai', 0),
             'original_filepath': data.get('original_filepath', '')
         }
 

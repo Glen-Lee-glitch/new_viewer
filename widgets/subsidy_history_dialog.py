@@ -566,13 +566,9 @@ class SubsidyHistoryDialog(QDialog):
                 'recent_received_date': row.get('recent_received_date'), # 날짜 원본
                 'urgent': row.get('urgent', 0),
                 'mail_count': row.get('mail_count', 0),
-                'finished_file_path': row.get('finished_file_path', ''),  # 추가됨
-                'original_filepath': row.get('original_filepath', ''),    # 추가됨
-                # AI 관련 플래그들
-                '구매계약서': row.get('구매계약서', 0),
-                '초본': row.get('초본', 0),
-                '공동명의': row.get('공동명의', 0),
-                'is_법인': row.get('is_법인', 0),
+                'finished_file_path': row.get('finished_file_path', ''),
+                'original_filepath': row.get('original_filepath', ''),
+                'all_ai': row.get('all_ai', 0),
             }
 
             # 수신일 포맷팅 (MM-DD HH:mm) 및 KST 변환
@@ -588,15 +584,8 @@ class SubsidyHistoryDialog(QDialog):
                 except Exception:
                     received_date_str = str(raw_date)
 
-            # AI 상태 계산
-            ai_status = 'X'
-            구매계약서 = row_data['구매계약서'] == 1
-            초본 = row_data['초본'] == 1
-            공동명의 = row_data['공동명의'] == 1
-            is_법인 = row_data['is_법인'] == 1
-
-            if 구매계약서 and (초본 or 공동명의 or is_법인):
-                ai_status = 'O'
+            # AI 상태 계산 (all_ai 플래그 사용)
+            ai_status = 'O' if row_data.get('all_ai') == 1 else 'X'
 
             # 아이템 생성 및 설정
             table.setItem(row_index, 0, QTableWidgetItem(row_data['region']))
