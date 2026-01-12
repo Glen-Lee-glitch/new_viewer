@@ -381,7 +381,11 @@ class InfoPanelWidget(QWidget):
             else:
                 self._email_history = [content] if content else []
             
-            self._current_history_index = 0
+            # CE 모드나 확인필요 모드일 경우 가장 최신 메시지(마지막 아이템)를 먼저 보여줌
+            if mode in ['ce', 'checked'] and self._email_history:
+                self._current_history_index = len(self._email_history) - 1
+            else:
+                self._current_history_index = 0
             
             # 텍스트 에디트 보이기 및 네비게이션 업데이트
             self._update_history_display()
