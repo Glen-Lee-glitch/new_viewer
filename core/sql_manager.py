@@ -576,7 +576,7 @@ def fetch_daily_status_counts() -> dict:
                         COUNT(DISTINCT "RN") as total_pipeline,
                         COUNT(DISTINCT CASE WHEN status = '신청불가' THEN "RN" END) as impossible_count,
                         COUNT(DISTINCT CASE WHEN status = '처리완료' THEN "RN" END) as completed_count,
-                        COUNT(DISTINCT CASE WHEN status IN ('서류미비 요청', '서류미비 도착', 'EV보완요청', '중복메일') THEN "RN" END) as deferred_count,
+                        COUNT(DISTINCT CASE WHEN status IN ('서류미비 요청', '서류미비 도착', 'EV보완요청', 'EV보완 필요', '중복메일') THEN "RN" END) as deferred_count,
                         COUNT(DISTINCT CASE WHEN status = '추후 신청' THEN "RN" END) as future_apply_count
                     FROM rns 
                     WHERE original_received_date::date = %s
@@ -652,7 +652,7 @@ def fetch_today_processing_list() -> list:
                 WHERE original_received_date::date = %s
                   AND (status IS NULL OR status NOT IN (
                       '신청불가', '처리완료', '서류미비 요청', 
-                      '서류미비 도착', 'EV보완요청', '중복메일', '추후 신청'
+                      '서류미비 도착', 'EV보완요청', 'EV보완 필요', '중복메일', '추후 신청'
                   ))
                 ORDER BY "RN" ASC
             """
@@ -2671,7 +2671,7 @@ def fetch_today_deferred_list() -> list[dict]:
                 SELECT r."RN", r.region, r.status, r.customer
                 FROM rns r
                 WHERE r.original_received_date::date = %s
-                  AND r.status IN ('서류미비 요청', '서류미비 도착', 'EV보완요청', '중복메일')
+                  AND r.status IN ('서류미비 요청', '서류미비 도착', 'EV보완요청', 'EV보완 필요', '중복메일')
                 ORDER BY r."RN" ASC
             """
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:

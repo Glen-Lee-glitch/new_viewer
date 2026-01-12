@@ -301,7 +301,10 @@ class WorkerProgressDialog(QDialog):
             clickable=True, onClick=self._show_completed_stats,
             tooltip="작업자 상태 처리완료 수(금일 EV 상 신청완료 건)"
         )
-        self._create_summary_card("deferred", "미비/보류", "#e74c3c")
+        self._create_summary_card(
+            "deferred", "미비/보류", "#e74c3c",
+            clickable=True, onClick=self._show_deferred_list
+        )
         self._create_summary_card("impossible", "신청불가", "#95a5a6", clickable=True, onClick=self._show_impossible_list)
         self._create_summary_card("future_apply", "추후 신청", "#9b59b6", clickable=True, onClick=self._show_future_apply_stats)
         
@@ -669,6 +672,58 @@ class WorkerProgressDialog(QDialog):
                 
             self.chart_container.layout().addWidget(table)
             self.current_chart_type = 'future_apply'
+            
+        except Exception as e:
+            self._show_message_in_chart(f"데이터 로드 실패: {str(e)}")
+            self.current_chart_type = None
+
+    def _show_deferred_list(self):
+        """미비/보류 건에 대한 상세 목록을 보여준다 (토글 방식)."""
+        if self.current_chart_type == 'deferred':
+            self._show_message_in_chart("상단의 카드를 클릭하면 상세 통계를 볼 수 있습니다.")
+            self.current_chart_type = None
+            return
+            
+        try:
+            items = fetch_today_deferred_list()
+            
+            self._clear_layout(self.chart_container.layout())
+            if self.chart_container.layout() is None:
+                layout = QVBoxLayout()
+                self.chart_container.setLayout(layout)
+            
+            if not items:
+                self._show_message_in_chart("미비/보류 데이터가 없습니다.")
+                self.current_chart_type = 'deferred'
+                return
+            
+            table = QTableWidget()
+            table.setColumnCount(3)
+            table.setHorizontalHeaderLabels(["RN", "지역", "현재 상태"])
+            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+            
+            self._apply_table_style(table)
+            
+            table.setRowCount(len(items))
+            for i, item in enumerate(items):
+                rn_item = QTableWidgetItem(str(item.get('RN', '')))
+                rn_item.setFlags(rn_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                
+                region_item = QTableWidgetItem(str(item.get('region', '')))
+                region_item.setFlags(region_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                region_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                
+                status_item = QTableWidgetItem(str(item.get('status', '')))
+                status_item.setFlags(status_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+                
+                table.setItem(i, 0, rn_item)
+                table.setItem(i, 1, region_item)
+                table.setItem(i, 2, status_item)
+            
+            self.chart_container.layout().addWidget(table)
+            self.current_chart_type = 'deferred'
             
         except Exception as e:
             self._show_message_in_chart(f"데이터 로드 실패: {str(e)}")
