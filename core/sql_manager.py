@@ -311,6 +311,7 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
         }
         return result
 
+    try:
         with closing(psycopg2.connect(**DB_CONFIG)) as connection:
             query = (
                 "SELECT "
@@ -340,10 +341,6 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 result = dict(row)
                 result['outlier'] = '' 
                 return result
-
-    except Exception:
-        traceback.print_exc()
-        return None
 
     except Exception:
         traceback.print_exc()
