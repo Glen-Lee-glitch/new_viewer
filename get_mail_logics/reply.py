@@ -190,7 +190,7 @@ def send_reply_all_email(service, email_info, rn, apply_num, special_items=None,
         return
 
     # 답장 내용 구성
-    if status == '중복메일확인':
+    if status == '중복메일확인' or status == 'EV보완 완료':
         message_text = "처리 완료하였습니다."
     else:
         if special_items and len(special_items) > 0:
@@ -215,7 +215,7 @@ def fetch_pending_applications(conn):
     try:
         with conn.cursor() as cursor:
             # 1. ev_rns 조회
-            sql_ev = "SELECT rn, apply_num, special, status FROM ev_rns WHERE status IN ('신청완료', '중복메일확인')"
+            sql_ev = "SELECT rn, apply_num, special, status FROM ev_rns WHERE status IN ('신청완료', '중복메일확인', 'EV보완 완료')"
             cursor.execute(sql_ev)
             ev_rows = cursor.fetchall()
             results.extend(ev_rows)
@@ -224,7 +224,7 @@ def fetch_pending_applications(conn):
             # 여기서는 간단하게 rns만 조회하되, 이미 results에 있는 RN은 제외
             existing_rns = {row[0] for row in results}
             
-            sql_rns = "SELECT \"RN\", NULL as apply_num, NULL as special, status FROM rns WHERE status = '중복메일확인'"
+            sql_rns = "SELECT \"RN\", NULL as apply_num, NULL as special, status FROM rns WHERE status = '중복메일확인' OR status = 'EV보완 완료'"
             cursor.execute(sql_rns)
             rns_rows = cursor.fetchall()
             
