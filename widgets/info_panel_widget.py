@@ -92,7 +92,7 @@ class SpecialEditDialog(QDialog):
         row_layout.addWidget(line_edit)
         
         del_btn = QPushButton("삭제")
-        del_btn.setFixedWidth(40)
+        del_btn.setFixedWidth(60)
         del_btn.setStyleSheet("background-color: #f44336; color: white;")
         del_btn.clicked.connect(lambda: self._remove_row(row_widget))
         row_layout.addWidget(del_btn)
