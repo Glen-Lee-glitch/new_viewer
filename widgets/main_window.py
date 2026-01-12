@@ -91,15 +91,10 @@ class MainWindow(QMainWindow):
         self._page_order: list[int] = []
         self._pending_basic_info: dict | None = None
         
-        # 이상치 및 작업 관련 변수
+        # 작업 관련 변수
         self._current_rn = ""
         self._is_context_menu_work = False
         self._special_note_dialog = None  # 비모달 다이얼로그 인스턴스 유지용
-        self._pending_outlier_check = False
-        self._pending_outlier_metadata = None
-        self._pending_outlier_metadata_copy = None
-        self._outlier_queue = []
-        self._original_outlier_types = []
         self._pending_open_file_after_save = False
 
     def _create_widgets(self):
@@ -642,9 +637,6 @@ class MainWindow(QMainWindow):
         # PDF 열면 맨 처음 페이지 포커스
         if self.renderer.get_page_count() > 0:
             QTimer.singleShot(0, lambda: self.go_to_page(0))
-            # PDF 렌더 완료 후 이상치 체크 (약간의 지연을 두어 렌더링 완료 보장)
-            if self._pending_outlier_check:
-                QTimer.singleShot(500, self._check_and_show_outlier_reminder)
 
         # PDF 편집 모드 진입 시 3분 타이머 시작
         self._edit_mode_timer.start()
@@ -945,15 +937,6 @@ class MainWindow(QMainWindow):
                 full_address = f"{addr1} {addr2}".strip()
                 if self._pending_basic_info:
                     self._pending_basic_info['address'] = full_address
-        
-        # 이상치 정보 저장 (컨텍스트 메뉴 작업인 경우에만)
-        outlier_value = metadata.get('outlier', '')
-        if outlier_value == 'O': # outlier 값이 'O'이면 이상치 체크 플래그 설정
-            self._pending_outlier_check = True
-            self._pending_outlier_metadata = metadata  # 이상치 메타데이터 저장
-        else:
-            self._pending_outlier_check = False # outlier가 'O'가 아니면 플래그 리셋
-            self._pending_outlier_metadata = None
         
         self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
         
@@ -1342,128 +1325,6 @@ class MainWindow(QMainWindow):
                 return self.ui_main_splitter.restoreState(state)
         return False
 
-    def _check_and_show_outlier_reminder(self):
-        """PDF 렌더 완료 후 이상치가 있는 경우 리마인더 메시지를 표시한다."""
-        if self._pending_outlier_check:
-            self._pending_outlier_check = False  # 플래그 리셋
-            
-            # print(f"[디버그 main_window] _check_and_show_outlier_reminder - 호출 전 _pending_outlier_metadata: {self._pending_outlier_metadata}")
-            # 이상치 종류 판단
-            self._original_outlier_types = self._determine_outlier_type(self._pending_outlier_metadata)
-            self._outlier_queue = self._original_outlier_types[:] # 처리할 큐 복사
-            
-            # 메타데이터 복사본 저장
-            self._pending_outlier_metadata_copy = self._pending_outlier_metadata
-            self._pending_outlier_metadata = None  # 원본 메타데이터 리셋
-            
-            # 순차적으로 이상치 처리 시작
-            self._process_outlier_queue()
-
-    def _process_outlier_queue(self):
-        """이상치 큐를 순차적으로 처리하여 다이얼로그를 표시한다."""
-        if not self._outlier_queue:
-            # 큐가 비었으면 페이지 이동 로직 처리 후 종료
-            if 'contract' in self._original_outlier_types:
-                try:
-                    page_number_raw = self._pending_outlier_metadata_copy.get('page_number')
-                    if page_number_raw:
-                        page_number = int(page_number_raw) - 1
-                        total_pages = self.renderer.get_page_count()
-                        if 0 <= page_number < total_pages:
-                            self.go_to_page(page_number)
-                except (ValueError, TypeError):
-                    pass
-            
-            # 정리
-            self._original_outlier_types = []
-            self._pending_outlier_metadata_copy = None
-            return
-
-        outlier_type = self._outlier_queue.pop(0)
-
-        # 타입에 따라 다이얼로그 표시
-        if outlier_type == 'multichild':
-            child_birth_date_str = self._pending_outlier_metadata_copy.get('child_birth_date')
-            dates = []
-            try:
-                import json
-                dates = json.loads(child_birth_date_str) if isinstance(child_birth_date_str, str) else child_birth_date_str
-                if not isinstance(dates, list): dates = []
-            except Exception:
-                dates = []
-            
-            dialog = MultiChildCheckDialog(dates, self)
-            dialog.exec()
-
-        elif outlier_type == 'contract':
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("구매계약서 이상")
-            msg_box.setText("구매계약서 이상!")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
-
-        elif outlier_type == 'contract_missing':
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("구매계약서 확인 불가")
-            msg_box.setText("구매계약서 확인 불가!")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
-
-        elif outlier_type == 'chobon':
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("초본 이상")
-            msg_box.setText("초본 이상!")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
-
-        elif outlier_type == 'chobon_data_missing':
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("초본 데이터 누락")
-            msg_box.setText("초본 필수 데이터가 누락되었습니다!")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
-
-        elif outlier_type == 'chobon_address_mismatch':
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("초본 주소 불일치")
-            msg_box.setText("초본 주소와 지역이 일치하지 않습니다!")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
-
-        # elif outlier_type == 'chobon_issue_date_outlier':
-        #     msg_box = QMessageBox(self)
-        #     msg_box.setIcon(QMessageBox.Icon.Warning)
-        #     msg_box.setWindowTitle("초본 발행일 이상")
-        #     msg_box.setText("초본 발행일이 31일 이상 경과했습니다!")
-        #     msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        #     msg_box.exec()
-
-        elif outlier_type == 'chobon_missing':
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("초본 없음")
-            msg_box.setText("초본 없음!")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
-
-        # 현재 다이얼로그가 닫힌 후, 다음 큐 아이템을 처리하도록 스케줄링
-        QTimer.singleShot(0, self._process_outlier_queue)
-    
-    def _determine_outlier_type(self, metadata: dict | None) -> list[str]:
-        """
-        메타데이터를 기반으로 이상치 종류를 판단하여 리스트로 반환한다.
-        """
-        if not metadata:
-            return []
-        
-        # 문서 플래그 기반 이상치 검증은 제거되었습니다.
-        return []
-    
     def _on_data_refreshed(self):
         """데이터 새로고침 완료 시 호출되는 슬롯"""
         self._update_refresh_time()

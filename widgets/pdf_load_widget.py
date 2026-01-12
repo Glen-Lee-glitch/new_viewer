@@ -199,7 +199,6 @@ class PdfLoadWidget(QWidget):
                     'recent_thread_id': self._sanitize_text(row.get('recent_thread_id', '')),
                     'urgent': row.get('urgent', 0),
                     'mail_count': row.get('mail_count', 0),
-                    'outlier': self._sanitize_text(row.get('outlier', '')),
                     'original_filepath': self._normalize_file_path(row.get('original_filepath')),
                     'finished_file_path': self._normalize_file_path(row.get('finished_file_path')),
                     'result': self._sanitize_text(row.get('result', '')),

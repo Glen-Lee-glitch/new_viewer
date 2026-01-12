@@ -90,7 +90,6 @@ def _build_subsidy_query_base():
         '  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, '
         '  r.mail_count, '
         '  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, '
-        '  \'\' AS outlier, '
         '  COALESCE(r.status, \'\') AS result '
         'FROM rns r '
         'LEFT JOIN emails e ON r.recent_thread_id = e.thread_id '
@@ -301,7 +300,6 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
             'urgent': 1 if rn_info['is_urgent'] else 0,
             'mail_count': rn_info['mail_count'],
             'all_ai': 1 if rn_info['all_ai'] else 0,
-            'outlier': '',
             'result': rn_info['status']
         }
         return result
@@ -333,7 +331,6 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                     return None
                 
                 result = dict(row)
-                result['outlier'] = '' 
                 return result
 
     except Exception:
