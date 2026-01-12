@@ -924,19 +924,34 @@ class MainWindow(QMainWindow):
 
     def _initialize_work_session(self, pdf_paths: list, metadata: dict, is_preprocessed: bool, rn_value: str, mail_content: str):
         """작업 세션을 초기화하고 문서를 로드하는 공통 로직을 수행한다."""
-        from core.sql_manager import fetch_ev_complement_memo, fetch_gemini_chobon_results
+        from core.sql_manager import (fetch_ev_complement_memo, fetch_gemini_chobon_results, 
+                                     fetch_gemini_corporation_results, fetch_gemini_business_results)
 
         self._pending_basic_info = normalize_basic_info(metadata)
         
-        # 주소 정보 가져오기 (초본 데이터)
+        # 주소 정보 가져오기
         if rn_value:
-            chobon_data = fetch_gemini_chobon_results(rn_value)
-            if chobon_data:
-                addr1 = chobon_data.get('address_1', '') or ''
-                addr2 = chobon_data.get('address_2', '') or ''
-                full_address = f"{addr1} {addr2}".strip()
-                if self._pending_basic_info:
-                    self._pending_basic_info['address'] = full_address
+            # 특이사항에 '법인'이 포함되어 있는지 확인
+            special_note = self._pending_basic_info.get('special_note', '') if self._pending_basic_info else ''
+            is_corporation = '법인' in special_note
+            
+            if is_corporation:
+                # 법인인 경우: 법인주소 사용 (fetch_gemini_corporation_results, fetch_gemini_business_results 사용)
+                corp_data = fetch_gemini_corporation_results(rn_value)
+                biz_data = fetch_gemini_business_results(rn_value)
+                
+                full_address = corp_data.get('법인주소', '') or biz_data.get('법인주소', '')
+                if full_address and self._pending_basic_info:
+                    self._pending_basic_info['address'] = str(full_address).strip()
+            else:
+                # 개인인 경우: 초본 데이터 사용
+                chobon_data = fetch_gemini_chobon_results(rn_value)
+                if chobon_data:
+                    addr1 = chobon_data.get('address_1', '') or ''
+                    addr2 = chobon_data.get('address_2', '') or ''
+                    full_address = f"{addr1} {addr2}".strip()
+                    if self._pending_basic_info:
+                        self._pending_basic_info['address'] = full_address
         
         self.load_document(pdf_paths, is_preprocessed=is_preprocessed)
         
