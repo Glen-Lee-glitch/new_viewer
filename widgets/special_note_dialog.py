@@ -17,11 +17,11 @@ class SpecialNoteDialog(QDialog):
     # Define detailed items as class constants
     MISSING_DOCS_ITEMS = [
         '신청서1p', '신청서2p(동의서)', '계약서1p', '계약서4p', 
-        '초본', '등본', '가족', '지납세', '지세과', '기타'
+        '초본', '등본', '가족', '지납세', '지세과', '직접입력'
     ]
     
     REQ_ITEMS = [
-        '전입일', '중복', '공동명의 거주지 다름', '자녀 생년월일 요건', '청년생애 요건', '기타'
+        '전입일', '중복', '공동명의 거주지 다름', '자녀 생년월일 요건', '청년생애 요건', '직접입력'
     ]
 
     def __init__(self, parent=None):
@@ -235,8 +235,8 @@ class SpecialNoteDialog(QDialog):
             # Place checkbox
             layout.addWidget(cb, row, col)
             
-            # If item is "기타", add a LineEdit (for both missing_docs and req)
-            if item_text == "기타":
+            # If item is "직접입력", add a LineEdit (for both missing_docs and req)
+            if item_text == "직접입력":
                 le = QLineEdit()
                 le.setPlaceholderText("직접 입력")
                 le.setVisible(False) # Initially hidden
@@ -264,7 +264,7 @@ class SpecialNoteDialog(QDialog):
         # Connect all checkboxes (except "기타") to update side panel visibility for missing docs
         if is_missing_docs:
             for item_text in items:
-                if item_text != "기타":
+                if item_text != "직접입력":
                     storage[item_text]['cb'].toggled.connect(self._update_side_panel_visibility)
 
     def _update_extra_widgets_visibility(self):
@@ -282,9 +282,9 @@ class SpecialNoteDialog(QDialog):
 
     def _update_side_panel_visibility(self):
         """Update visibility of the side panel when any 서류미비 checkbox is toggled."""
-        # Check if any checkbox is checked (excluding "기타" which has its own logic)
+        # Check if any checkbox is checked (excluding "직접입력" which has its own logic)
         any_checked = any(
-            widgets['cb'].isChecked() and name != '기타' 
+            widgets['cb'].isChecked() and name != '직접입력' 
             for name, widgets in self.missing_checkboxes.items()
         )
         
@@ -332,10 +332,10 @@ class SpecialNoteDialog(QDialog):
             for name, widgets in self.missing_checkboxes.items():
                 if widgets['cb'].isChecked():
                     any_detail_checked = True
-                    # If 'Other' is checked, ensure text is entered
-                    if name == '기타' and widgets['le']:
+                    # If '직접입력' is checked, ensure text is entered
+                    if name == '직접입력' and widgets['le']:
                          if not widgets['le'].text().strip():
-                             QMessageBox.warning(self, "경고", "서류미비 - '기타' 사유를 입력해주세요.")
+                             QMessageBox.warning(self, "경고", "서류미비 - 상세 사유를 입력해주세요.")
                              widgets['le'].setFocus()
                              return False
             
@@ -349,9 +349,9 @@ class SpecialNoteDialog(QDialog):
             for name, widgets in self.req_checkboxes.items():
                 if widgets['cb'].isChecked():
                     any_detail_checked = True
-                    if name == '기타' and widgets['le']:
+                    if name == '직접입력' and widgets['le']:
                          if not widgets['le'].text().strip():
-                             QMessageBox.warning(self, "경고", "요건 - '기타' 사유를 입력해주세요.")
+                             QMessageBox.warning(self, "경고", "요건 - 상세 사유를 입력해주세요.")
                              widgets['le'].setFocus()
                              return False
             
@@ -362,7 +362,7 @@ class SpecialNoteDialog(QDialog):
         # 4. Check Other (Main) Details
         if is_other_checked:
             if not self.lineEdit_other_detail.toPlainText().strip():
-                QMessageBox.warning(self, "경고", "기타 상세 사유를 입력해주세요.")
+                QMessageBox.warning(self, "경고", "상세 사유를 직접 입력해주세요.")
                 self.lineEdit_other_detail.setFocus()
                 return False
 
@@ -398,11 +398,11 @@ class SpecialNoteDialog(QDialog):
         rn = self.RN_lineEdit.text().strip()
         
         # 사이드 패널 활성화 여부 확인
-        # 서류미비가 체크되어 있고, '기타'를 제외한 상세 항목이 하나라도 체크되어 있어야 함
+        # 서류미비가 체크되어 있고, '직접입력'을 제외한 상세 항목이 하나라도 체크되어 있어야 함
         is_side_panel_active = False
         if self.checkBox_2.isChecked():
             is_side_panel_active = any(
-                widgets['cb'].isChecked() and name != '기타' 
+                widgets['cb'].isChecked() and name != '직접입력' 
                 for name, widgets in self.missing_checkboxes.items()
             )
         
@@ -443,13 +443,13 @@ class SpecialNoteDialog(QDialog):
                 cb = widgets['cb']
                 le = widgets['le']
                 if cb.isChecked():
-                    if name == '기타' and le:
+                    if name == '직접입력' and le:
                         detail = le.text().strip()
                         if detail:
-                            # Use input text directly instead of "기타(text)"
+                            # Use input text directly instead of "직접입력(text)"
                             data['missing'].append(detail)
                         else:
-                             data['missing'].append("기타(내용없음)")
+                             data['missing'].append("직접입력(내용없음)")
                     else:
                         data['missing'].append(name)
 
@@ -459,23 +459,23 @@ class SpecialNoteDialog(QDialog):
                 cb = widgets['cb']
                 le = widgets['le']
                 if cb.isChecked():
-                    if name == '기타' and le:
+                    if name == '직접입력' and le:
                         detail = le.text().strip()
                         if detail:
-                            # Use input text directly instead of "기타(text)"
+                            # Use input text directly instead of "직접입력(text)"
                             data['requirements'].append(detail)
                         else:
-                             data['requirements'].append("기타(내용없음)")
+                             data['requirements'].append("직접입력(내용없음)")
                     else:
                         data['requirements'].append(name)
         
-        # 3. Other (기타 - 대분류)
+        # 3. Other (직접입력 - 대분류)
         if self.checkBox_3.isChecked():
              text = self.lineEdit_other_detail.toPlainText().strip()
              if text:
                  data['other'] = text
              else:
-                 data['other'] = "기타(내용없음)"
+                 data['other'] = "직접입력(내용없음)"
         
         return data
 

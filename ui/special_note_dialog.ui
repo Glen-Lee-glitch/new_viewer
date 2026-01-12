@@ -90,7 +90,7 @@
         <item>
          <widget class="QCheckBox" name="checkBox_3">
           <property name="text">
-           <string>기타</string>
+           <string>직접입력</string>
           </property>
          </widget>
         </item>
@@ -150,7 +150,7 @@
               <string>color: gray;</string>
              </property>
              <property name="text">
-              <string>↳ 기타 상세:</string>
+              <string>↳ 상세 내용:</string>
              </property>
             </widget>
            </item>
@@ -191,7 +191,7 @@
             </size>
            </property>
            <property name="placeholderText">
-            <string>기타 사유를 직접 입력하세요...</string>
+            <string>상세 내용을 직접 입력하세요...</string>
            </property>
           </widget>
          </item>
