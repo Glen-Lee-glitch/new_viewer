@@ -101,7 +101,7 @@ def get_email_details(conn, thread_id):
         print(f"❌ Error getting email details for thread {thread_id}: {e}", flush=True)
         return None
 
-def update_status_both_tables(conn, rn, status):
+def update_status_both_tables(conn, rn, status, apply_num=None):
     """
     rns 테이블과 ev_rns 테이블의 status 값을 모두 업데이트합니다.
     """
@@ -112,8 +112,12 @@ def update_status_both_tables(conn, rn, status):
             cursor.execute(sql_rns, (status, rn))
             
             # ev_rns 테이블 업데이트 (데이터가 있을 때만 업데이트됨)
-            sql_ev_rns = "UPDATE ev_rns SET status = %s WHERE rn = %s"
-            cursor.execute(sql_ev_rns, (status, rn))
+            if apply_num is not None:
+                sql_ev_rns = "UPDATE ev_rns SET status = %s WHERE rn = %s AND apply_num = %s"
+                cursor.execute(sql_ev_rns, (status, rn, apply_num))
+            else:
+                sql_ev_rns = "UPDATE ev_rns SET status = %s WHERE rn = %s"
+                cursor.execute(sql_ev_rns, (status, rn))
             
             conn.commit()
             print(f"✅ DB Update Successful - RN: {rn}, Status: {status}", flush=True)
@@ -193,12 +197,26 @@ def send_reply_all_email(service, email_info, rn, apply_num, special_items=None,
     if status == '중복메일확인' or status == 'EV보완 완료':
         message_text = "처리 완료하였습니다."
     else:
+        # 동일한 RN으로 '취소' 상태인 행이 있는지 확인
+        is_reapplication = False
+        try:
+            conn = get_db_connection() # 매번 연결하는 것은 비효율적일 수 있으나 현재 구조 유지
+            with conn.cursor() as cursor:
+                check_sql = "SELECT EXISTS(SELECT 1 FROM ev_rns WHERE rn = %s AND status = '취소')"
+                cursor.execute(check_sql, (rn,))
+                is_reapplication = cursor.fetchone()[0]
+            conn.close()
+        except Exception as e:
+            print(f"⚠️ Error checking reapplication status for RN {rn}: {e}")
+
+        suffix = "재신청완료입니다." if is_reapplication else "신청완료입니다."
+
         if special_items and len(special_items) > 0:
             valid_items = [str(item) for item in special_items if item]
             special_text = "/".join(valid_items)
-            message_text = f"#{apply_num} {special_text} 신청완료입니다."
+            message_text = f"#{apply_num} {special_text} {suffix}"
         else:
-            message_text = f"#{apply_num} 신청완료입니다."
+            message_text = f"#{apply_num} {suffix}"
     
     sent_message = send_gmail_reply(service, email_info, message_text)
     if sent_message:
@@ -291,7 +309,7 @@ def process_replies_queue(service, conn):
         sent_msg = send_gmail_reply(service, email_info, content)
         if sent_msg:
             update_reply_status(conn, reply_id)
-            # RN 상태를 '첨부파일 누락'으로 업데이트
+            # RN 상태를 '첨부파일 누락'으로 업데이트 (replies 큐에서는 apply_num 정보가 없으므로 일단 rn으로만 수행)
             update_status_both_tables(conn, rn, '첨부파일 누락')
             print("⏳ Waiting 2 seconds before next reply...", flush=True)
             time.sleep(2)
@@ -317,7 +335,7 @@ def process_single_application(service, conn, rn, apply_num, special_items=None,
     sent_msg = send_reply_all_email(service, email_info, rn, apply_num, special_items, status)
     
     if sent_msg:
-        update_status_both_tables(conn, rn, '처리완료')
+        update_status_both_tables(conn, rn, '처리완료', apply_num)
 
 def main():
     try:
