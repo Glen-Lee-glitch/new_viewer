@@ -164,7 +164,20 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="lineEdit_special"/>
+          <widget class="QLineEdit" name="lineEdit_special"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_edit_special">
+           <property name="maximumSize">
+            <size>
+             <width>60</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>수정</string>
+           </property>
+          </widget>
         </item>
        </layout>
       </item>

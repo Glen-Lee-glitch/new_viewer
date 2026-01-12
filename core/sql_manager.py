@@ -2764,6 +2764,31 @@ def update_rn_region(rn: str, new_region: str) -> bool:
         traceback.print_exc()
         return False
 
+def update_rn_special(rn: str, special_list: list[str]) -> bool:
+    """
+    rns 테이블에서 해당 RN의 special(특이사항) 배열을 업데이트한다. (PostgreSQL 버전)
+    
+    Args:
+        rn: RN 번호
+        special_list: 변경할 특이사항 리스트
+        
+    Returns:
+        업데이트 성공 여부
+    """
+    if not rn:
+        return False
+        
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            query = "UPDATE rns SET special = %s WHERE \"RN\" = %s"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (special_list, rn))
+                connection.commit()
+                return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
 def fetch_today_email_count() -> int:
     """
     금일 수신된 이메일(emails 테이블 기준)의 총 개수를 조회한다. (PostgreSQL 버전)

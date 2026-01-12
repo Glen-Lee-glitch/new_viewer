@@ -3,8 +3,8 @@ import json
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from PyQt6 import uic
-from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox, QTextEdit, QVBoxLayout, QDialog, QLabel, QPushButton, QHBoxLayout, QLineEdit, QDialogButtonBox
-from PyQt6.QtCore import pyqtSignal, QTimer
+from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox, QTextEdit, QVBoxLayout, QDialog, QLabel, QPushButton, QHBoxLayout, QLineEdit, QDialogButtonBox, QScrollArea
+from PyQt6.QtCore import pyqtSignal, QTimer, Qt
 
 class RegionEditDialog(QDialog):
     """지역 수정을 위한 다이얼로그"""
@@ -36,6 +36,91 @@ class RegionEditDialog(QDialog):
         
     def get_new_region(self) -> str:
         return self.new_region_edit.text().strip()
+
+class SpecialEditDialog(QDialog):
+    """특이사항 수정을 위한 다이얼로그 (행 기반)"""
+    def __init__(self, current_special: list[str], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("특이사항 수정")
+        self.setFixedWidth(400)
+        self.setMinimumHeight(300)
+        
+        self.layout = QVBoxLayout(self)
+        
+        # 안내 문구
+        self.layout.addWidget(QLabel("특이사항 항목 (한 행에 하나씩 입력하세요):"))
+        
+        # 스크롤 영역 (항목이 많아질 경우 대비)
+        from PyQt6.QtWidgets import QScrollArea
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_content = QWidget()
+        self.items_layout = QVBoxLayout(self.scroll_content)
+        self.items_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.scroll_area.setWidget(self.scroll_content)
+        self.layout.addWidget(self.scroll_area)
+        
+        self.row_widgets = []
+        
+        # 기존 항목 추가
+        if current_special:
+            for item in current_special:
+                self._add_row(item)
+        else:
+            # 항목이 하나도 없으면 빈 항목 하나 추가
+            self._add_row("")
+            
+        # 추가 버튼
+        self.add_btn = QPushButton("+ 항목 추가")
+        self.add_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+        self.add_btn.clicked.connect(lambda: self._add_row(""))
+        self.layout.addWidget(self.add_btn)
+        
+        # 버튼 박스
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        self.layout.addWidget(button_box)
+        
+    def _add_row(self, text: str):
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 2, 0, 2)
+        
+        line_edit = QLineEdit(text)
+        line_edit.setPlaceholderText("특이사항 입력")
+        row_layout.addWidget(line_edit)
+        
+        del_btn = QPushButton("삭제")
+        del_btn.setFixedWidth(40)
+        del_btn.setStyleSheet("background-color: #f44336; color: white;")
+        del_btn.clicked.connect(lambda: self._remove_row(row_widget))
+        row_layout.addWidget(del_btn)
+        
+        self.items_layout.addWidget(row_widget)
+        self.row_widgets.append((row_widget, line_edit))
+        
+    def _remove_row(self, widget):
+        if len(self.row_widgets) <= 1:
+            # 최소 하나는 남겨둠 (또는 그냥 삭제 허용)
+            # return
+            pass
+            
+        for i, (w, _) in enumerate(self.row_widgets):
+            if w == widget:
+                self.items_layout.removeWidget(w)
+                w.deleteLater()
+                self.row_widgets.pop(i)
+                break
+                
+    def get_special_list(self) -> list[str]:
+        special_list = []
+        for _, line_edit in self.row_widgets:
+            text = line_edit.text().strip()
+            if text:
+                special_list.append(text)
+        return special_list
+
 
 class InfoPanelWidget(QWidget):
     """PDF 파일 및 페이지 정보를 표시하는 위젯"""
@@ -82,9 +167,16 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'pushButton_edit_region'):
             self.pushButton_edit_region.clicked.connect(self._on_edit_region_clicked)
 
-        # 지역 입력 필드를 읽기 전용으로 설정
+        # 특이사항 수정 버튼 연결
+        if hasattr(self, 'pushButton_edit_special'):
+            self.pushButton_edit_special.clicked.connect(self._on_edit_special_clicked)
+
+        # 입력 필드를 읽기 전용으로 설정
         if hasattr(self, 'lineEdit_region'):
             self.lineEdit_region.setReadOnly(True)
+            
+        if hasattr(self, 'lineEdit_special'):
+            self.lineEdit_special.setReadOnly(True)
 
 
 
@@ -185,6 +277,31 @@ class InfoPanelWidget(QWidget):
                 QMessageBox.information(self, "성공", "지역 정보가 수정되었습니다.")
             else:
                 QMessageBox.critical(self, "오류", "지역 정보 수정에 실패했습니다.")
+
+    def _on_edit_special_clicked(self):
+        """특이사항 수정 버튼 클릭 시 처리"""
+        if not self._current_rn:
+            QMessageBox.warning(self, "경고", "RN 정보가 없습니다.")
+            return
+
+        # 현재 특이사항 리스트 가져오기
+        current_text = self.lineEdit_special.text()
+        # 콤마로 구분된 문자열을 리스트로 변환 (빈 문자열 처리)
+        current_list = [s.strip() for s in current_text.split(',')] if current_text else []
+        
+        dialog = SpecialEditDialog(current_list, self)
+        
+        if dialog.exec():
+            new_list = dialog.get_special_list()
+            
+            # DB 업데이트
+            from core.sql_manager import update_rn_special
+            if update_rn_special(self._current_rn, new_list):
+                # UI 업데이트 (리스트를 콤마로 구분된 문자열로)
+                self.lineEdit_special.setText(", ".join(new_list))
+                QMessageBox.information(self, "성공", "특이사항 정보가 수정되었습니다.")
+            else:
+                QMessageBox.critical(self, "오류", "특이사항 정보 수정에 실패했습니다.")
 
     def showEvent(self, event):
         """위젯이 보여질 때 타이머 시작"""
