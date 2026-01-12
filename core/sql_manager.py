@@ -1322,6 +1322,39 @@ def get_chained_emails_file_path_by_thread_id(thread_id: str) -> str | None:
         traceback.print_exc()
         return None
 
+def fetch_email_history_by_thread_id(thread_id: str) -> list[str]:
+    """
+    thread_id를 기준으로 emails 테이블(원본)과 chained_emails 테이블(추가)의 모든 본문을 
+    시간순(오름차순)으로 조회한다.
+    
+    Args:
+        thread_id: 조회할 thread_id
+        
+    Returns:
+        메일본문 리스트
+    """
+    if not thread_id:
+        return []
+        
+    try:
+        with closing(psycopg2.connect(**DB_CONFIG)) as connection:
+            # UNION ALL을 사용하여 원본 메일과 추가 메일을 합침
+            # emails.original_received_date와 chained_emails.received_date를 정렬 기준으로 사용
+            query = """
+                SELECT content, original_received_date as received_date FROM emails WHERE thread_id = %s
+                UNION ALL
+                SELECT content, received_date FROM chained_emails WHERE thread_id = %s
+                ORDER BY received_date ASC
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query, (thread_id, thread_id))
+                rows = cursor.fetchall()
+                # None이 아닌 content만 추출하여 리스트로 반환
+                return [row[0] for row in rows if row[0]]
+    except Exception:
+        traceback.print_exc()
+        return []
+
 def insert_reply_email(
     thread_id: str | None,
     rn: str,

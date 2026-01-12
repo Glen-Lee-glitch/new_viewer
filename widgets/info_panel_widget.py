@@ -141,6 +141,10 @@ class InfoPanelWidget(QWidget):
         
         # 현재 로그인한 작업자 정보
         self._worker_id: int | None = None
+        
+        # 이메일 히스토리 관련 변수
+        self._email_history: list[str] = []
+        self._current_history_index: int = 0
 
         # 자동 새로고침 타이머 설정 (20초)
         self._refresh_timer = QTimer(self)
@@ -334,7 +338,6 @@ class InfoPanelWidget(QWidget):
         if not layout:
             return
 
-        # 내용 표시용 QTextEdit가 없으면 생성하여 layout에 추가하고 숨겨둠.
         if not hasattr(self, '_info_display_text_edit'):
             self._info_display_text_edit = QTextEdit()
             self._info_display_text_edit.setReadOnly(True)
@@ -345,14 +348,48 @@ class InfoPanelWidget(QWidget):
             self._info_display_text_edit.setFont(font)
             layout.addWidget(self._info_display_text_edit)
             
+        # 히스토리 네비게이션 레이아웃 생성
+        if not hasattr(self, '_history_nav_widget'):
+            self._history_nav_widget = QWidget()
+            nav_layout = QHBoxLayout(self._history_nav_widget)
+            nav_layout.setContentsMargins(0, 0, 0, 0)
+            
+            self._prev_btn = QPushButton("<")
+            self._prev_btn.setFixedWidth(40)
+            self._next_btn = QPushButton(">")
+            self._next_btn.setFixedWidth(40)
+            self._page_label = QLabel("0 / 0")
+            self._page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            nav_layout.addWidget(self._prev_btn)
+            nav_layout.addWidget(self._page_label)
+            nav_layout.addWidget(self._next_btn)
+            
+            layout.addWidget(self._history_nav_widget)
+            self._history_nav_widget.setVisible(False)
+            
+            self._prev_btn.clicked.connect(self._on_prev_history)
+            self._next_btn.clicked.connect(self._on_next_history)
+            
         if mode in ['ev', 'ce', 'checked']:
             # 기존 체크박스들 숨기기
             self._set_task_list_visible(False)
             
-            # 텍스트 에디트 보이기 및 내용 설정
-            processed_content = content.replace('\\n', '\n')
-            self._info_display_text_edit.setText(processed_content)
+            # 히스토리 데이터 설정
+            if isinstance(content, list):
+                self._email_history = content
+            else:
+                self._email_history = [content] if content else []
+            
+            self._current_history_index = 0
+            
+            # 텍스트 에디트 보이기 및 네비게이션 업데이트
+            self._update_history_display()
             self._info_display_text_edit.setVisible(True)
+            
+            # 네비게이션 위젯 노출 여부 (EV 모드가 아니고 데이터가 있을 때)
+            show_nav = (mode != 'ev' and len(self._email_history) > 1)
+            self._history_nav_widget.setVisible(show_nav)
             
             # 타이틀 변경
             if mode == 'ev':
@@ -360,9 +397,12 @@ class InfoPanelWidget(QWidget):
             else:
                 self.groupBox_2.setTitle("확인 요청 내용")
         else:
-            # 텍스트 에디트 숨기기
+            # 텍스트 에디트 및 네비게이션 숨기기
             self._info_display_text_edit.setVisible(False)
             self._info_display_text_edit.clear()
+            if hasattr(self, '_history_nav_widget'):
+                self._history_nav_widget.setVisible(False)
+            
             # 기존 체크박스들 보이기
             self._set_task_list_visible(True)
             self.groupBox_2.setTitle("작업 리스트")
@@ -465,6 +505,33 @@ class InfoPanelWidget(QWidget):
                 else:
                     print(f"보조금 정보 없음 (지역: {region}, 모델: {model})")
                     self.text_edit.setText("보조금 정보 없음")
+
+    def _update_history_display(self):
+        """현재 인덱스에 해당하는 이메일 내용을 표시하고 페이지 라벨을 업데이트한다."""
+        if not self._email_history:
+            self._info_display_text_edit.clear()
+            self._page_label.setText("0 / 0")
+            return
+            
+        content = self._email_history[self._current_history_index]
+        processed_content = content.replace('\\\\n', '\\n').replace('\\n', '\n')
+        self._info_display_text_edit.setText(processed_content)
+        
+        total = len(self._email_history)
+        current = self._current_history_index + 1
+        self._page_label.setText(f"{current} / {total}")
+        
+    def _on_prev_history(self):
+        """이전 히스토리로 이동"""
+        if self._current_history_index > 0:
+            self._current_history_index -= 1
+            self._update_history_display()
+            
+    def _on_next_history(self):
+        """다음 히스토리로 이동"""
+        if self._current_history_index < len(self._email_history) - 1:
+            self._current_history_index += 1
+            self._update_history_display()
 
     def clear_info(self):
         """정보 패널 초기화"""

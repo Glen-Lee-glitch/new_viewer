@@ -951,15 +951,20 @@ class MainWindow(QMainWindow):
                 self._info_panel.set_display_mode('ev', ev_memo if ev_memo else "")
                 self._pdf_view_widget.set_ev_complement_mode(True)
             elif is_ce or is_checked:
-                # CE 또는 확인필요 모드일 경우 메일 본문을 표시
-                from core.sql_manager import get_chained_emails_content_by_thread_id
-                chain_content = get_chained_emails_content_by_thread_id(metadata.get('recent_thread_id'))
+                # CE 또는 확인필요 모드일 경우 전체 메일 히스토리를 표시
+                from core.sql_manager import fetch_email_history_by_thread_id
                 
-                # 표시할 텍스트 결정 (추가 메일 내용 우선, 없으면 기본 메일 내용)
-                display_content = chain_content if chain_content else mail_content
+                thread_id = metadata.get('recent_thread_id')
+                email_history = []
+                if thread_id:
+                    email_history = fetch_email_history_by_thread_id(thread_id)
+                
+                # 히스토리가 비어있으면 기본 메일 내용이라도 사용 시도
+                if not email_history and mail_content:
+                    email_history = [mail_content]
                 
                 mode = 'ce' if is_ce else 'checked'
-                self._info_panel.set_display_mode(mode, display_content if display_content else "수신된 메일 본문이 없습니다.")
+                self._info_panel.set_display_mode(mode, email_history if email_history else "수신된 메일 본문이 없습니다.")
                 self._pdf_view_widget.set_ev_complement_mode(False)
             else:
                 self._info_panel.set_display_mode('normal')
