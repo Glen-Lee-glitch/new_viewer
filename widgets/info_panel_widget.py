@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtWidgets import QWidget, QMessageBox, QCheckBox, QTextEdit, QVBoxLayout, QDialog, QLabel, QPushButton, QHBoxLayout, QLineEdit, QDialogButtonBox
-from PyQt6.QtCore import pyqtSignal, QTimer, QEvent, Qt
+from PyQt6.QtCore import pyqtSignal, QTimer
 
 class RegionEditDialog(QDialog):
     """지역 수정을 위한 다이얼로그"""
@@ -78,18 +78,15 @@ class InfoPanelWidget(QWidget):
         if hasattr(self, 'pushButton_needs_check'):
             self.pushButton_needs_check.clicked.connect(self._on_needs_check_clicked)
 
-        # 지역 입력 필드 더블클릭 이벤트 필터 설치
+        # 지역 수정 버튼 연결
+        if hasattr(self, 'pushButton_edit_region'):
+            self.pushButton_edit_region.clicked.connect(self._on_edit_region_clicked)
+
+        # 지역 입력 필드를 읽기 전용으로 설정
         if hasattr(self, 'lineEdit_region'):
-            self.lineEdit_region.installEventFilter(self)
-            # 읽기 전용으로 설정하여 사용자가 직접 수정하는 것처럼 보이지 않게 함 (더블클릭 유도)
             self.lineEdit_region.setReadOnly(True)
 
-    def eventFilter(self, source, event):
-        """이벤트 필터 처리"""
-        if source == self.lineEdit_region and event.type() == QEvent.Type.MouseButtonDblClick:
-            self._on_region_double_clicked()
-            return True
-        return super().eventFilter(source, event)
+
 
     def _on_save_memo_clicked(self):
         """메모 저장 버튼 클릭 시 처리"""
@@ -163,8 +160,8 @@ class InfoPanelWidget(QWidget):
         # 필요한 경우 스크롤을 맨 위로
         self.listWidget_memos.scrollToTop()
 
-    def _on_region_double_clicked(self):
-        """지역 입력 필드 더블클릭 시 처리"""
+    def _on_edit_region_clicked(self):
+        """지역 수정 버튼 클릭 시 처리"""
         if not self._current_rn:
             QMessageBox.warning(self, "경고", "RN 정보가 없습니다.")
             return

@@ -139,6 +139,19 @@
         <item>
          <widget class="QLineEdit" name="lineEdit_region"/>
         </item>
+        <item>
+         <widget class="QPushButton" name="pushButton_edit_region">
+          <property name="maximumSize">
+           <size>
+            <width>40</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>수정</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
       <item>
