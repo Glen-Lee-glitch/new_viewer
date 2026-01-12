@@ -15,7 +15,7 @@ from contextlib import closing
 warnings.filterwarnings('ignore', message='pandas only supports SQLAlchemy', category=UserWarning)
 
 FETCH_EMAILS_COLUMNS = ['title', 'received_date', 'from_email_address', 'content']
-FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id', 'file_rendered']
+FETCH_SUBSIDY_COLUMNS = ['RN', 'region', 'worker', 'name', 'special_note', 'file_status', 'original_filepath', 'recent_thread_id']
 
 def claim_subsidy_work(rn: str, worker_id: int) -> bool:
     """
@@ -87,7 +87,6 @@ def _build_subsidy_query_base():
         '  r.file_path AS finished_file_path, '
         '  e.original_pdf_path AS original_filepath, '
         '  r.recent_thread_id, '
-        '  0 AS file_rendered, '
         '  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, '
         '  r.mail_count, '
         '  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, '
@@ -189,7 +188,6 @@ def fetch_subsidy_applications(
                 'finished_file_path': r['file_path'],
                 'original_filepath': email.get('original_pdf_path'),
                 'recent_thread_id': r['recent_thread_id'],
-                'file_rendered': 0,
                 'urgent': 1 if r['is_urgent'] else 0,
                 'mail_count': r['mail_count'],
                 'all_ai': 1 if r['all_ai'] else 0,
@@ -300,7 +298,6 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
             'finished_file_path': rn_info['file_path'],
             'original_filepath': email.get('original_pdf_path'),
             'recent_thread_id': rn_info['recent_thread_id'],
-            'file_rendered': 0,
             'urgent': 1 if rn_info['is_urgent'] else 0,
             'mail_count': rn_info['mail_count'],
             'all_ai': 1 if rn_info['all_ai'] else 0,
@@ -318,7 +315,6 @@ def fetch_application_data_by_rn(rn: str) -> dict | None:
                 "  r.file_path AS finished_file_path, "
                 "  e.original_pdf_path AS original_filepath, "
                 "  r.recent_thread_id, "
-                "  0 AS file_rendered, "
                 "  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, "
                 "  r.mail_count, "
                 "  CASE WHEN r.all_ai THEN 1 ELSE 0 END AS all_ai, "

@@ -197,7 +197,6 @@ class PdfLoadWidget(QWidget):
                     'worker': self._sanitize_text(row.get('worker', '')),
                     'special_note': self._sanitize_text(row.get('special_note', '')),
                     'recent_thread_id': self._sanitize_text(row.get('recent_thread_id', '')),
-                    'file_rendered': row.get('file_rendered', 0),
                     'urgent': row.get('urgent', 0),
                     'mail_count': row.get('mail_count', 0),
                     'outlier': self._sanitize_text(row.get('outlier', '')),
