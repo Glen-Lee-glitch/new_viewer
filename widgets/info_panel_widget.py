@@ -136,6 +136,8 @@ class InfoPanelWidget(QWidget):
         self._current_rn: str = "" # 현재 표시 중인 RN 저장
         self._initial_error_items = set() # 최초 로드된 에러 항목 저장 (비교용)
         self._is_ev_complement_mode = False # EV 보완 모드 여부
+        self._is_ce_mode = False # CE 요청 모드 여부
+        self._is_checked_mode = False # 확인필요 모드 여부
         
         # 현재 로그인한 작업자 정보
         self._worker_id: int | None = None
@@ -323,6 +325,7 @@ class InfoPanelWidget(QWidget):
         """
         self._is_ev_complement_mode = (mode == 'ev')
         self._is_ce_mode = (mode == 'ce')
+        self._is_checked_mode = (mode == 'checked')
         
         if not hasattr(self, 'groupBox_2'):
             return
@@ -342,7 +345,7 @@ class InfoPanelWidget(QWidget):
             self._info_display_text_edit.setFont(font)
             layout.addWidget(self._info_display_text_edit)
             
-        if mode in ['ev', 'ce']:
+        if mode in ['ev', 'ce', 'checked']:
             # 기존 체크박스들 숨기기
             self._set_task_list_visible(False)
             
@@ -538,10 +541,8 @@ class InfoPanelWidget(QWidget):
             
         self._current_rn = rn  # RN 업데이트 보장
 
-        # EV 보완 모드일 경우 작업 리스트(체크박스) 업데이트를 건너뜀
-        if self._is_ev_complement_mode:
-            # 단, 내부 데이터 처리를 위해 필요한 경우 로직 분리 가능
-            # 현재는 UI 표시가 주 목적이므로 리턴
+        # EV 보완 / CE / 확인필요 모드일 경우 작업 리스트(체크박스) 업데이트를 건너뜀
+        if self._is_ev_complement_mode or self._is_ce_mode or self._is_checked_mode:
             return
 
         # 현재 체크된 상태 저장

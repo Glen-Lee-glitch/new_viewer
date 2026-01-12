@@ -94,6 +94,7 @@ class MainWindow(QMainWindow):
         # 작업 관련 변수
         self._current_rn = ""
         self._is_ce_work = False
+        self._is_checked_work = False
         self._special_note_dialog = None  # 비모달 다이얼로그 인스턴스 유지용
         self._pending_open_file_after_save = False
 
@@ -682,23 +683,22 @@ class MainWindow(QMainWindow):
             self.menu_additional_documents.menuAction().setEnabled(False)
         self.load_document(pdf_paths)
 
-    def _handle_alarm_rn_clicked(self, rn: str, is_ev: bool = False, is_ce: bool = False):
-        """알람 위젯에서 RN 버튼 클릭 시 호출되는 핸들러.
-        
-        RN의 rns.file_path와 chained_emails.chained_file_path를 병합하여 작업을 시작한다.
-        중복 메일(duplicated_rn)이 있는 경우 해당 파일들과 rns 파일을 병합한다.
-        """
+    def _handle_alarm_rn_clicked(self, rn: str, is_ev: bool = False, is_ce: bool = False, is_checked: bool = False):
+        """알람 위젯에서 RN 버튼 클릭 시 호출되는 핸들러."""
         if not rn:
             return
         
-        # EV 보완 작업 플래그 설정
+        # 작업 플래그 설정
         self._is_ev_complement_work = is_ev
         self._is_ce_work = is_ce
+        self._is_checked_work = is_checked
         
         if is_ev:
             print(f"[MainWindow] EV 보완 작업 모드로 시작 (RN: {rn})")
         if is_ce:
             print(f"[MainWindow] CE(Chained Emails) 작업 모드로 시작 (RN: {rn})")
+        if is_checked:
+            print(f"[MainWindow] 확인필요 작업 모드로 시작 (RN: {rn})")
         
         from core.sql_manager import (
             get_recent_thread_id_by_rn, 
@@ -945,13 +945,21 @@ class MainWindow(QMainWindow):
             ev_memo = fetch_ev_complement_memo(rn_value)
             is_ev = self._is_ev_complement_work or (ev_memo is not None)
             is_ce = getattr(self, '_is_ce_work', False)
+            is_checked = getattr(self, '_is_checked_work', False)
             
             if is_ev:
                 self._info_panel.set_display_mode('ev', ev_memo if ev_memo else "")
                 self._pdf_view_widget.set_ev_complement_mode(True)
-            elif is_ce:
-                # CE 모드일 경우 메일 본문을 표시
-                self._info_panel.set_display_mode('ce', mail_content if mail_content else "수신된 메일 본문이 없습니다.")
+            elif is_ce or is_checked:
+                # CE 또는 확인필요 모드일 경우 메일 본문을 표시
+                from core.sql_manager import get_chained_emails_content_by_thread_id
+                chain_content = get_chained_emails_content_by_thread_id(metadata.get('recent_thread_id'))
+                
+                # 표시할 텍스트 결정 (추가 메일 내용 우선, 없으면 기본 메일 내용)
+                display_content = chain_content if chain_content else mail_content
+                
+                mode = 'ce' if is_ce else 'checked'
+                self._info_panel.set_display_mode(mode, display_content if display_content else "수신된 메일 본문이 없습니다.")
                 self._pdf_view_widget.set_ev_complement_mode(False)
             else:
                 self._info_panel.set_display_mode('normal')
@@ -1116,6 +1124,7 @@ class MainWindow(QMainWindow):
             self._is_alarm_rn_work = False
             self._is_ev_complement_work = False # EV 플래그 리셋
             self._is_ce_work = False # CE 플래그 리셋
+            self._is_checked_work = False # 확인필요 플래그 리셋
             print("[알람 위젯 작업 플래그] 저장 완료 후 초기화됨")
         
         # 지급 테이블 작업이었다면 플래그 리셋
@@ -1158,6 +1167,7 @@ class MainWindow(QMainWindow):
         self._is_context_menu_work = False  # 컨텍스트 메뉴 작업 플래그 리셋
         self._is_alarm_rn_work = False  # 알람 위젯 작업 플래그 리셋
         self._is_ce_work = False  # CE 플래그 리셋
+        self._is_checked_work = False  # 확인필요 플래그 리셋
         self._pending_outlier_check = False  # 이상치 체크 플래그 리셋
         self._pending_outlier_metadata = None  # 이상치 메타데이터 리셋
         self._pdf_view_widget.set_current_rn("") # PdfViewWidget의 RN도 초기화
