@@ -89,10 +89,6 @@ def _build_subsidy_query_base():
         '  e.original_pdf_path AS original_filepath, '
         '  r.recent_thread_id, '
         '  0 AS file_rendered, '
-        '  CASE WHEN a."구매계약서" IS NOT NULL THEN 1 ELSE 0 END AS "구매계약서", '
-        '  CASE WHEN a."초본" IS NOT NULL THEN 1 ELSE 0 END AS "초본", '
-        '  CASE WHEN a."초본"->\'second_person\' IS NOT NULL OR \'공동명의\' = ANY(r.special) THEN 1 ELSE 0 END AS "공동명의", '
-        '  CASE WHEN a."다자녀" IS NOT NULL OR \'다자녀\' = ANY(r.special) THEN 1 ELSE 0 END AS "다자녀", '
         '  CASE WHEN r.is_urgent THEN 1 ELSE 0 END AS urgent, '
         '  r.mail_count, '
         '  a."다자녀"->\'child_birth_date\' AS child_birth_date, '
@@ -175,7 +171,7 @@ def fetch_today_unfinished_subsidy_applications() -> pd.DataFrame:
 
 def fetch_subsidy_applications(
     worker_id: int = None,
-    filter_type: str = 'all',  # 'all', 'mine', 'unfinished', 'uncompleted'
+    filter_type: str = 'all',
     start_date: str = '2025-01-01 00:00:00',
     end_date: str = None,
     show_only_deferred: bool = False,
@@ -210,7 +206,6 @@ def fetch_subsidy_applications(
                 'original_filepath': email.get('original_pdf_path'),
                 'recent_thread_id': r['recent_thread_id'],
                 'file_rendered': 0,
-                '구매계약서': 0, '초본': 0, '공동명의': 0, '다자녀': 0,
                 'urgent': 1 if r['is_urgent'] else 0,
                 'mail_count': r['mail_count'],
                 'all_ai': 1 if r['all_ai'] else 0,
